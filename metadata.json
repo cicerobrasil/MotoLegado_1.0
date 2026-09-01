@@ -1,0 +1,6 @@
+{
+  "name": "MotoLegado",
+  "description": "SaaS platform for motorcyclists to manage routes, organize trips, and connect with the community.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
