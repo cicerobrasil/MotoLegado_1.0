@@ -15,7 +15,6 @@ import {
   Phone, 
   Check, 
   ExternalLink,
-  ChevronRight,
   ShieldAlert,
   Compass,
   GraduationCap,
@@ -24,11 +23,7 @@ import {
   Eye,
   UserCheck,
   MessageSquare,
-  Send,
-  Heart,
-  Users,
   Star,
-  Clock,
   ShieldCheck,
   Globe
 } from 'lucide-react';
@@ -79,177 +74,6 @@ export interface Partner {
   posts?: PartnerPost[];
   status?: 'aprovado' | 'pendente' | 'rejeitado';
 }
-
-const DEFAULT_PARTNERS: Partner[] = [
-  {
-    id: "p1",
-    name: "Aço & Fogo Themed Bar",
-    category: "Bar e Point",
-    location: "Curitiba, PR - Rodovia do Xisto, KM 12",
-    mapUrl: "https://maps.google.com/?q=Rodovia+do+Xisto+Curitiba",
-    discount: "10% de Desconto na conta total + Chopp Duplo para pilotos com Brasão",
-    news: "Neste sábado teremos banda tributo ao Iron Maiden ao vivo a partir das 20:00!",
-    image: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&q=80&w=600",
-    corporateContact: "Atendimento & Reservas",
-    phone: "(41) 3333-5544",
-    whatsapp: "(41) 98877-6655",
-    website: "https://acofegobar.com.br",
-    rating: 4.9,
-    highlight: true,
-    responsible: {
-      name: "Carlos 'Trovoada' Silva",
-      avatar: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=200",
-      phone: "(41) 98877-6655",
-      whatsapp: "(41) 98877-6655"
-    },
-    posts: [
-      {
-        id: "m101",
-        author: {
-          name: "Carlos 'Trovoada' Silva",
-          photo: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=200",
-          role: "Proprietário & Capitão",
-          isOwner: true
-        },
-        type: "announcement",
-        content: "🚨 Bate-fica do final de semana confirmado! Apresente o brasão ou perfil cadastrado no app para ativar o Chopp duplo e 10% OFF no consumo.",
-        timestamp: "Hoje às 10:30",
-        likes: 34
-      },
-      {
-        id: "m102",
-        author: {
-          name: "Marcos 'Ninja'",
-          photo: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&q=80&w=200",
-          role: "Membro Convidado"
-        },
-        type: "checkin",
-        content: "Point excelente para reunir a irmandade de Curitiba! Atendimento rápido, ambiente seguro e estacionamento monitorado para as motos.",
-        timestamp: "Ontem às 20:15",
-        likes: 19
-      }
-    ]
-  },
-  {
-    id: "p2",
-    name: "Overdrive Custom Motorcycles",
-    category: "Oficina",
-    location: "São Paulo, SP - Av. Europa, 1420",
-    mapUrl: "https://maps.google.com/?q=Av.+Europa+1420+Sao+Paulo",
-    discount: "Alinhamento e balanceamento grátis na troca de pneus Metzeler",
-    news: "Chegou o novo lote de escapamentos esportivos pretos foscos Vance & Hines.",
-    image: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&q=80&w=600",
-    corporateContact: "Recepção de Serviços",
-    phone: "(11) 3088-1122",
-    whatsapp: "(11) 99911-2233",
-    website: "https://overdrivecustom.com.br",
-    rating: 4.8,
-    highlight: true,
-    responsible: {
-      name: "Beto 'Graxas' Oliveira",
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200",
-      phone: "(11) 99911-2233",
-      whatsapp: "(11) 99911-2233"
-    },
-    posts: [
-      {
-        id: "m201",
-        author: {
-          name: "Beto 'Graxas' Oliveira",
-          photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200",
-          role: "Proprietário",
-          isOwner: true
-        },
-        type: "announcement",
-        content: "Irmãos, agendem a revisão de viagem com antecedência para os finais de semana! Atendimento prioritário para cadastrados.",
-        timestamp: "Há 2 dias",
-        likes: 22
-      }
-    ]
-  },
-  {
-    id: "p3",
-    name: "Pousada Rota das Nuvens",
-    category: "Hospedagem",
-    location: "Urubici, SC - Saída Serra do Corvo Branco",
-    mapUrl: "https://maps.google.com/?q=Urubici+Serra+do+Corvo+Branco",
-    discount: "Tarifa 20% OFF para reservas antecipadas e garagem com tranca individual",
-    news: "Lareira acesa toda noite e sopa de pinhão cortesia da chef para aquecer da estrada.",
-    image: "https://images.unsplash.com/photo-1542718610-a1d656d1884c?auto=format&fit=crop&q=80&w=600",
-    corporateContact: "Central de Reservas",
-    phone: "(49) 3232-4400",
-    whatsapp: "(49) 98822-4411",
-    website: "https://pousadarotadasnuvens.com.br",
-    rating: 5.0,
-    highlight: true,
-    responsible: {
-      name: "Dona Helena & Roberto",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-      phone: "(49) 98822-4411",
-      whatsapp: "(49) 98822-4411"
-    },
-    posts: [
-      {
-        id: "m301",
-        author: {
-          name: "Carla 'Fênix'",
-          photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200",
-          role: "Piloto Estradeiro"
-        },
-        type: "review",
-        content: "Lugar espetacular! A garagem trancada dá total tranquilidade para deixar a moto. A sopa de pinhão na lareira é imbatível.",
-        timestamp: "Há 3 dias",
-        likes: 41
-      }
-    ]
-  },
-  {
-    id: "p4",
-    name: "Couro Legítimo Route 66",
-    category: "Acessórios",
-    location: "Belo Horizonte, MG - Bairro Savassi",
-    mapUrl: "https://maps.google.com/?q=Savassi+Belo+Horizonte",
-    discount: "15% de desconto em jaquetas de couro de búfalo sob medida",
-    news: "Nova coleção de luvas de cano longo com reforço de fibra de carbono.",
-    image: "https://images.unsplash.com/photo-1521485950395-bcfb8fc9bc06?auto=format&fit=crop&q=80&w=600",
-    corporateContact: "Vendas On-line & Loja",
-    phone: "(31) 3222-1100",
-    whatsapp: "(31) 98555-0012",
-    website: "https://courolegitimoroute66.com.br",
-    rating: 4.7,
-    highlight: false,
-    responsible: {
-      name: "Fernando 'Couro'",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
-      phone: "(31) 98555-0012",
-      whatsapp: "(31) 98555-0012"
-    },
-    posts: []
-  },
-  {
-    id: "p5",
-    name: "Posto Pit Stop Graal",
-    category: "Combustível",
-    location: "São Roque, SP - Rodovia Castelo Branco, KM 53",
-    mapUrl: "https://maps.google.com/?q=Rodovia+Castelo+Branco+KM+53",
-    discount: "Ducha pneumática rápida com secagem de retrovisores grátis pós abastecer octanada",
-    news: "Espaço exclusivo para descanso do piloto com café expresso artesanal cortesia.",
-    image: "https://images.unsplash.com/photo-1527018601619-a508a2be00cd?auto=format&fit=crop&q=80&w=600",
-    corporateContact: "Conveniência & Posto",
-    phone: "(11) 4712-9000",
-    whatsapp: "(11) 94712-9000",
-    website: "https://pitstopgraal.com.br",
-    rating: 4.6,
-    highlight: false,
-    responsible: {
-      name: "Gerência Pit Stop",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200",
-      phone: "(11) 4712-9000",
-      whatsapp: "(11) 94712-9000"
-    },
-    posts: []
-  }
-];
 
 const PRESETS_IMAGE = [
   "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&q=80&w=600",
@@ -305,13 +129,20 @@ export function Partners() {
     const saved = localStorage.getItem('motolegado_partners');
     if (saved) {
       try {
-        setPartners(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        const mockIds = ['p1', 'p2', 'p3', 'p4', 'p5'];
+        const cleaned = Array.isArray(parsed) 
+          ? parsed.filter((p: Partner) => !mockIds.includes(p.id) && !p.name?.includes('Aço & Fogo') && !p.name?.includes('Minha Empresa'))
+          : [];
+        setPartners(cleaned);
+        localStorage.setItem('motolegado_partners', JSON.stringify(cleaned));
       } catch (e) {
-        setPartners(DEFAULT_PARTNERS);
+        setPartners([]);
+        localStorage.setItem('motolegado_partners', JSON.stringify([]));
       }
     } else {
-      setPartners(DEFAULT_PARTNERS);
-      localStorage.setItem('motolegado_partners', JSON.stringify(DEFAULT_PARTNERS));
+      setPartners([]);
+      localStorage.setItem('motolegado_partners', JSON.stringify([]));
     }
   }, []);
 

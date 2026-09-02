@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -14,17 +13,12 @@ import { Calendar, Store, Percent, Route, BookOpen, CheckCircle, ArrowUpRight, P
 import { MotoEvent } from './Events';
 import { Partner } from './Partners';
 import { LogEntry } from './Logbook';
-
-const chartKmData = [
-  { name: 'Jan', km: 450 },
-  { name: 'Fev', km: 680 },
-  { name: 'Mar', km: 320 },
-  { name: 'Abr', km: 950 },
-  { name: 'Mai', km: 1240 },
-];
+import { useAuth } from '../context/AuthContext';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [events, setEvents] = useState<MotoEvent[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -50,32 +44,71 @@ export function Dashboard() {
       }
     }
 
-    // Load Logbook
-    const savedLogs = localStorage.getItem('motolegado_logs');
-    if (savedLogs) {
-      try {
-        setLogs(JSON.parse(savedLogs));
-      } catch (e) {
-        console.error('Error reading motolegado_logs', e);
+    // Load Logbook (from Supabase if configured and logged in)
+    if (isSupabaseConfigured && user) {
+      supabase
+        .from('logbook_trips')
+        .select('*')
+        .eq('pilot_id', user.id)
+        .order('date', { ascending: false })
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            const mappedLogs: LogEntry[] = data.map((t: any) => ({
+              id: t.id,
+              title: t.title,
+              date: t.date || new Date().toISOString().split('T')[0],
+              origin: t.origin,
+              destination: t.destination,
+              distance: String(t.distance_km || 0),
+              duration: '2h',
+              bike: t.bike_model || profile?.motorcycle || 'Motocicleta',
+              climate: 'sun',
+              road: 'Boa',
+              rating: t.rating || 5,
+              content: t.notes || '',
+              image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
+            }));
+            setLogs(mappedLogs);
+          } else {
+            setLogs([]);
+          }
+        });
+    } else {
+      const savedLogs = localStorage.getItem('motolegado_logs');
+      if (savedLogs) {
+        try {
+          setLogs(JSON.parse(savedLogs));
+        } catch (e) {
+          console.error('Error reading motolegado_logs', e);
+        }
       }
     }
-  }, []);
+  }, [user, isSupabaseConfigured]);
 
   const checkedInEvents = events.filter(evt => evt.checkedIn);
   const displayEvents = checkedInEvents.length > 0 ? checkedInEvents.slice(0, 3) : events.slice(0, 3);
   const highlightedPartners = partners.filter(p => p.highlight).slice(0, 2);
   const displayPartners = highlightedPartners.length > 0 ? highlightedPartners : partners.slice(0, 2);
 
-  // Calculate live total distance
-  const baseKm = 12450;
+  // Calculate live total distance from actual pilot logs
   const loggedKm = logs.reduce((acc, log) => {
     const val = parseInt(log.distance, 10);
     return acc + (isNaN(val) ? 0 : val);
   }, 0);
-  const totalKmCombined = baseKm + loggedKm;
+
+  const totalKmCombined = loggedKm;
 
   // Active or latest trip
   const latestLog = logs.length > 0 ? logs[0] : null;
+
+  // Dynamic telemetry chart data
+  const chartKmData = [
+    { name: 'Jan', km: logs.length > 0 ? Math.round(loggedKm * 0.15) : 0 },
+    { name: 'Fev', km: logs.length > 0 ? Math.round(loggedKm * 0.25) : 0 },
+    { name: 'Mar', km: logs.length > 0 ? Math.round(loggedKm * 0.35) : 0 },
+    { name: 'Abr', km: logs.length > 0 ? Math.round(loggedKm * 0.15) : 0 },
+    { name: 'Mai', km: logs.length > 0 ? Math.round(loggedKm * 0.10) : 0 },
+  ];
 
   return (
     <div className="p-4 sm:p-6 h-full flex flex-col gap-6 overflow-y-auto bg-slate-950">
@@ -114,11 +147,11 @@ export function Dashboard() {
                 ÚLTIMA ROTA REGISTRADA
               </span>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-black italic uppercase mt-2 sm:mt-3 tracking-tighter text-white">
-                {latestLog ? latestLog.title : 'Serra do Rio do Rastro'}
+                {latestLog ? latestLog.title : 'Nenhuma Viagem Registrada'}
               </h2>
               <p className="text-slate-400 mt-1 flex items-center gap-2 sm:gap-3 font-black text-[9px] sm:text-[10px] uppercase tracking-[0.15em] sm:tracking-[0.2em]">
                 <MapPin size={12} className="text-orange-500 shrink-0" />
-                {latestLog ? `${latestLog.origin} ➔ ${latestLog.destination}` : 'SC — 284 KM • 12 CURVAS ACENTUADAS'}
+                {latestLog ? `${latestLog.origin} ➔ ${latestLog.destination}` : 'Inicie seu primeiro roteiro no diário de bordo'}
               </p>
             </div>
 
@@ -257,6 +290,12 @@ export function Dashboard() {
                   </div>
                 </div>
               ))}
+
+              {displayEvents.length === 0 && (
+                <div className="col-span-full py-6 text-center text-slate-500 text-xs">
+                  Nenhum evento agendado no momento.
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -294,6 +333,12 @@ export function Dashboard() {
                   </div>
                 </div>
               ))}
+
+              {displayPartners.length === 0 && (
+                <div className="col-span-full py-6 text-center text-slate-500 text-xs">
+                  Nenhum parceiro cadastrado no momento.
+                </div>
+              )}
             </div>
           </div>
 

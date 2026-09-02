@@ -3,6 +3,8 @@ import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, Clou
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export interface LogEntry {
   id: string;
@@ -20,41 +22,9 @@ export interface LogEntry {
   image: string;
 }
 
-const DEFAULT_LOGS: LogEntry[] = [
-  {
-    id: '1',
-    title: 'EXPEDIÇÃO CURVAS DA SERRA',
-    date: '15/05/2026',
-    origin: 'Florianópolis / SC',
-    destination: 'Urubici / SC',
-    distance: '180',
-    duration: '3h 45min',
-    bike: 'Harley Davidson 883 Iron',
-    climate: 'sun',
-    road: 'Tapete (Perfeita)',
-    rating: 5,
-    content: 'Dia perfeito para rodar. A subida da serra estava com visibilidade 100%. O café no mirante foi o ponto alto antes de seguir para o centro. A moto se comportou muito bem nas curvas fechadas.',
-    image: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: '2',
-    title: 'ROTA DOS CÂNYONS DO SUL',
-    date: '10/04/2026',
-    origin: 'Praia Grande / SC',
-    destination: 'Cambará do Sul / RS',
-    distance: '120',
-    duration: '2h 30min',
-    bike: 'Triumph Bonneville T120',
-    climate: 'cloud',
-    road: 'Razoável',
-    rating: 5,
-    content: 'Nevoeiro baixo na chegada ao parque dos cânyons, criando um cenário incrível. Estrada com trechos desafiadores e paisagens inesquecíveis.',
-    image: 'https://images.unsplash.com/photo-1591637333184-19aa84b3e01f?auto=format&fit=crop&q=80&w=800'
-  }
-];
-
 export function Logbook() {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
@@ -62,8 +32,8 @@ export function Logbook() {
   const [title, setTitle] = useState('');
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
-  const [date, setDate] = useState('15/05/2026');
-  const [bike, setBike] = useState('Harley Davidson 883 Iron');
+  const [date, setDate] = useState('');
+  const [bike, setBike] = useState(profile?.motorcycle || '');
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
   const [climate, setClimate] = useState('sun');
@@ -72,30 +42,79 @@ export function Logbook() {
   const [content, setContent] = useState('');
   const [image, setImage] = useState('');
 
-  // Load logs on mount
+  // Load logs on mount / auth change
   useEffect(() => {
-    const saved = localStorage.getItem('motolegado_logs');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setLogs(parsed);
-          return;
+    if (isSupabaseConfigured && user) {
+      supabase
+        .from('logbook_trips')
+        .select('*')
+        .eq('pilot_id', user.id)
+        .order('date', { ascending: false })
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            const mappedLogs: LogEntry[] = data.map((t: any) => ({
+              id: t.id,
+              title: t.title,
+              date: t.date || new Date().toISOString().split('T')[0],
+              origin: t.origin,
+              destination: t.destination,
+              distance: String(t.distance_km || 0),
+              duration: '2h 30min',
+              bike: t.bike_model || profile?.motorcycle || 'Motocicleta',
+              climate: 'sun',
+              road: 'Tapete (Perfeita)',
+              rating: t.rating || 5,
+              content: t.notes || '',
+              image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
+            }));
+            setLogs(mappedLogs);
+          } else {
+            setLogs([]);
+          }
+        });
+    } else {
+      const saved = localStorage.getItem('motolegado_logs');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setLogs(parsed);
+            return;
+          }
+        } catch (e) {
+          console.error('Error loading logbook from localStorage', e);
         }
-      } catch (e) {
-        console.error('Error loading logbook from localStorage', e);
+      }
+      setLogs([]);
+    }
+  }, [user, isSupabaseConfigured]);
+
+  const saveLogsToStorage = async (newEntry: LogEntry) => {
+    if (isSupabaseConfigured && user) {
+      try {
+        await supabase.from('logbook_trips').insert({
+          pilot_id: user.id,
+          title: newEntry.title,
+          origin: newEntry.origin,
+          destination: newEntry.destination,
+          distance_km: parseInt(newEntry.distance, 10) || 0,
+          bike_model: newEntry.bike,
+          rating: newEntry.rating,
+          notes: newEntry.content,
+          date: new Date().toISOString().split('T')[0],
+          photos: [newEntry.image]
+        });
+      } catch (err) {
+        console.error('Erro ao gravar logbook no Supabase:', err);
       }
     }
-    setLogs(DEFAULT_LOGS);
-    localStorage.setItem('motolegado_logs', JSON.stringify(DEFAULT_LOGS));
-  }, []);
 
-  const saveLogsToStorage = (updatedLogs: LogEntry[]) => {
-    setLogs(updatedLogs);
-    localStorage.setItem('motolegado_logs', JSON.stringify(updatedLogs));
+    const updated = [newEntry, ...logs];
+    setLogs(updated);
+    localStorage.setItem('motolegado_logs', JSON.stringify(updated));
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     if (!title.trim()) {
       alert('Por favor, informe o título da viagem.');
       return;
@@ -104,12 +123,12 @@ export function Logbook() {
     const newEntry: LogEntry = {
       id: Date.now().toString(),
       title: title.toUpperCase(),
-      date: date || '15/05/2026',
-      origin: origin || 'Florianópolis / SC',
-      destination: destination || 'Destino Não Especificado',
-      distance: distance ? distance.replace(/\D/g, '') || '100' : '150',
+      date: date || new Date().toLocaleDateString('pt-BR'),
+      origin: origin || 'Cidade de Origem',
+      destination: destination || 'Cidade de Destino',
+      distance: distance ? distance.replace(/\D/g, '') || '100' : '100',
       duration: duration || '2h 30min',
-      bike: bike || 'Harley Davidson 883 Iron',
+      bike: bike || profile?.motorcycle || 'Motocicleta',
       climate,
       road,
       rating,
@@ -117,8 +136,7 @@ export function Logbook() {
       image: image || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
     };
 
-    const updated = [newEntry, ...logs];
-    saveLogsToStorage(updated);
+    await saveLogsToStorage(newEntry);
 
     // Reset Form
     setTitle('');

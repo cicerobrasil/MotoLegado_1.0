@@ -62,24 +62,6 @@ export interface Achievement {
   unlockedAt?: string;
 }
 
-export interface FeedItem {
-  id: string;
-  user: {
-    name: string;
-    avatar: string;
-    role?: string;
-  };
-  content: string;
-  image?: string;
-  category?: string;
-  likes: number;
-  comments: number;
-  timestamp: string;
-  status?: 'aprovado' | 'pendente' | 'rejeitado';
-  createdAt?: string;
-  rejectionReason?: string;
-}
-
 export interface CommunityPost {
   id: string;
   user: {
@@ -103,11 +85,4 @@ export interface CommunityPost {
     text: string;
     createdAt: string;
   }>;
-}
-
-export interface UserStats {
-  totalKm: number;
-  totalTrips: number;
-  reputationPoints: number;
-  rank: string;
 }

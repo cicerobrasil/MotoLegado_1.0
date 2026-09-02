@@ -1,4 +1,4 @@
-import { useState, useRef, ChangeEvent } from 'react';
+import { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { 
   User, 
   MapPin, 
@@ -12,23 +12,48 @@ import {
   Zap, 
   AlertCircle, 
   Plus, 
-  ArrowLeft 
+  ArrowLeft,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export function ProfileSettings() {
   const navigate = useNavigate();
+  const { profile, user, updateProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<'piloto' | 'identidade' | 'endereco' | 'motocicleta'>('piloto');
   
-  // Form States
-  const [email, setEmail] = useState('guest@motolegado.com');
-  const [phone, setPhone] = useState('');
-  const [isMemberOfClub, setIsMemberOfClub] = useState(true);
+  // Form States vinculados ao perfil real
+  const [name, setName] = useState(profile?.name || '');
+  const [email, setEmail] = useState(profile?.email || '');
+  const [phone, setPhone] = useState(profile?.phone || '');
+  const [bio, setBio] = useState(profile?.bio || '');
+  const [city, setCity] = useState(profile?.city || '');
+  const [state, setState] = useState(profile?.state || '');
+  const [motorcycle, setMotorcycle] = useState(profile?.motorcycle || '');
+  const [isMemberOfClub, setIsMemberOfClub] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const [personalLogo, setPersonalLogo] = useState<string | null>(null);
-  const [profilePhoto, setProfilePhoto] = useState('https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=400');
+  const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || 'Piloto')}&background=ea580c&color=ffffff&bold=true`;
+  const [personalLogo, setPersonalLogo] = useState<string | null>(profile?.personal_logo_url || null);
+  const [profilePhoto, setProfilePhoto] = useState((profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61')) ? profile.avatar_url : defaultAvatar);
+
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name || '');
+      setEmail(profile.email || '');
+      setPhone(profile.phone || '');
+      setBio(profile.bio || '');
+      setCity(profile.city || '');
+      setState(profile.state || '');
+      setMotorcycle(profile.motorcycle || '');
+      if (profile.avatar_url) setProfilePhoto(profile.avatar_url);
+      if (profile.personal_logo_url) setPersonalLogo(profile.personal_logo_url);
+    }
+  }, [profile]);
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +94,32 @@ export function ProfileSettings() {
         else setProfilePhoto(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveSuccess(false);
+
+    try {
+      await updateProfile({
+        name,
+        phone,
+        bio,
+        city,
+        state,
+        motorcycle,
+        avatar_url: profilePhoto,
+        personal_logo_url: personalLogo || undefined
+      });
+      setSaveSuccess(true);
+      setTimeout(() => {
+        navigate('/profile');
+      }, 800);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -174,11 +225,23 @@ export function ProfileSettings() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="space-y-2 sm:space-y-3">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Nome do Piloto</label>
-                  <input type="text" defaultValue="Piloto Convidado" className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white" />
+                  <input 
+                    type="text" 
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Seu nome de piloto"
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white" 
+                  />
                 </div>
                 <div className="space-y-2 sm:space-y-3">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Nome do(a) Garupa</label>
-                  <input type="text" defaultValue="Parceiro(a) de estrada" className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white" />
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Motocicleta Principal</label>
+                  <input 
+                    type="text" 
+                    value={motorcycle}
+                    onChange={(e) => setMotorcycle(e.target.value)}
+                    placeholder="Ex: BMW R 1250 GS, Triumph Tiger 900..."
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white" 
+                  />
                 </div>
                 <div className="space-y-2 sm:space-y-3 relative">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">E-mail de Contato</label>
@@ -186,9 +249,10 @@ export function ProfileSettings() {
                     <input 
                       type="email" 
                       value={email}
+                      disabled={!!user}
                       onChange={(e) => setEmail(e.target.value)}
                       className={cn(
-                        "w-full bg-slate-950 border rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white",
+                        "w-full bg-slate-950 border rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white disabled:opacity-60",
                         email === "" 
                           ? "border-slate-800/50 focus:border-orange-500" 
                           : isEmailValid 
@@ -211,12 +275,23 @@ export function ProfileSettings() {
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Telefone / WhatsApp</label>
                   <input 
                     type="text" 
-                    placeholder="(00) 000000000" 
+                    placeholder="(00) 00000-0000" 
                     value={phone}
                     onChange={handlePhoneChange}
                     className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white" 
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2 sm:space-y-3">
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Biografia / Lema de Estrada</label>
+                <textarea
+                  rows={3}
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Escreva um resumo sobre suas viagens e sua paixão por duas rodas..."
+                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white resize-none"
+                />
               </div>
 
               {/* Visual Identity Section */}
@@ -408,12 +483,35 @@ export function ProfileSettings() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Bairro</label>
-                  <input type="text" className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" />
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Bairro / Região</label>
+                  <input 
+                    type="text" 
+                    placeholder="Bairro"
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
+                  />
                 </div>
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Cidade</label>
-                  <input type="text" defaultValue="Curitiba" className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Cidade</label>
+                    <input 
+                      type="text" 
+                      value={city} 
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Ex: São Paulo" 
+                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Estado (UF)</label>
+                    <input 
+                      type="text" 
+                      value={state} 
+                      onChange={(e) => setState(e.target.value.toUpperCase())}
+                      placeholder="SP" 
+                      maxLength={2}
+                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white uppercase" 
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -484,14 +582,26 @@ export function ProfileSettings() {
         </button>
 
         <button 
-          onClick={() => {
-            alert('Registro gravado com sucesso!');
-            navigate('/profile');
-          }}
-          className="w-full sm:w-auto flex items-center justify-center gap-3 px-10 py-3.5 bg-gradient-to-r from-orange-600 to-orange-500 text-white rounded-2xl font-black italic uppercase text-xs tracking-[0.15em] hover:from-orange-500 hover:to-orange-400 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_25px_-5px_rgba(255,85,0,0.4)] relative overflow-hidden group"
+          onClick={handleSave}
+          disabled={isSaving}
+          className="w-full sm:w-auto flex items-center justify-center gap-3 px-10 py-3.5 bg-gradient-to-r from-orange-600 to-orange-500 text-white rounded-2xl font-black italic uppercase text-xs tracking-[0.15em] hover:from-orange-500 hover:to-orange-400 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_25px_-5px_rgba(255,85,0,0.4)] relative overflow-hidden group cursor-pointer disabled:opacity-50"
         >
-          <Check size={20} className="group-hover:rotate-12 transition-transform" />
-          <span className="relative drop-shadow-md">GRAVAR REGISTRO</span>
+          {isSaving ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              <span>GRAVANDO...</span>
+            </>
+          ) : saveSuccess ? (
+            <>
+              <Check size={18} className="text-white" />
+              <span>SALVO COM SUCESSO!</span>
+            </>
+          ) : (
+            <>
+              <Check size={20} className="group-hover:rotate-12 transition-transform" />
+              <span className="relative drop-shadow-md">GRAVAR REGISTRO</span>
+            </>
+          )}
         </button>
       </footer>
     </div>

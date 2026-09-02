@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Users, 
   Calendar, 
   Heart, 
   Cake, 
@@ -9,13 +8,13 @@ import {
   Send, 
   ArrowLeft, 
   ShieldCheck, 
-  Clock,
+  Clock, 
   MoreVertical,
-  Plus,
   Image as ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
 
 interface Post {
   id: string;
@@ -32,55 +31,25 @@ interface Post {
   image?: string;
 }
 
-const MOCK_MURAL_POSTS: Post[] = [
-  {
-    id: '1',
-    author: {
-      name: 'Ricardo "Veludo"',
-      photo: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=200',
-      role: 'Presidente'
-    },
-    type: 'meeting',
-    content: '🚨 ATENÇÃO IRMÃOS! Bate-fica confirmado para o próximo sábado. Destino: Serra da Graciosa. Saída do ponto zero às 08:30 em ponto. Tanque cheio e união total.',
-    timestamp: '2 horas atrás',
-    likes: 34,
-    comments: 8,
-    image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: '2',
-    author: {
-      name: 'Carla "Fênix"',
-      photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200',
-      role: 'Tesoureira'
-    },
-    type: 'social',
-    content: 'Arrecadação de agasalhos para o Lar dos Idosos foi um sucesso! Conseguimos mais de 200kg de doações. Obrigado a todos que fortaleceram essa ação social.',
-    timestamp: '5 horas atrás',
-    likes: 56,
-    comments: 12
-  },
-  {
-    id: '3',
-    author: {
-      name: 'Beto "Trovoada"',
-      photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200',
-      role: 'Road Captain'
-    },
-    type: 'birthday',
-    content: 'Hoje o ronco dos motores é em homenagem ao nosso irmão Marcos "Ninja" que completa mais um ano de asfalto! Vida longa, irmão! 🎂🏍️',
-    timestamp: '8 horas atrás',
-    likes: 42,
-    comments: 15
-  }
-];
+const MOCK_MURAL_POSTS: Post[] = [];
 
 export function MotoClubMural() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [posts, setPosts] = useState<Post[]>(MOCK_MURAL_POSTS);
+  const { profile } = useAuth();
+  const [posts, setPosts] = useState<Post[]>(() => {
+    const saved = localStorage.getItem('motolegado_mural_posts');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return []; }
+    }
+    return [];
+  });
   const [newPostContent, setNewPostContent] = useState('');
   const [activeType, setActiveType] = useState<Post['type']>('general');
+
+  useEffect(() => {
+    localStorage.setItem('motolegado_mural_posts', JSON.stringify(posts));
+  }, [posts]);
 
   const getTypeStyle = (type: Post['type']) => {
     switch (type) {
@@ -97,9 +66,9 @@ export function MotoClubMural() {
     const newPost: Post = {
       id: Date.now().toString(),
       author: {
-        name: 'Piloto Convidado',
-        photo: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&q=80&w=200',
-        role: 'Membro Elite'
+        name: profile?.name || 'Piloto MotoLegado',
+        photo: (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61')) ? profile.avatar_url : `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || 'Piloto')}&background=ea580c&color=ffffff&bold=true`,
+        role: profile?.role === 'admin' ? 'Administrador' : 'Membro Piloto'
       },
       type: activeType,
       content: newPostContent,
@@ -224,8 +193,19 @@ export function MotoClubMural() {
 
         {/* Posts Feed */}
         <div className="space-y-8 pb-32">
-          {posts.map((post) => {
-            const style = getTypeStyle(post.type);
+          {posts.length === 0 ? (
+            <div className="bg-slate-900/40 border border-slate-800 rounded-[2.5rem] p-12 text-center space-y-3">
+              <MessageSquare size={36} className="text-slate-600 mx-auto" />
+              <h4 className="text-base font-black italic uppercase text-slate-300">
+                Nenhum comunicado no mural
+              </h4>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Seja o primeiro a publicar um comunicado, aviso de encontro ou mensagem para os membros do Moto Clube!
+              </p>
+            </div>
+          ) : (
+            posts.map((post) => {
+              const style = getTypeStyle(post.type);
             return (
               <motion.div 
                 layout
@@ -289,7 +269,7 @@ export function MotoClubMural() {
                 </div>
               </motion.div>
             );
-          })}
+          }))}
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { 
   ShieldCheck, 
   ShieldAlert, 
@@ -22,10 +23,7 @@ import {
   Activity, 
   Lock, 
   X,
-  FileText,
-  ChevronRight,
   Eye,
-  RefreshCw,
   Award,
   Phone,
   Sparkles,
@@ -34,10 +32,11 @@ import {
   UtensilsCrossed,
   GraduationCap,
   Compass,
-  Flame,
   ExternalLink,
   Navigation,
-  Star
+  Star,
+  ArrowLeft,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -113,179 +112,6 @@ interface PartnerRequest {
   status: 'pendente' | 'aprovado' | 'rejeitado';
 }
 
-const DEFAULT_EVENTS: MotoEvent[] = [
-  {
-    id: "e_pend_1",
-    title: "Encontro Regional de Custom & Vintage (Pendente)",
-    desc: "Aguardando aprovação da administração. Exposição de motos clássicas, mercado de peças raras e recepção aos motociclistas de fora.",
-    time: "A PARTIR DAS 10:00",
-    date: "2026-07-18",
-    location: "Praça Central - Blumenau, SC",
-    distance: 60,
-    category: "Festas & Encontros",
-    image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80&w=800",
-    checkedIn: false,
-    memberCount: 1,
-    status: 'pendente',
-    createdBy: 'Irmandade Vintage MC',
-    createdAt: '2026-08-10'
-  },
-  {
-    id: "e_pend_2",
-    title: "Rali Noturno de Regularidade Big Trail (Pendente)",
-    desc: "Aguardando aprovação. Rota noturna pelas serras com navegação por GPS e pontos de apoio com guincho e resgate.",
-    time: "SÁBADO ÀS 20:00",
-    date: "2026-08-01",
-    location: "São Joaquim, SC",
-    distance: 180,
-    category: "Off-Road",
-    image: "https://images.unsplash.com/photo-1517649763962-0c623266010b?auto=format&fit=crop&q=80&w=800",
-    checkedIn: false,
-    memberCount: 1,
-    status: 'pendente',
-    createdBy: 'Clube Big Trail Sul',
-    createdAt: '2026-08-10'
-  },
-  {
-    id: "e_fest_1",
-    title: "1º MotoFest & Rock'n'Roll Night",
-    desc: "Evento estático de celebração! Show de rock ao vivo, praça de alimentação com food trucks, estandes custom, chopp artesanal e troféus para Moto Clubes.",
-    time: "A PARTIR DAS 14:00",
-    date: "2026-07-11",
-    location: "Centro de Eventos - Curitiba, PR",
-    distance: 40,
-    category: "Festas & Encontros",
-    image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=800",
-    checkedIn: true,
-    memberCount: 420,
-    status: 'aprovado'
-  }
-];
-
-const INITIAL_CLUB_REQUESTS: ClubModerationRequest[] = [
-  {
-    id: "club_req_1",
-    clubName: "Nômades do Asfalto MC",
-    president: "Marcos 'Bandeira'",
-    cityState: "Joinville, SC",
-    type: "criacao",
-    requestedAt: "2026-08-09",
-    membersCount: 18,
-    status: "pendente",
-    motto: "Liberdade acima de tudo, respeito na estrada."
-  },
-  {
-    id: "club_req_2",
-    clubName: "Fantasmas da Serra MG",
-    president: "Renata 'Sombra'",
-    cityState: "Caxias do Sul, RS",
-    type: "criacao",
-    requestedAt: "2026-08-08",
-    membersCount: 12,
-    status: "pendente",
-    motto: "Nas curvas da serra deixamos nossa história."
-  }
-];
-
-const INITIAL_REPORTS: PostReport[] = [
-  {
-    id: "rep_1",
-    author: "Ricardo 'Vento'",
-    authorAvatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100",
-    content: "Venda ilegal de peças de procedência duvidosa sem nota fiscal na região central...",
-    reportedBy: "Comando de Ética MC",
-    reason: "Conteúdo impróprio / suspeita de irregularidade",
-    reportedAt: "Há 3 horas",
-    status: "pendente"
-  }
-];
-
-const INITIAL_PARTNER_REQUESTS: PartnerRequest[] = [
-  {
-    id: "part_req_1",
-    businessName: "Oficina Pneu & Graxa Custom",
-    category: "Oficina & Customização",
-    city: "Florianópolis, SC",
-    discountOffered: "15% em Mão de Obra para Integrantes",
-    submittedBy: "Oficina Pneu & Graxa",
-    submittedAt: "2026-08-09",
-    status: "pendente"
-  },
-  {
-    id: "part_req_2",
-    businessName: "Guincho 24h Resgate do Asfalto",
-    category: "Guincho & Socorro",
-    city: "Curitiba, PR",
-    discountOffered: "Atendimento prioritário + 10% desconto",
-    submittedBy: "Resgate Asfalto LTDA",
-    submittedAt: "2026-08-07",
-    status: "pendente"
-  }
-];
-
-const DEFAULT_PARTNERS: Partner[] = [
-  {
-    id: "p1",
-    name: "Aço & Fogo Themed Bar",
-    category: "Bar e Point",
-    location: "Curitiba, PR - Rodovia do Xisto, KM 12",
-    discount: "10% de Desconto na conta total + Chopp Duplo para pilotos com Brasão",
-    news: "Neste sábado teremos banda tributo ao Iron Maiden ao vivo a partir das 20:00!",
-    image: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&q=80&w=600",
-    phone: "(41) 98877-6655",
-    rating: 4.9,
-    highlight: true
-  },
-  {
-    id: "p2",
-    name: "Overdrive Custom Motorcycles",
-    category: "Oficina",
-    location: "São Paulo, SP - Av. Europa, 1420",
-    discount: "Alinhamento e balanceamento grátis na troca de pneus Metzeler",
-    news: "Chegou o novo lote de escapamentos esportivos pretos foscos Vance & Hines.",
-    image: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&q=80&w=600",
-    phone: "(11) 99911-2233",
-    rating: 4.8,
-    highlight: true
-  },
-  {
-    id: "p3",
-    name: "Pousada Rota das Nuvens",
-    category: "Hospedagem",
-    location: "Urubici, SC - Saída Serra do Corvo Branco",
-    discount: "Tarifa 20% OFF para reservas antecipadas e garagem com tranca individual",
-    news: "Lareira acesa toda noite e sopa de pinhão cortesia da chef para aquecer da estrada.",
-    image: "https://images.unsplash.com/photo-1542718610-a1d656d1884c?auto=format&fit=crop&q=80&w=600",
-    phone: "(49) 98822-4411",
-    rating: 5.0,
-    highlight: true
-  },
-  {
-    id: "p4",
-    name: "Couro Legítimo Route 66",
-    category: "Acessórios",
-    location: "Belo Horizonte, MG - Bairro Savassi",
-    discount: "15% de desconto em jaquetas de couro de búfalo sob medida",
-    news: "Nova coleção de luvas de cano longo com reforço de fibra de carbono.",
-    image: "https://images.unsplash.com/photo-1521485950395-bcfb8fc9bc06?auto=format&fit=crop&q=80&w=600",
-    phone: "(31) 98555-0012",
-    rating: 4.7,
-    highlight: false
-  },
-  {
-    id: "p5",
-    name: "Posto Pit Stop Graal",
-    category: "Combustível",
-    location: "São Roque, SP - Rodovia Castelo Branco, KM 53",
-    discount: "Ducha pneumática rápida com secagem de retrovisores grátis pós abastecer octanada",
-    news: "Espaço exclusivo para descanso do piloto com café expresso artesanal cortesia.",
-    image: "https://images.unsplash.com/photo-1527018601619-a508a2be00cd?auto=format&fit=crop&q=80&w=600",
-    phone: "(11) 4712-9000",
-    rating: 4.6,
-    highlight: false
-  }
-];
-
 const PARTNER_CATEGORIES: Partner['category'][] = [
   "Bar e Point",
   "Alimentação",
@@ -298,6 +124,10 @@ const PARTNER_CATEGORIES: Partner['category'][] = [
 ];
 
 export function CommandCenter() {
+  const { profile, loading, user } = useAuth();
+  const navigate = useNavigate();
+  const isAdmin = profile?.role === 'admin';
+
   const [activeTab, setActiveTab] = useState<'eventos' | 'clubes' | 'roteiros' | 'comunidade' | 'parceiros' | 'telemetria'>('eventos');
   
   // Routes Moderation State
@@ -425,37 +255,42 @@ export function CommandCenter() {
     const savedEvents = localStorage.getItem('motolegado_events');
     if (savedEvents) {
       try {
-        setEvents(JSON.parse(savedEvents));
+        const parsed = JSON.parse(savedEvents);
+        const mockIds = ['e_fest_1', 'e_fest_2', 'e_sul_1', 'e_pend_1', 'e_pend_2', 'e0', 'e1', 'e2', 'e3', 'e4', 'e5'];
+        const cleaned = Array.isArray(parsed) ? parsed.filter((e: MotoEvent) => !mockIds.includes(e.id)) : [];
+        setEvents(cleaned);
+        localStorage.setItem('motolegado_events', JSON.stringify(cleaned));
       } catch (e) {
-        setEvents(DEFAULT_EVENTS);
+        setEvents([]);
+        localStorage.setItem('motolegado_events', JSON.stringify([]));
       }
     } else {
-      setEvents(DEFAULT_EVENTS);
-      localStorage.setItem('motolegado_events', JSON.stringify(DEFAULT_EVENTS));
+      setEvents([]);
+      localStorage.setItem('motolegado_events', JSON.stringify([]));
     }
 
     // Load Clubs
     const savedClubs = localStorage.getItem('motolegado_clubs_moderation');
     if (savedClubs) {
-      try { setClubRequests(JSON.parse(savedClubs)); } catch (e) { setClubRequests(INITIAL_CLUB_REQUESTS); }
+      try { setClubRequests(JSON.parse(savedClubs)); } catch (e) { setClubRequests([]); }
     } else {
-      setClubRequests(INITIAL_CLUB_REQUESTS);
+      setClubRequests([]);
     }
 
     // Load Reports
     const savedReports = localStorage.getItem('motolegado_community_reports');
     if (savedReports) {
-      try { setReports(JSON.parse(savedReports)); } catch (e) { setReports(INITIAL_REPORTS); }
+      try { setReports(JSON.parse(savedReports)); } catch (e) { setReports([]); }
     } else {
-      setReports(INITIAL_REPORTS);
+      setReports([]);
     }
 
     // Load Partners
     const savedPartners = localStorage.getItem('motolegado_partners_moderation');
     if (savedPartners) {
-      try { setPartnerRequests(JSON.parse(savedPartners)); } catch (e) { setPartnerRequests(INITIAL_PARTNER_REQUESTS); }
+      try { setPartnerRequests(JSON.parse(savedPartners)); } catch (e) { setPartnerRequests([]); }
     } else {
-      setPartnerRequests(INITIAL_PARTNER_REQUESTS);
+      setPartnerRequests([]);
     }
 
     // Load Community Posts
@@ -474,51 +309,49 @@ export function CommandCenter() {
     // Load Active Registered Partners
     const savedActivePartners = localStorage.getItem('motolegado_partners');
     if (savedActivePartners) {
-      try { setAllPartners(JSON.parse(savedActivePartners)); } catch (e) { setAllPartners(DEFAULT_PARTNERS); }
+      try { 
+        const parsed = JSON.parse(savedActivePartners);
+        const mockIds = ['p1', 'p2', 'p3', 'p4', 'p5'];
+        const cleaned = Array.isArray(parsed) ? parsed.filter((p: Partner) => !mockIds.includes(p.id)) : [];
+        setAllPartners(cleaned); 
+        localStorage.setItem('motolegado_partners', JSON.stringify(cleaned));
+      } catch (e) { 
+        setAllPartners([]); 
+        localStorage.setItem('motolegado_partners', JSON.stringify([]));
+      }
     } else {
-      setAllPartners(DEFAULT_PARTNERS);
-      localStorage.setItem('motolegado_partners', JSON.stringify(DEFAULT_PARTNERS));
+      setAllPartners([]);
+      localStorage.setItem('motolegado_partners', JSON.stringify([]));
     }
 
     // Load Routes for Moderation
     const loadRoutes = () => {
-      const savedRoutes = localStorage.getItem('motolegado_routes');
+      const savedRoutes = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
       if (savedRoutes) {
-        try { setRoutes(JSON.parse(savedRoutes)); } catch (e) { setRoutes([]); }
+        try { 
+          const parsed = JSON.parse(savedRoutes);
+          const mockIds = ['serra-rio-rastro', 'estrada-graciosa', 'rota-das-hortensias', 'route-pending-1', '1'];
+          const cleaned = Array.isArray(parsed) ? parsed.filter((r: Route) => {
+            const name = (r.name || '').toLowerCase();
+            const address = (r.mapsAddress || '').toLowerCase();
+            const author = (r.author?.name || '').toLowerCase();
+            const isMock = mockIds.includes(r.id) ||
+              name.includes('cunha') || name.includes('paraty') || address.includes('cunha') || address.includes('paraty') ||
+              author.includes('renato') || name.includes('estrada real');
+            return !isMock;
+          }) : [];
+          setRoutes(cleaned); 
+          localStorage.setItem('motolegado_routes', JSON.stringify(cleaned));
+          localStorage.setItem('motolegado_routes_v3', JSON.stringify(cleaned));
+        } catch (e) { 
+          setRoutes([]); 
+          localStorage.setItem('motolegado_routes', JSON.stringify([]));
+          localStorage.setItem('motolegado_routes_v3', JSON.stringify([]));
+        }
       } else {
-        const initialRoutes: Route[] = [
-          {
-            id: 'route-pending-1',
-            name: 'Expedição Rota dos Canyons',
-            mapsAddress: 'Praia Grande - SC',
-            description: 'Travessia espetacular subindo o trecho da serra do mormaço em direção a Cambará do Sul.',
-            riderTips: 'Atenção aos trechos com neblina alta no topo da serra e trechos não pavimentados.',
-            aiTouristInfo: 'Visual incrível dos penhascos e vales profundos do Parque Nacional dos Aparados da Serra.',
-            difficulty: 'Difícil' as any,
-            image: 'https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=1200',
-            author: { name: 'Marcos Trail', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200' },
-            rating: 4.8,
-            totalRatingsCount: 12,
-            ratingMetrics: { paisagem: 5, asfalto: 4, curvas: 5, seguranca: 4, infraestrutura: 4 },
-            status: 'pendente'
-          },
-          {
-            id: '1',
-            name: 'Serra do Rio do Rastro',
-            mapsAddress: 'Lauro Müller - SC',
-            description: 'Uma das estradas mais espetaculares do mundo, com 284 curvas acentuadas e mirante a mais de 1.400m de altitude.',
-            riderTips: 'Cuidado com umidade na pista durante a manhã.',
-            difficulty: 'Especialista' as any,
-            image: 'https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=1200',
-            author: { name: 'Conselho MotoLegado', avatar: '' },
-            rating: 4.9,
-            totalRatingsCount: 150,
-            ratingMetrics: { paisagem: 5, asfalto: 5, curvas: 5, seguranca: 4, infraestrutura: 5 },
-            status: 'aprovado'
-          }
-        ];
-        setRoutes(initialRoutes);
-        localStorage.setItem('motolegado_routes', JSON.stringify(initialRoutes));
+        setRoutes([]);
+        localStorage.setItem('motolegado_routes', JSON.stringify([]));
+        localStorage.setItem('motolegado_routes_v3', JSON.stringify([]));
       }
     };
     loadRoutes();
@@ -723,7 +556,7 @@ export function CommandCenter() {
         return {
           ...evt,
           status: 'aprovado' as const,
-          checkedIn: true,
+          checkedIn: false,
           memberCount: Math.max(1, evt.memberCount || 1)
         };
       }
@@ -794,7 +627,7 @@ export function CommandCenter() {
       price: newEventData.price || 'Gratuito',
       organizer: newEventData.organizer || 'Administração MotoLegado',
       status: 'aprovado',
-      checkedIn: true,
+      checkedIn: false,
       memberCount: 10
     };
     const updated = [createdEvt, ...events];
@@ -972,6 +805,7 @@ export function CommandCenter() {
     });
     setRoutes(updatedRoutes);
     localStorage.setItem('motolegado_routes', JSON.stringify(updatedRoutes));
+    localStorage.setItem('motolegado_routes_v3', JSON.stringify(updatedRoutes));
     window.dispatchEvent(new Event('routes-updated'));
     
     if (action === 'approve') {
@@ -1014,6 +848,79 @@ export function CommandCenter() {
     return matchesFilter && matchesSearch;
   });
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] p-8 text-center space-y-4">
+        <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
+        <p className="text-xs font-black uppercase tracking-widest text-slate-400">Verificando credenciais do comando...</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="p-4 sm:p-8 max-w-4xl mx-auto min-h-[80vh] flex flex-col items-center justify-center">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          className="bento-card p-8 sm:p-12 text-center border-red-500/30 bg-slate-900/60 backdrop-blur-xl relative overflow-hidden w-full shadow-[0_0_50px_rgba(239,68,68,0.15)]"
+        >
+          <div className="w-20 h-20 bg-red-500/10 border border-red-500/30 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(239,68,68,0.2)]">
+            <Lock className="w-10 h-10 text-red-500" />
+          </div>
+
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-black uppercase tracking-[0.25em] mb-4">
+            <ShieldAlert size={14} />
+            ACESSO RESTRITO • PROTOCOLO DE SEGURANÇA
+          </div>
+
+          <h1 className="text-2xl sm:text-4xl font-black italic uppercase tracking-tighter text-white mb-3">
+            CENTRO DE COMANDO <span className="text-red-500">BLOQUEADO</span>
+          </h1>
+
+          <p className="text-slate-400 text-xs sm:text-sm font-medium leading-relaxed max-w-xl mx-auto mb-8">
+            Este módulo de moderação, homologação de Moto Clubes, auditoria de rotas e telemetria é de uso exclusivo para <strong className="text-white">Administradores do Sistema</strong>.
+          </p>
+
+          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-6 max-w-md mx-auto text-left space-y-3 mb-8">
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-800/80">
+              <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Piloto Conectado</span>
+              <span className="text-white font-black truncate max-w-[180px]">{profile?.name || user?.email || 'Piloto'}</span>
+            </div>
+            <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-800/80">
+              <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Papel Atual (Role)</span>
+              <span className="text-amber-400 font-black uppercase text-[10px] px-2 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/20">
+                {profile?.role || 'pilot'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Permissão Requerida</span>
+              <span className="text-red-400 font-black uppercase text-[10px] px-2 py-0.5 bg-red-500/10 rounded-md border border-red-500/20">
+                admin
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-black italic uppercase text-xs tracking-widest transition-all shadow-[0_0_20px_rgba(234,88,12,0.3)] cursor-pointer"
+            >
+              <ArrowLeft size={16} />
+              VOLTAR AO DASHBOARD
+            </button>
+            <button
+              onClick={() => navigate('/profile')}
+              className="w-full sm:w-auto px-8 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl font-bold uppercase text-xs tracking-widest transition-all cursor-pointer border border-slate-700"
+            >
+              VER MEU PERFIL
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 bg-slate-950 min-h-screen text-slate-100 pb-32">
       
@@ -1044,13 +951,15 @@ export function CommandCenter() {
           </div>
 
           {/* Quick summary badge */}
-          <div className="bg-slate-950/80 border border-amber-500/30 p-5 rounded-2xl flex items-center gap-4 shrink-0 shadow-inner">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-xl">
-              {totalPendingAll}
-            </div>
-            <div>
-              <div className="text-[10px] font-black uppercase text-amber-400 tracking-widest">PENDÊNCIAS TOTAIS</div>
-              <div className="text-xs text-slate-300 font-bold">Solicitações Aguardando Análise</div>
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="bg-slate-950/80 border border-amber-500/30 p-5 rounded-2xl flex items-center gap-4 shadow-inner">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-xl">
+                {totalPendingAll}
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase text-amber-400 tracking-widest">PENDÊNCIAS TOTAIS</div>
+                <div className="text-xs text-slate-300 font-bold">Solicitações Aguardando Análise</div>
+              </div>
             </div>
           </div>
         </div>

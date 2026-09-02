@@ -15,22 +15,62 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
 
 export function MotoClubApplication() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
 
-  // Mock Pilot Data (representing the current visitor)
+  const pilotName = profile?.name || 'Piloto MotoLegado';
+  const pilotEmail = profile?.email || '';
+  const pilotBike = profile?.motorcycle || 'Motocicleta Principal';
+  const pilotPoints = profile?.points ?? 0;
+  const pilotTier = profile?.tier || 'Bronze';
+  const pilotAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
+    ? profile.avatar_url
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotName)}&background=ea580c&color=ffffff&bold=true`;
+
   const pilot = {
-    name: 'Piloto Convidado',
-    nickname: 'Shadow Rider',
-    id: 'ID #MC-7729',
-    city: 'Joinville, SC',
-    motorcycle: 'BMW R1250 GS',
-    experience: '8 Anos',
-    kmTraveled: '42.500 KM',
-    photo: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&q=80&w=400'
+    name: pilotName,
+    nickname: pilotName.split(' ')[0] || 'Piloto',
+    id: `ID #${profile?.id ? profile.id.slice(0, 8).toUpperCase() : 'ML-001'}`,
+    city: profile?.city || 'Brasil',
+    motorcycle: pilotBike,
+    experience: `${pilotTier} (${pilotPoints} PTS)`,
+    kmTraveled: `${pilotPoints * 2} KM`,
+    photo: pilotAvatar
+  };
+
+  const handleSendApplication = () => {
+    setStatus('sending');
+
+    // Persist real application request
+    try {
+      const existingStr = localStorage.getItem('motolegado_club_applications');
+      const existing = existingStr ? JSON.parse(existingStr) : [];
+      const newApp = {
+        id: `app_${Date.now()}`,
+        clubId: id,
+        pilotId: profile?.id || `pilot_${Date.now()}`,
+        pilotName,
+        pilotEmail,
+        pilotBike,
+        pilotAvatar,
+        appliedAt: new Date().toISOString()
+      };
+      localStorage.setItem('motolegado_club_applications', JSON.stringify([newApp, ...existing]));
+    } catch (e) {
+      console.error('Error saving club application', e);
+    }
+
+    setTimeout(() => {
+      setStatus('sent');
+      setTimeout(() => {
+        navigate(`/motoclubes`);
+      }, 1800);
+    }, 1200);
   };
 
   return (
@@ -158,15 +198,7 @@ export function MotoClubApplication() {
 
           <button 
             disabled={status !== 'idle'}
-            onClick={() => {
-              setStatus('sending');
-              setTimeout(() => {
-                setStatus('sent');
-                setTimeout(() => {
-                  navigate(`/motoclub/${id}`);
-                }, 2000);
-              }, 1500);
-            }}
+            onClick={handleSendApplication}
             className={cn(
               "w-full py-6 text-white rounded-[2rem] font-black italic uppercase tracking-[0.3em] text-lg hover:scale-[1.03] active:scale-95 transition-all relative group overflow-hidden",
               status === 'sent' 

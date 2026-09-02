@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
 import { Sidebar } from "./components/Sidebar";
 import { LandingPage } from "./components/LandingPage";
 import { Dashboard } from "./components/Dashboard";
@@ -7,7 +8,6 @@ import { Routes as RoutesList } from "./components/Routes";
 import { ProfileDashboard } from "./components/ProfileDashboard";
 import { ProfileSettings } from "./components/ProfileSettings";
 import { Logbook } from "./components/Logbook";
-import { MotoClub } from "./components/MotoClub";
 import { MotoClubsList } from "./components/MotoClubsList";
 import { MotoClubDetail } from "./components/MotoClubDetail";
 import { MotoClubMural } from "./components/MotoClubMural";
@@ -17,6 +17,7 @@ import { Partners } from "./components/Partners";
 import { CommandCenter } from "./components/CommandCenter";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "./lib/utils";
+import "./utils/systemReset";
 
 // Mock Achievements Page
 function Achievements() {
@@ -85,7 +86,7 @@ function AppLayout() {
             <Route path="/community" element={<Feed />} />
             <Route path="/routes" element={<RoutesList />} />
             <Route path="/achievements" element={<Achievements />} />
-            <Route path="/motoclub" element={<MotoClub />} />
+            <Route path="/motoclub" element={<MotoClubsList />} />
             <Route path="/motoclubes" element={<MotoClubsList />} />
             <Route path="/motoclub/:id" element={<MotoClubDetail />} />
             <Route path="/motoclub/:id/mural" element={<MotoClubMural />} />
@@ -105,7 +106,9 @@ function AppLayout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppLayout />
+      <AuthProvider>
+        <AppLayout />
+      </AuthProvider>
     </BrowserRouter>
   );
 }

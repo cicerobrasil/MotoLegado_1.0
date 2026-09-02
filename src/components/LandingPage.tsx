@@ -7,47 +7,145 @@ import {
   Store, 
   BookOpen, 
   Trophy, 
-  Users, 
   Zap, 
   CheckCircle2, 
   X, 
   ArrowRight, 
   ChevronRight, 
-  Lock, 
   User, 
-  Check, 
   Sparkles,
-  Compass,
   Star,
-  Layers
+  Layers,
+  AlertCircle,
+  Loader2,
+  Database,
+  Info,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const { 
+    signInWithEmail, 
+    signUpWithEmail, 
+    signInWithGoogle, 
+    isSupabaseConfigured 
+  } = useAuth();
+
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginTab, setLoginTab] = useState<'login' | 'register'>('login');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isCredentialError, setIsCredentialError] = useState(false);
+  const [isAlreadyRegisteredError, setIsAlreadyRegisteredError] = useState(false);
+  const [authSuccess, setAuthSuccess] = useState<string | null>(null);
+  const [showConfigTip, setShowConfigTip] = useState(false);
   
-  // Pilot Form State
-  const [pilotName, setPilotName] = useState('Piloto de Testes');
-  const [pilotEmail, setPilotEmail] = useState('piloto@motolegado.com');
-  const [pilotPassword, setPilotPassword] = useState('••••••••');
-  const [bikeModel, setBikeModel] = useState('BMW R 1250 GS Adventure');
+  // Pilot Form State (zerado por padrão)
+  const [pilotName, setPilotName] = useState('');
+  const [pilotEmail, setPilotEmail] = useState('');
+  const [pilotPassword, setPilotPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [bikeModel, setBikeModel] = useState('');
 
-  const handleStartSession = (e: React.FormEvent) => {
-    e.preventDefault();
-    localStorage.setItem('motolegado_demo_mode', 'false');
-    localStorage.setItem('motolegado_pilot_name', pilotName || 'Piloto de Testes');
-    setShowLoginModal(false);
-    navigate('/dashboard');
+  const formatErrorMessage = (message?: string) => {
+    if (!message) return 'Ocorreu um erro na autenticação.';
+    const lower = message.toLowerCase();
+    if (lower.includes('invalid login credentials') || lower.includes('invalid_grant')) {
+      return 'E-mail ou senha incorretos, ou a conta ainda não foi criada no banco de dados.';
+    }
+    if (lower.includes('user already registered') || lower.includes('already registered')) {
+      return 'Este e-mail já possui cadastro no Supabase Auth.';
+    }
+    if (lower.includes('password should be at least 6 characters') || lower.includes('at least 6 characters')) {
+      return 'A senha de acesso deve ter no mínimo 6 caracteres.';
+    }
+    if (lower.includes('email not confirmed')) {
+      return 'E-mail não confirmado. Verifique sua caixa de entrada ou confirme no painel do Supabase.';
+    }
+    if (lower.includes('rate limit')) {
+      return 'Muitas tentativas consecutivas. Aguarde alguns segundos e tente novamente.';
+    }
+    return message;
   };
 
-  const handleDemoAccess = () => {
-    localStorage.setItem('motolegado_demo_mode', 'true');
-    localStorage.setItem('motolegado_pilot_name', 'Piloto de Testes');
-    setShowLoginModal(false);
-    navigate('/dashboard');
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setIsCredentialError(false);
+    setIsAlreadyRegisteredError(false);
+    setAuthSuccess(null);
+    setAuthLoading(true);
+
+    try {
+      if (loginTab === 'login') {
+        const { error } = await signInWithEmail(pilotEmail, pilotPassword);
+        if (error) {
+          const rawMsg = error.message || '';
+          const isCred = rawMsg.toLowerCase().includes('invalid login credentials') || rawMsg.toLowerCase().includes('invalid_grant');
+          setIsCredentialError(isCred);
+          setAuthError(formatErrorMessage(rawMsg));
+          setAuthLoading(false);
+          return;
+        }
+        setShowLoginModal(false);
+        navigate('/dashboard');
+      } else {
+        const { error } = await signUpWithEmail(pilotEmail, pilotPassword, {
+          name: pilotName || pilotEmail.split('@')[0],
+          motorcycle: bikeModel,
+        });
+        if (error) {
+          const rawMsg = error.message || '';
+          const isRegistered = rawMsg.toLowerCase().includes('already registered') || rawMsg.toLowerCase().includes('user already exists');
+          setIsAlreadyRegisteredError(isRegistered);
+          setAuthError(formatErrorMessage(rawMsg));
+          setAuthLoading(false);
+          return;
+        }
+        setAuthSuccess('Cadastro realizado com sucesso! Redirecionando...');
+        setTimeout(() => {
+          setShowLoginModal(false);
+          navigate('/dashboard');
+        }, 1200);
+      }
+    } catch (err: any) {
+      setAuthError(formatErrorMessage(err?.message));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSwitchToRegister = () => {
+    setLoginTab('register');
+    setAuthError(null);
+    setIsCredentialError(false);
+    setIsAlreadyRegisteredError(false);
+    if (!pilotName && pilotEmail) {
+      const suggested = pilotEmail.split('@')[0];
+      setPilotName(suggested.charAt(0).toUpperCase() + suggested.slice(1));
+    }
+  };
+
+  const handleSwitchToLogin = () => {
+    setLoginTab('login');
+    setAuthError(null);
+    setIsCredentialError(false);
+    setIsAlreadyRegisteredError(false);
+  };
+
+  const handleGoogleLogin = async () => {
+    setAuthError(null);
+    setAuthLoading(true);
+    const { error } = await signInWithGoogle();
+    if (error) {
+      setAuthError(error.message);
+      setAuthLoading(false);
+    }
   };
 
   return (
@@ -486,22 +584,136 @@ export function LandingPage() {
               </button>
 
               <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[9px] font-black uppercase rounded-full">
-                  <User size={12} />
-                  <span>Acesso do Piloto</span>
+                <div className="flex items-center justify-between">
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[9px] font-black uppercase rounded-full">
+                    <User size={12} />
+                    <span>Acesso do Piloto</span>
+                  </div>
+
+                  {isSupabaseConfigured ? (
+                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[8px] font-black uppercase rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span>Supabase Conectado</span>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-800/80 border border-slate-700/80 text-slate-400 text-[8px] font-black uppercase rounded-full">
+                      <Database size={10} />
+                      <span>Autenticação Local</span>
+                    </div>
+                  )}
                 </div>
+
                 <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white">
                   INICIAR SESSÃO NO <span className="text-orange-500">MOTOLEGADO</span>
                 </h3>
+              </div>
+
+              {/* Status & Error Alerts */}
+              <AnimatePresence>
+                {authError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="p-3.5 bg-red-950/70 border border-red-800/80 rounded-2xl flex flex-col gap-2 text-xs text-red-300 shadow-inner"
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                      <div className="flex-1 font-medium leading-relaxed">{authError}</div>
+                    </div>
+                    {isCredentialError && loginTab === 'login' && (
+                      <button
+                        type="button"
+                        onClick={handleSwitchToRegister}
+                        className="mt-1 w-full py-2 px-3 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/40 text-orange-300 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <User size={12} className="text-orange-400" />
+                        <span>Primeira vez? Criar Cadastro com este E-mail</span>
+                      </button>
+                    )}
+
+                    {isAlreadyRegisteredError && loginTab === 'register' && (
+                      <div className="flex flex-col gap-2 mt-1">
+                        <button
+                          type="button"
+                          onClick={handleSwitchToLogin}
+                          className="w-full py-2 px-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                        >
+                          <span>Entrar com Conta Existente</span>
+                          <ArrowRight size={12} />
+                        </button>
+                        
+                        <div className="p-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-[10px] text-slate-300 leading-relaxed font-normal">
+                          <p className="font-bold text-orange-400 mb-1 flex items-center gap-1">
+                            <Info size={12} />
+                            Por que isso acontece se você limpou a tabela profiles?
+                          </p>
+                          No Supabase, as contas de login ficam salvas em <strong className="text-white">Authentication &gt; Users</strong> (menu lateral esquerdo), e não na tabela <code>profiles</code>.
+                          <br />
+                          Para recriar uma nova senha do zero, basta entrar em <strong className="text-white">Authentication &gt; Users</strong> no Supabase e excluir o usuário lá.
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {authSuccess && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="p-3 bg-emerald-950/60 border border-emerald-800/80 rounded-xl flex items-start gap-2.5 text-xs text-emerald-300"
+                  >
+                    <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 font-medium">{authSuccess}</div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Google Social Login Button */}
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={authLoading}
+                className="w-full py-3 px-4 bg-slate-950 hover:bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-xl text-xs font-black uppercase tracking-wider text-white flex items-center justify-center gap-3 transition-all cursor-pointer shadow-md disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+                <span>Continuar com o Google</span>
+              </button>
+
+              <div className="relative flex items-center justify-center">
+                <div className="border-t border-slate-800 w-full"></div>
+                <span className="bg-slate-900 px-3 text-[9px] font-black uppercase tracking-widest text-slate-500">ou com e-mail</span>
+                <div className="border-t border-slate-800 w-full"></div>
               </div>
 
               {/* Login / Register Tab Toggle */}
               <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setLoginTab('login')}
+                  onClick={() => {
+                    setLoginTab('login');
+                    setAuthError(null);
+                  }}
                   className={cn(
-                    "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all",
+                    "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
                     loginTab === 'login' ? "bg-orange-600 text-slate-950 font-black shadow-md" : "text-slate-400 hover:text-white"
                   )}
                 >
@@ -509,9 +721,12 @@ export function LandingPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setLoginTab('register')}
+                  onClick={() => {
+                    setLoginTab('register');
+                    setAuthError(null);
+                  }}
                   className={cn(
-                    "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all",
+                    "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
                     loginTab === 'register' ? "bg-orange-600 text-slate-950 font-black shadow-md" : "text-slate-400 hover:text-white"
                   )}
                 >
@@ -519,7 +734,7 @@ export function LandingPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleStartSession} className="space-y-4">
+              <form onSubmit={handleEmailAuth} className="space-y-4">
                 {loginTab === 'register' && (
                   <div className="space-y-1">
                     <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Nome de Piloto / Apelido</label>
@@ -527,7 +742,7 @@ export function LandingPage() {
                       type="text"
                       value={pilotName}
                       onChange={(e) => setPilotName(e.target.value)}
-                      placeholder="Ex: Alex Rider"
+                      placeholder=""
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
                       required
                     />
@@ -540,7 +755,7 @@ export function LandingPage() {
                     type="email"
                     value={pilotEmail}
                     onChange={(e) => setPilotEmail(e.target.value)}
-                    placeholder="piloto@motolegado.com"
+                    placeholder=""
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
                     required
                   />
@@ -548,14 +763,27 @@ export function LandingPage() {
 
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Senha de Acesso</label>
-                  <input
-                    type="password"
-                    value={pilotPassword}
-                    onChange={(e) => setPilotPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      id="pilot-password-input"
+                      type={showPassword ? "text" : "password"}
+                      value={pilotPassword}
+                      onChange={(e) => setPilotPassword(e.target.value)}
+                      placeholder=""
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 pr-10 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                      required
+                    />
+                    <button
+                      type="button"
+                      id="toggle-password-visibility-btn"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Ocultar senha" : "Ver senha"}
+                      title={showPassword ? "Ocultar senha" : "Ver senha"}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-400 transition-colors p-1 cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
 
                 {loginTab === 'register' && (
@@ -565,7 +793,7 @@ export function LandingPage() {
                       type="text"
                       value={bikeModel}
                       onChange={(e) => setBikeModel(e.target.value)}
-                      placeholder="Ex: BMW R 1250 GS"
+                      placeholder=""
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
                     />
                   </div>
@@ -573,23 +801,48 @@ export function LandingPage() {
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 bg-orange-600 hover:bg-orange-500 text-slate-950 font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer mt-2"
+                  disabled={authLoading}
+                  className="w-full py-3.5 bg-orange-600 hover:bg-orange-500 text-slate-950 font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
                 >
-                  <span>{loginTab === 'login' ? 'Entrar no Sistema' : 'Concluir Cadastro & Entrar'}</span>
-                  <ArrowRight size={14} />
+                  {authLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Conectando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{loginTab === 'login' ? 'Entrar no Sistema' : 'Concluir Cadastro & Entrar'}</span>
+                      <ArrowRight size={14} />
+                    </>
+                  )}
                 </button>
               </form>
 
-              {/* Demo Login Option */}
-              <div className="pt-4 border-t border-slate-800/80 text-center">
-                <button
-                  type="button"
-                  onClick={handleDemoAccess}
-                  className="text-[10px] font-black uppercase tracking-wider text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
-                >
-                  ⚡ Entrar com Conta Demo de Teste (Piloto de Testes)
-                </button>
-              </div>
+              {!isSupabaseConfigured && (
+                <div className="pt-3 border-t border-slate-800/80 space-y-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowConfigTip(!showConfigTip)}
+                    className="text-[9px] text-slate-500 hover:text-slate-300 flex items-center justify-center gap-1 mx-auto cursor-pointer transition-colors"
+                  >
+                    <Info size={10} />
+                    <span>Como conectar com meu projeto Supabase?</span>
+                  </button>
+
+                  {showConfigTip && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left text-[10px] text-slate-400 space-y-1.5"
+                    >
+                      <p className="font-bold text-white">Configuração do Supabase:</p>
+                      <p>1. Crie um projeto em <strong className="text-orange-400">supabase.com</strong>.</p>
+                      <p>2. Execute o script <strong className="text-orange-400">supabase/schema.sql</strong> no SQL Editor do Supabase.</p>
+                      <p>3. Configure <strong className="text-orange-400">VITE_SUPABASE_URL</strong> e <strong className="text-orange-400">VITE_SUPABASE_ANON_KEY</strong> nas variáveis de ambiente.</p>
+                    </motion.div>
+                  )}
+                </div>
+              )}
             </motion.div>
           </div>
         )}

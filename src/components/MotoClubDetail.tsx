@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Shield, MapPin, Users, Calendar, ExternalLink, Trophy, UserCheck, ArrowLeft, Star } from 'lucide-react';
+import { Shield, MapPin, Users, Calendar, ExternalLink, Trophy, ArrowLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 
@@ -7,48 +7,102 @@ export function MotoClubDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // Mock data for the specific club (id=1, focusing on Devoradores de Asfalto style)
-  const club = {
-    name: 'DEVORADORES DE ASFALTO',
-    city: 'CURITIBA, PR',
-    membersCount: 154,
-    estYear: 2021,
-    description: 'Unidos pela estrada e pela liberdade. Nascido nas ruas de Curitiba, o Devoradores de Asfalto busca integrar pilotos que amam viagens de longa distância e mecânica clássica.',
-    banner: 'https://images.unsplash.com/photo-1558981852-4211a0978665?auto=format&fit=crop&q=80&w=1600',
+  // Load real club data from storage or fallback
+  const savedClubsStr = typeof window !== 'undefined' ? localStorage.getItem('motolegado_clubs') : null;
+  let storedClub: any = null;
+  if (savedClubsStr) {
+    try {
+      const parsed = JSON.parse(savedClubsStr);
+      storedClub = parsed.find((c: any) => String(c.id) === String(id) || String(c.clubName || '').toLowerCase() === String(id || '').toLowerCase());
+    } catch {
+      storedClub = null;
+    }
+  }
+
+  const club = storedClub ? {
+    name: storedClub.clubName || storedClub.name || 'MOTO CLUBE HOMOLOGADO',
+    city: storedClub.city || 'BRASIL',
+    membersCount: storedClub.membersCount || 1,
+    estYear: storedClub.foundationYear || storedClub.estYear || 2024,
+    description: storedClub.description || 'Moto Clube oficial cadastrado e integrado à rede MotoLegado.',
+    banner: storedClub.banner || 'https://images.unsplash.com/photo-1558981852-4211a0978665?auto=format&fit=crop&q=80&w=1600',
     stats: {
-      titles: '12 Gold',
-      activePilots: '45 Ativos'
+      titles: storedClub.titles || 'Oficial',
+      activePilots: `${storedClub.membersCount || 1} Ativos`
     },
     command: {
       president: {
-        name: 'Ricardo "Veludo"',
+        name: storedClub.president || 'Presidente do Clube',
         role: 'PRESIDENTE',
-        km: '9.8K KM',
-        photo: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=200'
+        km: '0 KM',
+        photo: `https://ui-avatars.com/api/?name=${encodeURIComponent(storedClub.president || 'Presidente')}&background=ea580c&color=ffffff&bold=true`
       },
       vice: {
-        name: 'Marcos "Ninja"',
+        name: storedClub.vice || 'Vice-Presidente',
         role: 'VICE-PRESIDENTE',
-        km: '8.4K KM',
-        photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200'
+        km: '0 KM',
+        photo: `https://ui-avatars.com/api/?name=${encodeURIComponent(storedClub.vice || 'Vice')}&background=ea580c&color=ffffff&bold=true`
       },
       secretary: {
-        name: 'Ana "Sombra"',
+        name: storedClub.secretary || 'Secretário(a)',
         role: 'SECRETÁRIA',
-        km: '7.2K KM',
-        photo: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=200'
+        km: '0 KM',
+        photo: `https://ui-avatars.com/api/?name=${encodeURIComponent(storedClub.secretary || 'Secretario')}&background=ea580c&color=ffffff&bold=true`
       },
       roadCaptain: {
-        name: 'Beto "Trovoada"',
+        name: storedClub.roadCaptain || 'Road Captain',
         role: 'ROAD CAPTAIN',
-        km: '12.1K KM',
-        photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200'
+        km: '0 KM',
+        photo: `https://ui-avatars.com/api/?name=${encodeURIComponent(storedClub.roadCaptain || 'Captain')}&background=ea580c&color=ffffff&bold=true`
       },
       treasurer: {
-        name: 'Carla "Fênix"',
+        name: storedClub.treasurer || 'Tesoureiro(a)',
         role: 'TESOUREIRA',
-        km: '5.9K KM',
-        photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200'
+        km: '0 KM',
+        photo: `https://ui-avatars.com/api/?name=${encodeURIComponent(storedClub.treasurer || 'Tesoureiro')}&background=ea580c&color=ffffff&bold=true`
+      }
+    }
+  } : {
+    name: 'MOTO CLUBE MOTOLEGADO',
+    city: 'BRASIL',
+    membersCount: 0,
+    estYear: 2024,
+    description: 'Moto Clube homologado e integrado à rede oficial MotoLegado.',
+    banner: 'https://images.unsplash.com/photo-1558981852-4211a0978665?auto=format&fit=crop&q=80&w=1600',
+    stats: {
+      titles: 'Oficial',
+      activePilots: '0 Ativos'
+    },
+    command: {
+      president: {
+        name: 'Presidente',
+        role: 'PRESIDENTE',
+        km: '0 KM',
+        photo: 'https://ui-avatars.com/api/?name=Presidente&background=ea580c&color=ffffff&bold=true'
+      },
+      vice: {
+        name: 'Vice-Presidente',
+        role: 'VICE-PRESIDENTE',
+        km: '0 KM',
+        photo: 'https://ui-avatars.com/api/?name=Vice&background=ea580c&color=ffffff&bold=true'
+      },
+      secretary: {
+        name: 'Secretário',
+        role: 'SECRETÁRIA',
+        km: '0 KM',
+        photo: 'https://ui-avatars.com/api/?name=Secretario&background=ea580c&color=ffffff&bold=true'
+      },
+      roadCaptain: {
+        name: 'Road Captain',
+        role: 'ROAD CAPTAIN',
+        km: '0 KM',
+        photo: 'https://ui-avatars.com/api/?name=Captain&background=ea580c&color=ffffff&bold=true'
+      },
+      treasurer: {
+        name: 'Tesoureiro',
+        role: 'TESOUREIRA',
+        km: '0 KM',
+        photo: 'https://ui-avatars.com/api/?name=Tesoureiro&background=ea580c&color=ffffff&bold=true'
       }
     }
   };

@@ -7,7 +7,6 @@ import {
   ArrowRight, 
   Star, 
   Plus, 
-  MessageSquare, 
   Calendar, 
   Tag, 
   ChevronDown, 
@@ -19,7 +18,6 @@ import {
   Trash2, 
   Check, 
   Sparkles,
-  User, 
   Tablet as Motorcycle,
   Settings
 } from 'lucide-react';
@@ -27,72 +25,49 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
-const MOCK_CLUBS = [
-  {
-    id: 1,
-    name: 'Falcões da Noite',
-    city: 'Curitiba, PR',
-    members: 124,
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1558981403-c5f91cbba527?auto=format&fit=crop&q=80&w=800',
-    logo: 'https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?auto=format&fit=crop&q=80&w=100',
-    description: 'Irmandade e asfalto. Fundado em 1998 para unir apaixonados por Harley-Davidson.',
-    category: 'Cruiser'
-  },
-  {
-    id: 2,
-    name: 'Asas de Aço MC',
-    city: 'Balneário Camboriú, SC',
-    members: 86,
-    rating: 4.8,
-    image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&q=80&w=800',
-    logo: 'https://images.unsplash.com/photo-1614332287897-cdc485fa562d?auto=format&fit=crop&q=80&w=100',
-    description: 'Focado em viagens de longa distância e ajuda comunitária nas estradas catarinenses.',
-    category: 'Touring'
-  },
-  {
-    id: 3,
-    name: 'Nômades do Sul',
-    city: 'Porto Alegre, RS',
-    members: 210,
-    rating: 4.7,
-    image: 'https://images.unsplash.com/photo-1458178401933-2046a546050b?auto=format&fit=crop&q=80&w=800',
-    logo: 'https://images.unsplash.com/photo-1533107862482-0e6974b06ec4?auto=format&fit=crop&q=80&w=100',
-    description: 'Liberdade sem fronteiras. Aceitamos todos os tipos de cilindrada e perfis de pilotos.',
-    category: 'Mixed'
-  }
-];
+export interface ClubItem {
+  id: string | number;
+  name: string;
+  city: string;
+  members: number;
+  rating: number;
+  image: string;
+  logo: string;
+  description: string;
+  category: string;
+}
 
 export function MotoClubsList() {
   const navigate = useNavigate();
   const [activeMainTab, setActiveMainTab] = useState<'explorar' | 'gestao'>('explorar');
   const [searchTerm, setSearchTerm] = useState('');
+  const [clubs, setClubs] = useState<ClubItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('motolegado_clubs');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // Gestão State Variables
   const [gestaoSubTab, setGestaoSubTab] = useState<'dados' | 'solicitacoes' | 'comando'>('dados');
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [newMember, setNewMember] = useState({ name: '', role: 'Membro' });
   
-  const [pendingRequests, setPendingRequests] = useState([
-    { id: '1', name: 'Rodrigo "Trovão"', city: 'Blumenau, SC', bike: 'Tiger 900 Rally Pro', photo: 'https://i.pravatar.cc/150?u=a' },
-    { id: '2', name: 'Juliana "Vento"', city: 'Florianópolis, SC', bike: 'Harley Fat Boy', photo: 'https://i.pravatar.cc/150?u=b' }
-  ]);
+  const [pendingRequests, setPendingRequests] = useState<Array<{ id: string; name: string; city: string; bike: string; photo: string }>>([]);
 
-  const [clubMembers, setClubMembers] = useState([
-    { id: 'm1', name: 'Ricardo "Veludo"', photo: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=200', role: 'Presidente', km: '9.8K' },
-    { id: 'm2', name: 'Marcos "Ninja"', photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200', role: 'Vice-Presidente', km: '8.4K' },
-    { id: 'm3', name: 'Ana "Sombra"', photo: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=200', role: 'Membro', km: '7.2K' },
-  ]);
+  const [clubMembers, setClubMembers] = useState<Array<{ id: string; name: string; photo: string; role: string; km: string }>>([]);
 
   const [clubRegistry, setClubRegistry] = useState({
-    name: 'DEVORADORES DE ASFALTO',
-    city: 'Curitiba, PR',
-    about: 'Irmandade, estrada e amizade. Somos focados em viagens seguras e eventos beneficentes.',
-    foundationDate: '2021-05-15',
+    name: '',
+    city: '',
+    about: '',
+    foundationDate: '',
     category: 'Cruiser',
     logo: null as string | null,
     banner: null as string | null,
-    president: 'Ricardo "Veludo"',
+    president: '',
     regulationsFileName: null as string | null
   });
 
@@ -143,7 +118,7 @@ export function MotoClubsList() {
     setShowAddMemberModal(false);
   };
 
-  const filteredClubs = MOCK_CLUBS.filter(club => 
+  const filteredClubs = clubs.filter(club => 
     club.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     club.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
     club.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -299,6 +274,24 @@ export function MotoClubsList() {
                 </div>
               </motion.div>
             ))}
+
+            {filteredClubs.length === 0 && (
+              <div className="col-span-full py-20 text-center space-y-6">
+                <div className="w-20 h-20 bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                  <Shield size={32} className="text-slate-700" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-lg font-black text-slate-400 italic uppercase">Nenhum Moto Clube Encontrado</p>
+                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.4em]">SEJA O PRIMEIRO A REGISTRAR SEU CLUBE NA COMUNIDADE</p>
+                </div>
+                <button
+                  onClick={() => setActiveMainTab('gestao')}
+                  className="px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-600/20 cursor-pointer"
+                >
+                  Cadastrar Meu Moto Clube
+                </button>
+              </div>
+            )}
           </motion.div>
         ) : (
           <motion.div

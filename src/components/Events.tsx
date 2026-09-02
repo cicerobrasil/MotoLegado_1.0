@@ -11,11 +11,9 @@ import {
   Compass, 
   Tag, 
   AlertTriangle, 
-  Filter, 
   Bookmark, 
   X, 
   Sparkles,
-  Award,
   Users,
   Upload,
   Image as ImageIcon,
@@ -25,15 +23,9 @@ import {
   Link as LinkIcon,
   Eye,
   Info,
-  FileText,
-  ShieldCheck,
-  ShieldAlert,
   Edit3,
   Trash2,
-  XCircle,
-  AlertCircle,
-  Sliders,
-  CheckSquare
+  XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -152,152 +144,7 @@ export const generateCategorySvgCover = (category: string) => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
-const DEFAULT_EVENTS: MotoEvent[] = [
-  {
-    id: "e_pend_1",
-    title: "Encontro Regional de Custom & Vintage (Pendente)",
-    desc: "Aguardando aprovação da administração. Exposição de motos clássicas, mercado de peças raras e recepção aos motociclistas de fora.",
-    time: "A PARTIR DAS 10:00",
-    date: "2026-07-18",
-    location: "Praça Central - Blumenau, SC",
-    distance: 60,
-    category: "Festas & Encontros",
-    image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80&w=800",
-    checkedIn: false,
-    memberCount: 1,
-    status: 'pendente',
-    createdBy: 'Irmandade Vintage MC',
-    createdAt: '2026-08-10'
-  },
-  {
-    id: "e_pend_2",
-    title: "Rali Noturno de Regularidade Big Trail (Pendente)",
-    desc: "Aguardando aprovação. Rota noturna pelas serras com navegação por GPS e pontos de apoio com guincho e resgate.",
-    time: "SÁBADO ÀS 20:00",
-    date: "2026-08-01",
-    location: "São Joaquim, SC",
-    distance: 180,
-    category: "Off-Road",
-    image: "https://images.unsplash.com/photo-1517649763962-0c623266010b?auto=format&fit=crop&q=80&w=800",
-    checkedIn: false,
-    memberCount: 1,
-    status: 'pendente',
-    createdBy: 'Clube Big Trail Sul',
-    createdAt: '2026-08-10'
-  },
-  {
-    id: "e_fest_1",
-    title: "1º MotoFest & Rock'n'Roll Night",
-    desc: "Evento estático de celebração! Show de rock ao vivo, praça de alimentação com food trucks, estandes custom, chopp artesanal e troféus para Moto Clubes.",
-    time: "SÁBADO A PARTIR DAS 16:00",
-    date: "2026-06-13",
-    location: "Sede MC Lendas - Joinville, SC",
-    distance: 0,
-    category: "Festas & Encontros",
-    image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=800",
-    checkedIn: true,
-    memberCount: 420,
-    status: 'aprovado'
-  },
-  {
-    id: "e0",
-    title: "Grande Comboio da Fraternidade",
-    desc: "Encontro aberto para todos os estilos e cilindradas. Confraternização, música ao vivo e trajeto em comboio unificado.",
-    time: "HOJE AS 10:00",
-    date: "2026-06-01",
-    location: "Florianópolis, SC",
-    distance: 150,
-    category: "Geral",
-    image: "https://images.unsplash.com/photo-1558981403-c5f91cbba527?auto=format&fit=crop&q=80&w=800",
-    checkedIn: true,
-    memberCount: 310,
-    status: 'aprovado'
-  },
-  {
-    id: "e_fest_2",
-    title: "Encontro Mensal & Churrasco MC",
-    desc: "Reunião estática de confraternização com churrasco coletivo, recepção para facções de todo o país e área de camping coberta.",
-    time: "14 DE JUNHO DAS 11:00 ÀS 22:00",
-    date: "2026-06-14",
-    location: "Parque de Eventos - Jaraguá do Sul, SC",
-    distance: 0,
-    category: "Festas & Encontros",
-    image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=800",
-    checkedIn: false,
-    memberCount: 280,
-    status: 'aprovado'
-  },
-  {
-    id: "e1",
-    title: "Encontro Harleys & Custom Sul",
-    desc: "O maior encontro de motos custom do sul, com rock, confraternização e estradas de nível europeu.",
-    time: "HÁ 2 HORAS",
-    date: "2026-05-28",
-    location: "Curitiba, PR",
-    distance: 120,
-    category: "On-Road",
-    image: "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&q=80&w=800",
-    checkedIn: true,
-    memberCount: 142,
-    status: 'aprovado'
-  },
-  {
-    id: "e2",
-    title: "Expedição Estrada Real",
-    desc: "A famosa rota histórica conectando lendas e monumentos imperiais sobre duas rodas.",
-    time: "HÁ 5 HORAS",
-    date: "2026-05-29",
-    location: "Tiradentes, MG",
-    distance: 284,
-    category: "On-Road",
-    image: "https://images.unsplash.com/photo-1458178401933-2046a546050b?auto=format&fit=crop&q=80&w=800",
-    checkedIn: true,
-    memberCount: 89,
-    status: 'aprovado'
-  },
-  {
-    id: "e3",
-    title: "Desafio Estendido 500KM",
-    desc: "Para pilotos experientes. Uma jornada do asfalto rumo ao nascer do sol e superação de limites.",
-    time: "ONTEM",
-    date: "2026-05-27",
-    location: "São Paulo, SP",
-    distance: 500,
-    category: "On-Road",
-    image: "https://images.unsplash.com/photo-1558981285-6f0c94958bb6?auto=format&fit=crop&q=80&w=800",
-    checkedIn: true,
-    memberCount: 204,
-    status: 'aprovado'
-  },
-  {
-    id: "e4",
-    title: "Rally Big Trail do Vale",
-    desc: "Trechos mofados, terra batida e vistas exuberantes entre os cânions catarinenses.",
-    time: "SÁBADO AS 08:30",
-    date: "2026-06-06",
-    location: "Blumenau, SC",
-    distance: 220,
-    category: "Off-Road",
-    image: "https://images.unsplash.com/photo-1599819811279-d5ad9cccf838?auto=format&fit=crop&q=80&w=800",
-    checkedIn: false,
-    memberCount: 64,
-    status: 'aprovado'
-  },
-  {
-    id: "e5",
-    title: "Bate-Volta Serra da Graciosa",
-    desc: "Tradicional de Curitiba. Curvas cercadas de mata atlântica nativa e calçamento de paralelepípedo secular.",
-    time: "DOMINGO AS 09:00",
-    date: "2026-06-07",
-    location: "Morretes, PR",
-    distance: 85,
-    category: "Misto",
-    image: "https://images.unsplash.com/photo-1502481851512-e9e2529bbbf9?auto=format&fit=crop&q=80&w=800",
-    checkedIn: false,
-    memberCount: 110,
-    status: 'aprovado'
-  }
-];
+const DEFAULT_EVENTS: MotoEvent[] = [];
 
 const DEFAULT_FALLBACK_IMAGE = generateCategorySvgCover("Geral");
 
@@ -428,15 +275,22 @@ export function Events() {
   // Load and Save LocalStorage sync
   useEffect(() => {
     const saved = localStorage.getItem('motolegado_events');
+
     if (saved) {
       try {
-        setEvents(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        // Remove fake/mock events
+        const mockIds = ['e_pend_1', 'e_pend_2', 'e_fest_1', 'e_fest_2', 'e_sul_1', 'e0', 'e1', 'e2', 'e3', 'e4', 'e5'];
+        const cleaned = parsed.filter((evt: MotoEvent) => !mockIds.includes(evt.id));
+        setEvents(cleaned);
+        localStorage.setItem('motolegado_events', JSON.stringify(cleaned));
       } catch (e) {
-        setEvents(DEFAULT_EVENTS);
+        setEvents([]);
+        localStorage.setItem('motolegado_events', JSON.stringify([]));
       }
     } else {
-      setEvents(DEFAULT_EVENTS);
-      localStorage.setItem('motolegado_events', JSON.stringify(DEFAULT_EVENTS));
+      setEvents([]);
+      localStorage.setItem('motolegado_events', JSON.stringify([]));
     }
   }, []);
 
@@ -476,7 +330,7 @@ export function Events() {
         return {
           ...evt,
           status: 'aprovado' as const,
-          checkedIn: true,
+          checkedIn: false,
           memberCount: Math.max(1, evt.memberCount || 1)
         };
       }

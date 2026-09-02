@@ -1,180 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   MapPin, Star, Clock, ArrowRight, Plus, Search, Sparkles, Navigation, 
-  Share2, Shield, Flame, ThumbsUp, MessageSquare, ExternalLink, RefreshCw, 
-  Check, AlertTriangle, Layers, Fuel, Camera, Info, Eye, X, Heart, Award,
-  ShieldAlert, ShieldCheck, CheckCircle, XCircle
+  ExternalLink, RefreshCw, Check, Fuel, Info, X, Heart, Award,
+  ShieldAlert, CheckCircle, XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Route, RouteDifficulty, RouteRatingMetrics, RouteReview } from '../types';
-
-const INITIAL_ROUTES: Route[] = [
-  {
-    id: "serra-rio-rastro",
-    name: "Serra do Rio do Rastro (SC-390)",
-    mapsAddress: "Serra do Rio do Rastro, Lauro Müller - SC",
-    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Serra+do+Rio+do+Rastro+SC-390",
-    description: "Uma das estradas mais espetaculares do planeta. Com 284 curvas acentuadas e paisagens deslumbrantes da serra catarinense, serpenteia a montanha a mais de 1.400 metros de altitude.",
-    riderTips: "⚡ Dicas Essenciais para Pilotos:\n• Asfalto de concreto na subida, mas fica escorregadio com chuva ou neblina densa.\n• Abasteça em Lauro Müller ou Bom Jardim da Serra (postos escassos no meio da serra).\n• Cuidado com o vento forte nas curvas mais expostas e pontos de parada na pista.\n• Melhor horário: Início da manhã para evitar névoa forte (viragem do tempo rápida).",
-    aiTouristInfo: `🏛️ **Destaques Turísticos & Atrações:**
-- Mirante da Serra do Rio do Rastro (visão panorâmica impressionante das curvas recortadas no paredão de rocha).
-- Cânion das Laranjeiras e Cânion do Funil em Bom Jardim da Serra.
-
-📜 **Curiosidades Históricas:**
-- Antiga rota de tropeiros que subiam a serra no século XIX a cavalo transportando mercadorias entre o litoral e o planalto serrano.
-
-🍲 **Gastronomia Típica:**
-- Entrevero de Pinhão, Paçoca de Pinhão e churrasco de ovelha serrana nos restaurantes no topo da serra.
-
-📸 **Dicas de Fotografia:**
-- Ponto clássico do mirante no topo ao entardecer quando as luzes da iluminação das curvas se acendem.`,
-    difficulty: RouteDifficulty.EXPERT,
-    image: "https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=1200",
-    author: {
-      name: "Conselho MotoLegado",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200"
-    },
-    rating: 4.9,
-    totalRatingsCount: 128,
-    ratingMetrics: {
-      paisagem: 5.0,
-      asfalto: 4.6,
-      curvas: 5.0,
-      seguranca: 4.3,
-      infraestrutura: 4.7
-    },
-    reviews: [
-      {
-        id: "r1",
-        pilotName: "Rodrigo 'KTM' Silveira",
-        pilotAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100",
-        date: "12 de Outubro",
-        overallRating: 5.0,
-        comment: "Experiência surreal na estrada! As curvas são fechadas e exigem atenção contínua na frenagem. Vale cada segundo.",
-        metrics: { paisagem: 5, asfalto: 5, curvas: 5, seguranca: 4, infraestrutura: 4 }
-      },
-      {
-        id: "r2",
-        pilotName: "Mariana Sombra",
-        pilotAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100",
-        date: "02 de Novembro",
-        overallRating: 4.8,
-        comment: "Pegamos neblina na metade da subida. Recomendo jaqueta impermeável e faróis auxiliares bem alinhados.",
-        metrics: { paisagem: 5, asfalto: 4, curvas: 5, seguranca: 4, infraestrutura: 5 }
-      }
-    ],
-    createdAt: "2026-01-15",
-    isFavorite: true,
-    status: 'aprovado'
-  },
-  {
-    id: "estrada-graciosa",
-    name: "Estrada da Graciosa (PR-410)",
-    mapsAddress: "PR-410, Antonina / Morretes - PR",
-    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Estrada+da+Graciosa+PR-410",
-    description: "Rodovia histórica que cruza o trecho mais preservado de Mata Atlântica do Brasil, com paralelepípedos centenários, flores nativas e recantos à beira do rio.",
-    riderTips: "⚡ Dicas Essenciais para Pilotos:\n• Trechos com paralelepípedos úmidos ficam extremamente escorregadios! Moderar velocidade.\n• Curvas travadas e vista constante para o riacho.\n• Vários recantos comunitários com churrasqueiras e banheiros estruturados.",
-    aiTouristInfo: `🏛️ **Destaques Turísticos:**
-- Recantos da Graciosa (Recanto Vista Ladeira e Recanto Bela Vista).
-- Centro Histórico de Morretes e Antonina.
-
-📜 **Curiosidades Históricas:**
-- A estrada começou a ser construída no século XVIII para ligar o Planalto de Curitiba ao litoral paranaense.
-
-🍲 **Gastronomia Típica:**
-- Tradicional Barreado em Morretes acompanhado de farinha de mandioca, banana e cachaça de banana local.`,
-    difficulty: RouteDifficulty.EASY,
-    image: "https://images.unsplash.com/photo-1471466054146-e71bcc0d2bb2?auto=format&fit=crop&q=80&w=1200",
-    author: {
-      name: "Sérgio V8",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200"
-    },
-    rating: 4.8,
-    totalRatingsCount: 84,
-    ratingMetrics: {
-      paisagem: 4.9,
-      asfalto: 4.0,
-      curvas: 4.8,
-      seguranca: 4.6,
-      infraestrutura: 4.8
-    },
-    reviews: [
-      {
-        id: "rg1",
-        pilotName: "Carlos 'BigBore'",
-        pilotAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100",
-        date: "20 de Janeiro",
-        overallRating: 4.8,
-        comment: "Ideal para um bate-volta de fim de semana com parada obrigatória para comer barreado em Morretes!",
-        metrics: { paisagem: 5, asfalto: 4, curvas: 5, seguranca: 5, infraestrutura: 5 }
-      }
-    ],
-    createdAt: "2026-02-01",
-    isFavorite: false,
-    status: 'aprovado'
-  },
-  {
-    id: "rota-das-hortensias",
-    name: "Rota das Hortênsias (Gramado x Canela)",
-    mapsAddress: "RS-235, Gramado / Canela - RS",
-    mapsUrl: "https://www.google.com/maps/search/?api=1&query=RS-235+Gramado+Canela",
-    description: "Cenário cinematográfico na Serra Gaúcha, cercado por hortênsias floridas na primavera e arquitetura enxaimel com curvas suaves e excelente estrutura de apoio.",
-    riderTips: "⚡ Dicas Essenciais para Pilotos:\n• Asfalto impecável em praticamente toda a extensão.\n• Tráfego intenso em finais de semana de temporada (Inverno e Natal Luz).\n• Excelentes postos de gasolina premium e cafés coloniais ao longo da rota.",
-    aiTouristInfo: `🏛️ **Destaques Turísticos:**
-- Lago Negro em Gramado e Catedral de Pedra em Canela.
-- Parque das Sequoias e Mirante do Vale do Quilombo.
-
-🍲 **Gastronomia Típica:**
-- Fondue na pedra, chocolates artesanais e café colonial serrano.`,
-    difficulty: RouteDifficulty.MEDIUM,
-    image: "https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=1200",
-    author: {
-      name: "Aline Motogirl",
-      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200"
-    },
-    rating: 4.9,
-    totalRatingsCount: 96,
-    ratingMetrics: {
-      paisagem: 5.0,
-      asfalto: 5.0,
-      curvas: 4.5,
-      seguranca: 4.9,
-      infraestrutura: 5.0
-    },
-    reviews: [],
-    createdAt: "2026-02-10",
-    isFavorite: false,
-    status: 'aprovado'
-  },
-  {
-    id: "rota-cunha-paraty-pendente",
-    name: "Estrada Real: Cunha x Paraty (Pendente de Análise)",
-    mapsAddress: "SP-171, Cunha - SP / Paraty - RJ",
-    mapsUrl: "https://www.google.com/maps/search/?api=1&query=SP-171+Cunha+Paraty",
-    description: "Percurso histórico serpenteando o Parque Nacional da Serra da Bocaina até o centro histórico de Paraty.",
-    riderTips: "⚡ Dicas Essenciais:\n• Trecho da serra com paralelos de blocos ecológicos e curvas muito inclinadas.\n• Evite descer com pista molhada à noite.",
-    aiTouristInfo: "🏛️ Destaques Turísticos: Lavandário de Cunha, Cachoeira do Flávio e Centro Histórico de Paraty.",
-    difficulty: RouteDifficulty.HARD,
-    image: "https://images.unsplash.com/photo-1519817650390-64a93db51149?auto=format&fit=crop&q=80&w=1200",
-    author: {
-      name: "Renato 'Custom'",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200"
-    },
-    rating: 4.7,
-    totalRatingsCount: 1,
-    ratingMetrics: {
-      paisagem: 4.9,
-      asfalto: 4.2,
-      curvas: 4.8,
-      seguranca: 4.3,
-      infraestrutura: 4.4
-    },
-    reviews: [],
-    createdAt: "2026-08-11",
-    isFavorite: false,
-    status: 'pendente'
-  }
-];
 
 export function Routes() {
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -225,25 +56,40 @@ export function Routes() {
 
   // Load from LocalStorage
   useEffect(() => {
-    const saved = localStorage.getItem('motolegado_routes_v3');
+    const saved = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setRoutes(parsed);
+        if (Array.isArray(parsed)) {
+          const mockIds = ['serra-rio-rastro', 'estrada-graciosa', 'rota-das-hortensias', 'route-pending-1', '1'];
+          const cleaned = parsed.filter((r: Route) => {
+            const name = (r.name || '').toLowerCase();
+            const address = (r.mapsAddress || '').toLowerCase();
+            const author = (r.author?.name || '').toLowerCase();
+            const isMock = mockIds.includes(r.id) ||
+              name.includes('cunha') || name.includes('paraty') || address.includes('cunha') || address.includes('paraty') ||
+              author.includes('renato') || name.includes('estrada real');
+            return !isMock;
+          });
+          setRoutes(cleaned);
+          localStorage.setItem('motolegado_routes_v3', JSON.stringify(cleaned));
+          localStorage.setItem('motolegado_routes', JSON.stringify(cleaned));
           return;
         }
       } catch (e) {
         console.error("Error loading routes", e);
       }
     }
-    setRoutes(INITIAL_ROUTES);
-    localStorage.setItem('motolegado_routes_v3', JSON.stringify(INITIAL_ROUTES));
+    setRoutes([]);
+    localStorage.setItem('motolegado_routes_v3', JSON.stringify([]));
+    localStorage.setItem('motolegado_routes', JSON.stringify([]));
   }, []);
 
   const saveRoutes = (updated: Route[]) => {
     setRoutes(updated);
     localStorage.setItem('motolegado_routes_v3', JSON.stringify(updated));
+    localStorage.setItem('motolegado_routes', JSON.stringify(updated));
+    window.dispatchEvent(new Event('routes-updated'));
   };
 
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {

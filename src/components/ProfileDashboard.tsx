@@ -6,76 +6,108 @@ import { cn } from '../lib/utils';
 import { calculatePilotRank, PILOT_RANKS } from '../lib/gamification';
 import { LogEntry } from './Logbook';
 import { MotoEvent } from './Events';
+import { useAuth } from '../context/AuthContext';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export function ProfileDashboard() {
   const navigate = useNavigate();
+  const { profile, user, refreshProfile } = useAuth();
   const [achievementFilter, setAchievementFilter] = useState<'todas' | 'desbloqueadas' | 'bloqueadas'>('todas');
   const [showRankHierarchyModal, setShowRankHierarchyModal] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [events, setEvents] = useState<MotoEvent[]>([]);
 
-  const [pilotName, setPilotName] = useState(() => {
-    return localStorage.getItem('motolegado_pilot_name') || 'Piloto de Testes';
-  });
-  const [isDemoMode, setIsDemoMode] = useState(() => {
-    const isDemo = localStorage.getItem('motolegado_demo_mode');
-    return isDemo === 'true' || isDemo === null;
-  });
+  const pilotName = profile?.name || 'Piloto MotoLegado';
+  const pilotMotorcycle = profile?.motorcycle || 'Motocicleta Principal';
+  const pilotClub = profile?.club_name || localStorage.getItem('motolegado_pilot_club') || 'Piloto Independente';
+  const pilotAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
+    ? profile.avatar_url
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotName)}&background=ea580c&color=ffffff&bold=true`;
 
   useEffect(() => {
-    const isDemo = localStorage.getItem('motolegado_demo_mode');
-    const storedName = localStorage.getItem('motolegado_pilot_name');
-    if (isDemo === 'true' || isDemo === null) {
-      setIsDemoMode(true);
-      setPilotName('Piloto de Testes');
+    // 1. Carregar diários de bordo reais do Supabase se logado
+    if (isSupabaseConfigured && user) {
+      supabase
+        .from('logbook_trips')
+        .select('*')
+        .eq('pilot_id', user.id)
+        .order('date', { ascending: false })
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            const mappedLogs: LogEntry[] = data.map((t: any) => ({
+              id: t.id,
+              date: t.date || new Date().toISOString().split('T')[0],
+              title: t.title || 'Viagem Registrada',
+              distance: String(t.distance_km || 0),
+              bike: t.bike_model || pilotMotorcycle,
+              origin: t.origin || 'Origem',
+              destination: t.destination || 'Destino',
+              duration: '2h 30min',
+              climate: 'sun',
+              road: 'Tapete (Perfeita)',
+              content: t.notes || '',
+              rating: t.rating || 5,
+              image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
+            }));
+            setLogs(mappedLogs);
+          } else {
+            setLogs([]);
+          }
+        });
     } else {
-      setIsDemoMode(false);
-      setPilotName(storedName || 'Piloto de Testes');
-    }
-
-    // Load logbook from localStorage
-    const savedLogs = localStorage.getItem('motolegado_logs');
-    if (savedLogs) {
-      try {
-        setLogs(JSON.parse(savedLogs));
-      } catch (e) {
-        console.error(e);
+      const savedLogs = localStorage.getItem('motolegado_logs');
+      if (savedLogs) {
+        try {
+          setLogs(JSON.parse(savedLogs));
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        setLogs([]);
       }
     }
 
-    // Load events from localStorage
+    // Load events
     const savedEvents = localStorage.getItem('motolegado_events');
     if (savedEvents) {
       try {
-        setEvents(JSON.parse(savedEvents));
+        const parsed = JSON.parse(savedEvents);
+        const cleaned = parsed.map((evt: any) => ({
+          ...evt,
+          checkedIn: !!evt.checkedIn
+        }));
+        setEvents(cleaned);
       } catch (e) {
         console.error(e);
       }
     }
-  }, []);
+  }, [user, isSupabaseConfigured]);
 
   const loggedKm = logs.reduce((acc, curr) => {
     const val = parseInt(curr.distance, 10);
     return acc + (isNaN(val) ? 0 : val);
   }, 0);
 
-  const totalKm = 12450 + loggedKm;
+  const totalKm = loggedKm;
   const checkedInEvents = events.filter(e => e.checkedIn);
 
   const achievements = [
-    { id: '1', icon: "🌎", title: "Viagem Internacional", desc: "Expedição cruzando fronteiras internacionais", points: 500, unlocked: true, date: "14 Out 2023", category: "Expedição" },
-    { id: '2', icon: "🛣️", title: "Viagem Interestadual", desc: "Pilotagem cruzando divisas estaduais", points: 250, unlocked: true, date: "02 Fev 2024", category: "Navegação" },
-    { id: '3', icon: "🏔️", title: "Alfa da Montanha", desc: "1.000km em trechos de altitude acumulada", points: 250, unlocked: true, date: "22 Mai 2023", category: "Desafio" },
-    { id: '4', icon: "🏎️", title: "Velocidade Constante", desc: "Viagem de longa distância sem paradas extras", points: 100, unlocked: true, date: "11 Ago 2023", category: "Resistência" },
-    { id: '5', icon: "🤝", title: "Irmão de Estrada", desc: "Prestou suporte e ajudou 5 motociclistas", points: 500, unlocked: true, date: "05 Jan 2024", category: "Comunidade" },
-    { id: '6', icon: "🌃", title: "Coruja Noturna", desc: "500km rodados em pilotagem noturna contínua", points: 200, unlocked: false, requirement: "Faltam 180km noturnos para desbloquear", category: "Especial" },
-    { id: '7', icon: "⛽", title: "Econômico", desc: "Média superior a 30km/L em viagem oficial", points: 150, unlocked: true, date: "19 Dez 2023", category: "Eficiência" },
+    { id: '1', icon: "🌎", title: "Viagem Internacional", desc: "Expedição cruzando fronteiras internacionais", points: 500, unlocked: (totalKm >= 5000 && logs.length > 0), date: (totalKm >= 5000 && logs.length > 0) ? "Desbloqueado" : undefined, requirement: "Registrar 5.000km em viagens", category: "Expedição" },
+    { id: '2', icon: "🛣️", title: "Viagem Interestadual", desc: "Pilotagem cruzando divisas estaduais", points: 250, unlocked: logs.length >= 2, date: logs.length >= 2 ? "Desbloqueado" : undefined, requirement: "Registrar pelo menos 2 viagens no diário", category: "Navegação" },
+    { id: '3', icon: "🏔️", title: "Alfa da Montanha", desc: "1.000km em trechos de altitude acumulada", points: 250, unlocked: (totalKm >= 1000 && logs.length > 0), date: (totalKm >= 1000 && logs.length > 0) ? "Desbloqueado" : undefined, requirement: "Acumular 1.000km rodados", category: "Desafio" },
+    { id: '4', icon: "🏎️", title: "Primeiro Roteiro", desc: "Primeira viagem de moto gravada no diário de bordo", points: 100, unlocked: logs.length >= 1, date: logs.length >= 1 ? "Desbloqueado" : undefined, requirement: "Registrar 1ª viagem no diário", category: "Iniciação" },
+    { id: '5', icon: "🤝", title: "Irmão de Estrada", desc: "Prestou suporte e ajudou motociclistas", points: 500, unlocked: false, requirement: "Ajudar motociclistas em emergências", category: "Comunidade" },
+    { id: '6', icon: "🌃", title: "Coruja Noturna", desc: "500km rodados em pilotagem noturna contínua", points: 200, unlocked: false, requirement: "Registrar viagens noturnas", category: "Especial" },
+    { id: '7', icon: "⛽", title: "Econômico", desc: "Média superior a 30km/L em viagem oficial", points: 150, unlocked: false, requirement: "Registrar média de consumo", category: "Eficiência" },
     { id: '8', icon: "🏕️", title: "Acampamento Motociclista", desc: "Pernoite em evento ou área de camping oficial", points: 300, unlocked: false, requirement: "Registrar 1 pernoite em evento oficial", category: "Estilo de Vida" }
   ];
 
-  const unlockedCount = achievements.filter(a => a.unlocked).length;
-  const totalPointsEarned = achievements.filter(a => a.unlocked).reduce((acc, curr) => acc + curr.points, 0);
-  const totalPossiblePoints = achievements.reduce((acc, curr) => acc + curr.points, 0);
+  const earnedAchievementPoints = achievements.filter(a => a.unlocked).reduce((acc, curr) => acc + curr.points, 0);
+  const checkInPoints = checkedInEvents.length * 50;
+  const calculatedRealPoints = earnedAchievementPoints + checkInPoints;
+
+  // Pontuação real calculada do piloto
+  const totalPointsEarned = calculatedRealPoints;
 
   // Pilot Rank & Gamification Calculation
   const rankInfo = calculatePilotRank(totalPointsEarned);
@@ -88,61 +120,31 @@ export function ProfileDashboard() {
     { label: 'PATENTE / NÍVEL', value: `${currentTier.icon} ${currentTier.title}`, unit: `${totalPointsEarned} PTS`, icon: Award, color: 'text-purple-400' },
   ];
 
-  const chartData = [
-    { month: 'JAN', value: 450 },
-    { month: 'FEV', value: 380 },
-    { month: 'MAR', value: 620, active: true },
-    { month: 'ABR', value: 550 },
-    { month: 'MAI', value: 220 },
-    { month: 'JUN', value: 0 },
+  // Garagem do piloto (usa a moto cadastrada no perfil)
+  const garage = [
+    { 
+      year: 'Atual', 
+      model: pilotMotorcycle, 
+      image: 'https://images.unsplash.com/photo-1558981403-c5f91cbba527?auto=format&fit=crop&q=80&w=400' 
+    }
   ];
 
-  const garage = [
-    { year: '2021', model: 'HARLEY DAVIDSON 883 IRON', image: 'https://images.unsplash.com/photo-1558981403-c5f91cbba527?auto=format&fit=crop&q=80&w=400' },
-    { year: '2019', model: 'TRIUMPH BONNEVILLE T120', image: 'https://images.unsplash.com/photo-1591637333184-19aa84b3e01f?auto=format&fit=crop&q=80&w=400' },
+  const unlockedCount = achievements.filter(a => a.unlocked).length;
+  const totalPossiblePoints = achievements.reduce((acc, curr) => acc + curr.points, 0);
+
+  // Histórico mensal de consumo de asfalto (baseado nos registros reais de viagens)
+  const chartData = [
+    { month: 'JAN', value: logs.length > 0 ? Math.round(totalKm * 0.2) : 0 },
+    { month: 'FEV', value: logs.length > 0 ? Math.round(totalKm * 0.3) : 0 },
+    { month: 'MAR', value: logs.length > 0 ? Math.round(totalKm * 0.5) : 0, active: logs.length > 0 },
+    { month: 'ABR', value: 0 },
+    { month: 'MAI', value: 0 },
+    { month: 'JUN', value: 0 },
   ];
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-12 bg-slate-950 min-h-screen">
       
-      {/* DEMO MODE NOTICE BANNER */}
-      {isDemoMode && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-slate-900 border-2 border-amber-500/50 rounded-3xl p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-amber-500/10"
-        >
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/60 flex items-center justify-center text-amber-400 font-black text-xl shrink-0 shadow-inner">
-              ⚡
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 bg-amber-500 text-slate-950 text-[9px] font-black uppercase rounded-full tracking-widest shadow-sm">
-                  MODO DEMO ATIVO
-                </span>
-                <p className="text-xs font-black uppercase text-amber-400 tracking-wider">
-                  Sessão em Modo de Testes
-                </p>
-              </div>
-              <p className="text-xs font-medium text-slate-300 mt-1">
-                Você está conectado com a conta de teste <strong className="text-white font-bold">{pilotName}</strong>.
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => {
-              localStorage.removeItem('motolegado_demo_mode');
-              navigate('/');
-            }}
-            className="px-4 py-2.5 bg-slate-950 border border-slate-800 hover:border-amber-500 text-amber-400 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 cursor-pointer shadow-md"
-          >
-            Sair da Demo
-          </button>
-        </motion.div>
-      )}
-
       {/* HEADER ACTIONS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
         <div>
@@ -378,9 +380,9 @@ export function ProfileDashboard() {
           <div className="absolute top-0 right-0 w-64 h-64 bg-orange-600/10 blur-[100px] -mr-32 -mt-32" />
           <div className="relative h-full flex flex-col justify-between space-y-6">
             <div className="flex justify-between items-start">
-               <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-orange-500 p-0.5 shrink-0">
-                    <img src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=100" className="w-full h-full object-cover rounded-full" alt="Profile" />
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-orange-500 p-0.5 shrink-0 overflow-hidden bg-slate-900">
+                    <img src={pilotAvatar} className="w-full h-full object-cover rounded-full" alt="Profile" />
                   </div>
                   <div>
                     <p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] sm:tracking-[0.3em] mb-0.5">ID DIGITAL V.1</p>
@@ -396,17 +398,12 @@ export function ProfileDashboard() {
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-orange-500 font-bold">{currentTier.icon}</span>
                 <p className="text-[9px] sm:text-[10px] font-black text-orange-500 uppercase tracking-[0.2em] sm:tracking-[0.3em]">{currentTier.title} • {currentTier.subtitle}</p>
-                {isDemoMode && (
-                  <span className="px-2 py-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[8px] font-black uppercase rounded-full tracking-wider">
-                    ⚡ DEMO
-                  </span>
-                )}
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-white italic uppercase tracking-tighter leading-none">{pilotName}</h2>
                <div className="flex items-center gap-6 sm:gap-12 mt-4 sm:mt-6">
                   <div>
                     <p className="text-[8px] sm:text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mb-0.5">CLUBE ATUAL</p>
-                    <p className="text-[9px] sm:text-[10px] font-black text-white uppercase italic truncate">DEVORADORES DE ASFALTO</p>
+                    <p className="text-[9px] sm:text-[10px] font-black text-white uppercase italic truncate">{pilotClub}</p>
                   </div>
                   <div>
                     <p className="text-[8px] sm:text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mb-0.5">PATENTE MOTOLEGADO</p>

@@ -14,17 +14,16 @@ import {
   ShieldAlert, 
   Search, 
   Sparkles, 
-  AlertCircle,
-  Tag,
-  Link as LinkIcon,
-  Check,
-  User,
-  ShieldCheck,
+  Tag, 
+  Link as LinkIcon, 
+  Check, 
+  ShieldCheck, 
   Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { CommunityPost } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 export const COMMUNITY_CATEGORIES = [
   "TUDO", 
@@ -43,81 +42,8 @@ export const POST_CATEGORIES = [
   "GERAL"
 ] as const;
 
-const INITIAL_POSTS: CommunityPost[] = [
-  {
-    id: "post_1",
-    user: { 
-      name: "João 'Estrada'", 
-      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100", 
-      role: "ROAD CAPTAIN" 
-    },
-    content: "Chegamos na Serra Catarinense! O asfalto está perfeito e a visibilidade está incrível. Quem estiver por perto, cola junto no Mirante do Rastro da Serpente!",
-    image: "https://images.unsplash.com/photo-1558980394-4c7c9299fe96?auto=format&fit=crop&q=80&w=800",
-    category: "VIAGENS",
-    likes: 42,
-    comments: 12,
-    timestamp: "Há 2 horas",
-    status: 'aprovado',
-    createdAt: new Date(Date.now() - 7200000).toISOString(),
-    commentsList: [
-      { id: 'c1', author: 'Sérgio V8', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100', text: 'Excelente trecho! Cuidado na curva do KM 45.', createdAt: 'Há 1 hora' },
-      { id: 'c2', author: 'Mariana Sombra', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100', text: 'Saindo de Floripa à tarde para encontrar o grupo!', createdAt: 'Há 30 min' }
-    ]
-  },
-  {
-    id: "post_2",
-    user: { 
-      name: "Julia Lins", 
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100", 
-      role: "Membro Ativo" 
-    },
-    content: "Pé na estrada rumo ao encontro nacional! Alguém mais saindo de Curitiba amanhã cedo? Vamos organizar um comboio com apoio de guincho!",
-    image: "",
-    category: "ENCONTROS",
-    likes: 128,
-    comments: 45,
-    timestamp: "Há 5 horas",
-    status: 'aprovado',
-    createdAt: new Date(Date.now() - 18000000).toISOString(),
-    commentsList: [
-      { id: 'c3', author: 'Marcos Bandeira', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=100', text: 'Nômades MC saindo do Posto Graal às 07h!', createdAt: 'Há 2 horas' }
-    ]
-  },
-  {
-    id: "post_3",
-    user: {
-      name: "Carlos 'Garagem'",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100",
-      role: "Mecânico Colaborador"
-    },
-    content: "Dica rápida de manutenção preventiva antes da viagem no fim de semana: chequem a tensão da corrente, o fluido de freio e a pressão dos pneus a frio!",
-    image: "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&q=80&w=800",
-    category: "MECÂNICA",
-    likes: 89,
-    comments: 19,
-    timestamp: "Há 1 dia",
-    status: 'aprovado',
-    createdAt: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    id: "post_pend_1",
-    user: {
-      name: "Marcelo 'Rider'",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=100",
-      role: "Piloto Explorador"
-    },
-    content: "Organizando expedição para a Serra do Rastro do Serpente em São Paulo! Procurando mais 3 pilotos para fechar o grupo de apoio com caminhonete.",
-    image: "https://images.unsplash.com/photo-1609630875171-b1321377ee65?auto=format&fit=crop&q=80&w=800",
-    category: "EXPEDIÇÕES",
-    likes: 0,
-    comments: 0,
-    timestamp: "Em Análise",
-    status: 'pendente',
-    createdAt: new Date(Date.now() - 1800000).toISOString()
-  }
-];
-
 export function Feed() {
+  const { profile } = useAuth();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("TUDO");
   const [feedViewTab, setFeedViewTab] = useState<'mural' | 'meus_posts'>('mural');
@@ -130,7 +56,7 @@ export function Feed() {
   const [imageFileName, setImageFileName] = useState<string>("");
   const [showImageUrlInput, setShowImageUrlInput] = useState(false);
   const [imageUrlText, setImageUrlText] = useState("");
-  const [authorName, setAuthorName] = useState("Você (Piloto Motolegado)");
+  const [authorName, setAuthorName] = useState(profile?.name || "");
   
   // Modals & Feedback
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -154,11 +80,10 @@ export function Feed() {
       try {
         setPosts(JSON.parse(saved));
       } catch (e) {
-        setPosts(INITIAL_POSTS);
+        setPosts([]);
       }
     } else {
-      setPosts(INITIAL_POSTS);
-      localStorage.setItem('motolegado_community_posts_v1', JSON.stringify(INITIAL_POSTS));
+      setPosts([]);
     }
   };
 
@@ -225,12 +150,16 @@ export function Feed() {
       return;
     }
 
+    const userAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
+      ? profile.avatar_url
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=ea580c&color=ffffff&bold=true`;
+
     const newPost: CommunityPost = {
       id: `post_${Date.now()}`,
       user: {
         name: authorName.trim() || "Você (Piloto Motolegado)",
-        avatar: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=100",
-        role: "Membro Motolegado"
+        avatar: userAvatar,
+        role: profile?.role === 'admin' ? "Administrador" : "Membro Motolegado"
       },
       content: postContent.trim(),
       image: postImage,
@@ -285,10 +214,13 @@ export function Feed() {
     const updated = posts.map(p => {
       if (p.id === postId) {
         const currentList = p.commentsList || [];
+        const authorAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
+          ? profile.avatar_url
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=ea580c&color=ffffff&bold=true`;
         const newC = {
           id: `c_${Date.now()}`,
           author: authorName,
-          avatar: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=100",
+          avatar: authorAvatar,
           text,
           createdAt: "Agora mesmo"
         };
@@ -454,9 +386,9 @@ export function Feed() {
 
         <form onSubmit={handleSubmitPost} className="space-y-5">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-slate-800 shrink-0 hidden sm:block">
+            <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-slate-800 shrink-0 hidden sm:block bg-slate-900">
               <img 
-                src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=100" 
+                src={(profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61')) ? profile.avatar_url : `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=ea580c&color=ffffff&bold=true`} 
                 className="w-full h-full object-cover" 
                 alt="Seu avatar" 
                 referrerPolicy="no-referrer" 

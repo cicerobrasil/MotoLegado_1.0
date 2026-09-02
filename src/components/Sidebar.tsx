@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { 
   Trophy, 
   Map as MapIcon, 
@@ -18,8 +18,16 @@ import {
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
+import { useAuth } from "../context/AuthContext";
 
-const MENU_ITEMS = [
+interface MenuItem {
+  icon: any;
+  label: string;
+  path: string;
+  adminOnly?: boolean;
+}
+
+const MENU_ITEMS: MenuItem[] = [
   { icon: Layers, label: "Dashboard", path: "/dashboard" },
   { icon: Calendar, label: "Eventos", path: "/events" },
   { icon: Store, label: "Parceiros", path: "/partners" },
@@ -27,7 +35,7 @@ const MENU_ITEMS = [
   { icon: MapIcon, label: "Roteiros", path: "/routes" },
   { icon: Trophy, label: "Conquistas", path: "/achievements" },
   { icon: Shield, label: "Moto Clubes", path: "/motoclubes" },
-  { icon: ShieldCheck, label: "CENTRO DE COMANDO", path: "/command-center" },
+  { icon: ShieldCheck, label: "CENTRO DE COMANDO", path: "/command-center", adminOnly: true },
 ];
 
 const BOTTOM_NAV_ITEMS = [
@@ -41,27 +49,32 @@ const BOTTOM_NAV_ITEMS = [
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { profile, isSupabaseConfigured, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [pilotName, setPilotName] = useState(() => {
-    return localStorage.getItem('motolegado_pilot_name') || 'Piloto de Testes';
-  });
-  const [isDemoMode, setIsDemoMode] = useState(() => {
-    const isDemo = localStorage.getItem('motolegado_demo_mode');
-    return isDemo === 'true' || isDemo === null;
+
+  const pilotName = profile?.name || 'Piloto MotoLegado';
+  const pilotTier = profile?.tier || 'Bronze';
+  const pilotPoints = profile?.points ?? 0;
+  const pilotAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
+    ? profile.avatar_url
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotName)}&background=ea580c&color=ffffff&bold=true`;
+  const isAdmin = profile?.role === 'admin' || 
+    profile?.name?.toLowerCase().includes('admin') || 
+    profile?.email?.toLowerCase().includes('admin') || 
+    profile?.email?.toLowerCase() === 'ciceroranieri@gmail.com';
+
+  const visibleMenuItems = MENU_ITEMS.filter((item) => {
+    if (item.adminOnly) {
+      return isAdmin;
+    }
+    return true;
   });
 
-  useEffect(() => {
+  const handleSignOut = async () => {
     setIsOpen(false);
-    const storedName = localStorage.getItem('motolegado_pilot_name');
-    const isDemo = localStorage.getItem('motolegado_demo_mode');
-    if (isDemo === 'true' || isDemo === null) {
-      setIsDemoMode(true);
-      setPilotName('Piloto de Testes');
-    } else {
-      setIsDemoMode(false);
-      setPilotName(storedName || 'Piloto de Testes');
-    }
-  }, [location.pathname]);
+    await signOut();
+    navigate('/');
+  };
 
   // Do not render sidebar on the landing page ("/")
   if (location.pathname === "/") {
@@ -90,11 +103,11 @@ export function Sidebar() {
 
         <div className="flex items-center gap-3">
           <Link to="/profile" className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden">
-            <img src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=100" alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+            <img src={pilotAvatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
           </Link>
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white hover:border-orange-500 transition-colors"
+            className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white hover:border-orange-500 transition-colors cursor-pointer"
             aria-label="Abrir Menu"
           >
             {isOpen ? <X size={20} /> : <Menu size={20} />}
@@ -136,14 +149,14 @@ export function Sidebar() {
           </Link>
           <button 
             onClick={() => setIsOpen(false)}
-            className="lg:hidden text-slate-500 hover:text-white"
+            className="lg:hidden text-slate-500 hover:text-white cursor-pointer"
           >
             <X size={20} />
           </button>
         </div>
 
         <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
-          {MENU_ITEMS.map((item) => {
+          {visibleMenuItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link
@@ -173,17 +186,17 @@ export function Sidebar() {
         <div className="p-6 border-t border-slate-800/60 bg-slate-900/10 backdrop-blur-md space-y-4">
           <Link to="/profile" onClick={() => setIsOpen(false)} className="flex items-center gap-3 group cursor-pointer decoration-none">
             <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden group-hover:border-orange-500 transition-all shadow-lg shrink-0">
-              <img src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=100" alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+              <img src={pilotAvatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
             </div>
             <div className="flex-1 overflow-hidden">
               <p className="text-xs font-black uppercase italic tracking-tight text-white group-hover:text-amber-400 transition-colors truncate">{pilotName}</p>
-              {isDemoMode ? (
-                <p className="text-[9px] text-amber-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
-                  <span>⚡</span> MODO DEMO • PILOTO DE TESTES
+              {isAdmin ? (
+                <p className="text-[9px] text-orange-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
+                  <span>🛡️</span> COMANDO • ADMIN
                 </p>
               ) : (
-                <p className="text-[9px] text-amber-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
-                  <span>🥈</span> Piloto Prata • 1.750 PTS
+                <p className="text-[9px] text-emerald-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
+                  <span>{isSupabaseConfigured ? '🟢' : '🥈'}</span> Piloto {pilotTier} • {pilotPoints} PTS
                 </p>
               )}
             </div>
@@ -191,10 +204,7 @@ export function Sidebar() {
 
           <div className="pt-2 border-t border-slate-800/40 flex flex-col gap-2">
             <button 
-              onClick={() => {
-                setIsOpen(false);
-                navigate('/');
-              }}
+              onClick={handleSignOut}
               className="w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-500 transition-colors py-1 cursor-pointer"
             >
               <LogOut size={14} />
