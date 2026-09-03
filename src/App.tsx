@@ -15,6 +15,8 @@ import { MotoClubApplication } from "./components/MotoClubApplication";
 import { Events } from "./components/Events";
 import { Partners } from "./components/Partners";
 import { CommandCenter } from "./components/CommandCenter";
+import { PWAInstallBanner } from "./components/PWAInstallBanner";
+import { OfflineIndicator } from "./components/OfflineIndicator";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "./lib/utils";
 import "./utils/systemReset";
@@ -99,6 +101,10 @@ function AppLayout() {
           </Routes>
         </AnimatePresence>
       </main>
+
+      {/* PWA In-App Mobile Install Banner & Offline Connectivity Indicator */}
+      <PWAInstallBanner />
+      <OfflineIndicator />
     </div>
   );
 }

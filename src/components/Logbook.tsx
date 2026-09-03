@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useRef, ChangeEvent } from 'react';
+import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, UploadCloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { uploadImageToStorage } from '../lib/storage';
 
 export interface LogEntry {
   id: string;
@@ -41,6 +42,33 @@ export function Logbook() {
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState('');
   const [image, setImage] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const tripPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTripPhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const result = await uploadImageToStorage(file, {
+        folder: 'trips',
+        userId: user?.id || 'pilot',
+      });
+
+      if (result.success && result.url) {
+        setImage(result.url);
+      } else {
+        alert(result.error || 'Erro ao fazer upload da imagem.');
+      }
+    } catch (err) {
+      console.error('Erro no upload da foto da viagem:', err);
+      alert('Falha ao processar a foto.');
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
 
   // Load logs on mount / auth change
   useEffect(() => {
@@ -362,20 +390,77 @@ export function Logbook() {
             {/* Bottom Section: Media & Story */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-6">
               <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">URL DA FOTO / CAPA DA VIAGEM</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">FOTO DA VIAGEM / CAPA</label>
+                  {image && (
+                    <button
+                      type="button"
+                      onClick={() => setImage('')}
+                      className="text-[9px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1"
+                    >
+                      <Trash2 size={11} />
+                      <span>Remover Foto</span>
+                    </button>
+                  )}
+                </div>
+
+                <input
+                  type="file"
+                  ref={tripPhotoInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleTripPhotoUpload}
+                />
+
                 <div className="space-y-3">
+                  <div
+                    onClick={() => !isUploadingPhoto && tripPhotoInputRef.current?.click()}
+                    className={cn(
+                      "w-full aspect-[2/1] rounded-2xl border-2 flex flex-col items-center justify-center cursor-pointer transition-all relative overflow-hidden group",
+                      image 
+                        ? "border-slate-800 bg-slate-950 shadow-lg" 
+                        : "border-dashed border-slate-800/80 bg-slate-900/20 hover:border-orange-500/50 hover:bg-slate-900/40"
+                    )}
+                  >
+                    {isUploadingPhoto ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 size={32} className="text-orange-500 animate-spin" />
+                        <span className="text-[9px] font-black text-white uppercase tracking-widest">Enviando para o Supabase Storage...</span>
+                      </div>
+                    ) : image ? (
+                      <>
+                        <img src={image} alt="Preview" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-2 backdrop-blur-xs">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-white flex items-center gap-1.5">
+                            <Camera size={16} className="text-orange-500" />
+                            Trocar Foto
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-center p-4">
+                        <div className="w-12 h-12 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-600 group-hover:text-orange-500 group-hover:scale-110 transition-all">
+                          <Camera size={20} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-white transition-colors">
+                            Tirar Foto ou Escolher da Galeria
+                          </p>
+                          <p className="text-[8px] font-bold text-slate-600 uppercase tracking-wider mt-0.5">
+                            Salva automaticamente no Supabase Storage
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <input 
                     type="text" 
                     value={image}
                     onChange={(e) => setImage(e.target.value)}
-                    placeholder="Cole a URL da imagem (ou deixe em branco para imagem padrão)" 
-                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 px-6 text-[13px] font-bold text-white placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50" 
+                    placeholder="Ou cole uma URL externa se preferir..." 
+                    className="w-full bg-slate-950/30 border border-slate-800 rounded-xl py-2.5 px-4 text-xs font-bold text-white placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50" 
                   />
-                  {image && (
-                    <div className="w-full aspect-[2/1] rounded-2xl overflow-hidden border border-slate-800">
-                      <img src={image} alt="Preview" className="w-full h-full object-cover" />
-                    </div>
-                  )}
                 </div>
               </div>
 

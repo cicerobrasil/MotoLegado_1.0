@@ -18,12 +18,14 @@ import {
   Link as LinkIcon, 
   Check, 
   ShieldCheck, 
-  Plus
+  Plus,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { CommunityPost } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { uploadImageToStorage } from '../lib/storage';
 
 export const COMMUNITY_CATEGORIES = [
   "TUDO", 
@@ -54,6 +56,7 @@ export function Feed() {
   const [selectedCategory, setSelectedCategory] = useState<string>("ENCONTROS");
   const [postImage, setPostImage] = useState<string>("");
   const [imageFileName, setImageFileName] = useState<string>("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showImageUrlInput, setShowImageUrlInput] = useState(false);
   const [imageUrlText, setImageUrlText] = useState("");
   const [authorName, setAuthorName] = useState(profile?.name || "");
@@ -110,20 +113,36 @@ export function Feed() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Image Upload Handler via FileReader
-  const handleImageFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  // Image Upload Handler via Supabase Storage
+  const handleImageFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        showToast("Selecione uma imagem menor que 5MB.");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPostImage(reader.result as string);
+    if (!file) return;
+
+    if (file.size > 8 * 1024 * 1024) {
+      showToast("Selecione uma imagem menor que 8MB.");
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const result = await uploadImageToStorage(file, {
+        folder: 'posts',
+        userId: profile?.id || 'community',
+      });
+
+      if (result.success && result.url) {
+        setPostImage(result.url);
         setImageFileName(file.name);
-      };
-      reader.readAsDataURL(file);
+        showToast("Imagem enviada para o storage com sucesso!");
+      } else {
+        showToast(result.error || "Erro no upload da imagem.");
+      }
+    } catch (err) {
+      console.error('Erro no upload de foto da publicação:', err);
+      showToast("Falha ao processar o upload da imagem.");
+    } finally {
+      setIsUploadingImage(false);
+      e.target.value = '';
     }
   };
 
@@ -478,21 +497,27 @@ export function Feed() {
                       </button>
                     </div>
                   ) : (
-                    <label className="border-2 border-dashed border-slate-800 hover:border-amber-500/60 bg-slate-950/60 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-center gap-3 cursor-pointer transition-all text-center sm:text-left group">
+                    <label className={cn(
+                      "border-2 border-dashed rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-center gap-3 transition-all text-center sm:text-left group",
+                      isUploadingImage 
+                        ? "border-amber-500/50 bg-amber-500/5 cursor-wait" 
+                        : "border-slate-800 hover:border-amber-500/60 bg-slate-950/60 cursor-pointer"
+                    )}>
                       <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-amber-500 group-hover:bg-amber-600 group-hover:text-white transition-all shrink-0">
-                        <Upload size={18} />
+                        {isUploadingImage ? <Loader2 size={18} className="animate-spin text-amber-500" /> : <Upload size={18} />}
                       </div>
                       <div>
                         <p className="text-xs font-black uppercase text-slate-300">
-                          Clique aqui para Fazer Upload de Imagem
+                          {isUploadingImage ? "Enviando para o Supabase Storage..." : "Clique aqui para Fazer Upload de Imagem"}
                         </p>
                         <p className="text-[9px] font-medium text-slate-500 uppercase mt-0.5">
-                          Suporta arquivos JPG, PNG ou WEBP até 5MB
+                          {isUploadingImage ? "Comprimindo e salvando no bucket..." : "Suporta arquivos de foto do celular ou galeria até 8MB"}
                         </p>
                       </div>
                       <input 
                         type="file" 
                         accept="image/*"
+                        disabled={isUploadingImage}
                         onChange={handleImageFileChange}
                         className="hidden"
                       />

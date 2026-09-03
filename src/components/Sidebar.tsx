@@ -19,6 +19,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../context/AuthContext";
+import { PWAInstallButton } from "./PWAInstallButton";
 
 interface MenuItem {
   icon: any;
@@ -101,7 +102,8 @@ export function Sidebar() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <PWAInstallButton variant="header" />
           <Link to="/profile" className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden">
             <img src={pilotAvatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
           </Link>
@@ -182,6 +184,11 @@ export function Sidebar() {
             );
           })}
         </nav>
+
+        {/* PWA Mobile & Desktop Install Action */}
+        <div className="px-4 pb-2">
+          <PWAInstallButton variant="sidebar" />
+        </div>
 
         <div className="p-6 border-t border-slate-800/60 bg-slate-900/10 backdrop-blur-md space-y-4">
           <Link to="/profile" onClick={() => setIsOpen(false)} className="flex items-center gap-3 group cursor-pointer decoration-none">

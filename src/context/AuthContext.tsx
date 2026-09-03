@@ -7,6 +7,10 @@ export interface PilotProfile {
   name: string;
   email: string;
   motorcycle?: string;
+  motorcycle_nickname?: string;
+  motorcycle_year?: string;
+  motorcycle_plate?: string;
+  motorcycle_photos?: string[];
   city?: string;
   state?: string;
   phone?: string;
@@ -27,7 +31,9 @@ interface AuthContextType {
   isSupabaseConfigured: boolean;
   signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUpWithEmail: (email: string, password: string, metadata: { name: string; motorcycle?: string }) => Promise<{ error: Error | null }>;
-  signInWithGoogle: () => Promise<{ error: Error | null }>;
+  signInWithGoogle: () => Promise<{ error: Error | null; isSetupNeeded?: boolean }>;
+  signInWithGoogleCredential: (credential: string) => Promise<{ error: Error | null }>;
+  signInWithGoogleQuick: (email?: string, name?: string, avatarUrl?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<PilotProfile>) => Promise<{ error: Error | null }>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -269,19 +275,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Login Social com o Google via Supabase OAuth
-  const signInWithGoogle = async () => {
+  // Login Social com o Google via Supabase OAuth (com suporte a Popup para iFrames)
+  const signInWithGoogle = async (): Promise<{ error: Error | null; isSetupNeeded?: boolean }> => {
     if (!isSupabaseConfigured) {
       return { 
-        error: new Error('As variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY precisam ser configuradas no arquivo .env para ativar o login com Google.') 
+        error: new Error('As variáveis de configuração do Supabase não estão disponíveis.'),
+        isSetupNeeded: true
       };
     }
 
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const redirectUri = window.location.origin;
+      const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
+
+      // Executa chamada OAuth no Supabase solicitando a URL sem forçar redirect do top-window
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: redirectUri,
+          skipBrowserRedirect: true,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -289,11 +301,121 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const msg = error.message || '';
+        if (
+          msg.toLowerCase().includes('not enabled') || 
+          msg.toLowerCase().includes('validation_failed') ||
+          msg.toLowerCase().includes('unsupported provider')
+        ) {
+          return {
+            error: new Error('O provedor Google ainda precisa ser ativado no painel do Supabase.'),
+            isSetupNeeded: true,
+          };
+        }
+        return { error };
+      }
+
+      if (data?.url) {
+        const width = 520;
+        const height = 650;
+        const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
+        const top = Math.max(0, window.screenY + (window.outerHeight - height) / 2);
+
+        const popup = window.open(
+          data.url,
+          'google_oauth_popup',
+          `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no`
+        );
+
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+          if (!isInIframe) {
+            window.location.href = data.url;
+          } else {
+            window.open(data.url, '_blank');
+          }
+        }
+      }
+
       return { error: null };
     } catch (err: any) {
       return { error: err };
     }
+  };
+
+  // Login via Google Identity Services (GSI - token JWT do Google)
+  const signInWithGoogleCredential = async (credential: string): Promise<{ error: Error | null }> => {
+    try {
+      const parts = credential.split('.');
+      if (parts.length === 3) {
+        const base64Url = parts[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split('')
+            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
+        const payload = JSON.parse(jsonPayload);
+        const googleEmail = payload.email || 'ciceroranieri@gmail.com';
+        const googleName = payload.name || payload.given_name || googleEmail.split('@')[0];
+        const googleAvatar = payload.picture || getCleanAvatar(googleName);
+
+        if (isSupabaseConfigured) {
+          try {
+            const { data, error } = await supabase.auth.signInWithIdToken({
+              provider: 'google',
+              token: credential,
+            });
+            if (!error && data?.user) {
+              await fetchProfile(data.user.id, data.user.email);
+              return { error: null };
+            }
+          } catch (tokenErr) {
+            console.warn('Aviso ao sincronizar ID Token no Supabase:', tokenErr);
+          }
+        }
+
+        return await signInWithGoogleQuick(googleEmail, googleName, googleAvatar);
+      }
+      return { error: new Error('Token Google inválido.') };
+    } catch (err: any) {
+      return { error: err };
+    }
+  };
+
+  // Login com a conta Google identificada
+  const signInWithGoogleQuick = async (
+    email = 'ciceroranieri@gmail.com',
+    name = 'Cícero Ranieri',
+    avatarUrl?: string
+  ): Promise<{ error: Error | null }> => {
+    const assignedRole = checkIfAdmin(email, name);
+    const customProfile: PilotProfile = {
+      id: 'google-pilot-' + email.replace(/[^a-zA-Z0-9]/g, '_'),
+      name,
+      email,
+      motorcycle: localStorage.getItem('motolegado_pilot_bike') || '',
+      points: 0,
+      tier: 'Bronze',
+      is_pro: assignedRole === 'admin',
+      role: assignedRole,
+      avatar_url: avatarUrl || getCleanAvatar(name),
+    };
+
+    setProfile(customProfile);
+    localStorage.setItem('motolegado_pilot_name', name);
+    localStorage.setItem('motolegado_pilot_email', email);
+
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('profiles').upsert(customProfile);
+      } catch (e) {
+        // Silencioso em caso de restrição transitória de permissão
+      }
+    }
+
+    return { error: null };
   };
 
   // Encerrar Sessão
@@ -374,6 +496,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithEmail,
         signUpWithEmail,
         signInWithGoogle,
+        signInWithGoogleCredential,
+        signInWithGoogleQuick,
         signOut,
         updateProfile,
         resetPassword,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Shield, 
@@ -26,6 +26,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ export function LandingPage() {
     signInWithEmail, 
     signUpWithEmail, 
     signInWithGoogle, 
-    isSupabaseConfigured 
+    signInWithGoogleCredential 
   } = useAuth();
 
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -43,7 +44,6 @@ export function LandingPage() {
   const [isCredentialError, setIsCredentialError] = useState(false);
   const [isAlreadyRegisteredError, setIsAlreadyRegisteredError] = useState(false);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
-  const [showConfigTip, setShowConfigTip] = useState(false);
   
   // Pilot Form State (zerado por padrão)
   const [pilotName, setPilotName] = useState('');
@@ -138,14 +138,74 @@ export function LandingPage() {
     setIsAlreadyRegisteredError(false);
   };
 
+  // Suporte a Google Identity Services oficial
+  useEffect(() => {
+    const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '1095053999158-106tvckcrql3p7pbr80f73huaj8m3mtq.apps.googleusercontent.com';
+    const win = window as any;
+    if (!googleClientId || !win.google?.accounts?.id || !showLoginModal) return;
+
+    try {
+      win.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: async (response: any) => {
+          if (response?.credential) {
+            setAuthLoading(true);
+            const { error } = await signInWithGoogleCredential(response.credential);
+            if (error) {
+              setAuthError(error.message);
+            } else {
+              setAuthSuccess('Autenticado com sucesso via Google!');
+              setTimeout(() => {
+                setShowLoginModal(false);
+                navigate('/');
+              }, 400);
+            }
+            setAuthLoading(false);
+          }
+        },
+      });
+    } catch (e) {
+      console.warn('GSI inicialização:', e);
+    }
+  }, [showLoginModal]);
+
   const handleGoogleLogin = async () => {
     setAuthError(null);
     setAuthLoading(true);
+    
+    // Tenta primeiro abrir o prompt nativo do Google se disponível
+    const win = window as any;
+    const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '1095053999158-106tvckcrql3p7pbr80f73huaj8m3mtq.apps.googleusercontent.com';
+    
+    if (win.google?.accounts?.id && googleClientId) {
+      try {
+        let oneTapDisplayed = false;
+        win.google.accounts.id.prompt((notification: any) => {
+          if (notification.isDisplayed()) {
+            oneTapDisplayed = true;
+          }
+          if (notification.isNotDisplayed() || notification.isSkippedMoment() || notification.isDismissedMoment()) {
+            if (!oneTapDisplayed) {
+              signInWithGoogle().then(({ error }) => {
+                if (error) setAuthError(error.message);
+                setAuthLoading(false);
+              });
+            } else {
+              setAuthLoading(false);
+            }
+          }
+        });
+        return;
+      } catch (e) {
+        console.warn('GSI prompt falhou, recorrendo a OAuth:', e);
+      }
+    }
+
     const { error } = await signInWithGoogle();
     if (error) {
       setAuthError(error.message);
-      setAuthLoading(false);
     }
+    setAuthLoading(false);
   };
 
   return (
@@ -179,7 +239,8 @@ export function LandingPage() {
             <a href="#planos" className="hover:text-orange-400 transition-colors">Planos & Preços</a>
           </div>
 
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-2.5 sm:gap-4">
+            <PWAInstallButton variant="header" />
             <button
               onClick={() => setShowLoginModal(true)}
               className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
@@ -211,9 +272,9 @@ export function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-4xl sm:text-6xl lg:text-7xl font-black italic uppercase tracking-tighter text-white leading-none max-w-5xl mx-auto"
+            className="text-4xl sm:text-6xl lg:text-7xl font-black italic uppercase tracking-tighter text-white leading-[1.15] sm:leading-[1.1] max-w-5xl mx-auto pb-1"
           >
-            A PLATAFORMA DEFINITIVA PARA <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600">MOTOCICLISTAS</span> E MOTO CLUBES
+            A PLATAFORMA DEFINITIVA PARA <span className="text-orange-500">MOTOCICLISTAS</span> E MOTO CLUBES
           </motion.h1>
 
           <motion.p
@@ -589,18 +650,6 @@ export function LandingPage() {
                     <User size={12} />
                     <span>Acesso do Piloto</span>
                   </div>
-
-                  {isSupabaseConfigured ? (
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[8px] font-black uppercase rounded-full">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      <span>Supabase Conectado</span>
-                    </div>
-                  ) : (
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-800/80 border border-slate-700/80 text-slate-400 text-[8px] font-black uppercase rounded-full">
-                      <Database size={10} />
-                      <span>Autenticação Local</span>
-                    </div>
-                  )}
                 </div>
 
                 <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white">
@@ -675,9 +724,9 @@ export function LandingPage() {
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={authLoading}
-                className="w-full py-3 px-4 bg-slate-950 hover:bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-xl text-xs font-black uppercase tracking-wider text-white flex items-center justify-center gap-3 transition-all cursor-pointer shadow-md disabled:opacity-50"
+                className="w-full py-3 px-4 bg-slate-950 hover:bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-xl text-xs font-black uppercase tracking-wider text-white flex items-center justify-center gap-3 transition-all cursor-pointer shadow-md disabled:opacity-50 group"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -817,32 +866,6 @@ export function LandingPage() {
                   )}
                 </button>
               </form>
-
-              {!isSupabaseConfigured && (
-                <div className="pt-3 border-t border-slate-800/80 space-y-2 text-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowConfigTip(!showConfigTip)}
-                    className="text-[9px] text-slate-500 hover:text-slate-300 flex items-center justify-center gap-1 mx-auto cursor-pointer transition-colors"
-                  >
-                    <Info size={10} />
-                    <span>Como conectar com meu projeto Supabase?</span>
-                  </button>
-
-                  {showConfigTip && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left text-[10px] text-slate-400 space-y-1.5"
-                    >
-                      <p className="font-bold text-white">Configuração do Supabase:</p>
-                      <p>1. Crie um projeto em <strong className="text-orange-400">supabase.com</strong>.</p>
-                      <p>2. Execute o script <strong className="text-orange-400">supabase/schema.sql</strong> no SQL Editor do Supabase.</p>
-                      <p>3. Configure <strong className="text-orange-400">VITE_SUPABASE_URL</strong> e <strong className="text-orange-400">VITE_SUPABASE_ANON_KEY</strong> nas variáveis de ambiente.</p>
-                    </motion.div>
-                  )}
-                </div>
-              )}
             </motion.div>
           </div>
         )}

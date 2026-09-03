@@ -19,11 +19,13 @@ import {
   Check, 
   Sparkles,
   Tablet as Motorcycle,
-  Settings
+  Settings,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
+import { uploadImageToStorage } from '../lib/storage';
 
 export interface ClubItem {
   id: string | number;
@@ -75,18 +77,38 @@ export function MotoClubsList() {
   const clubBannerInputRef = useRef<HTMLInputElement>(null);
   const regulationsInputRef = useRef<HTMLInputElement>(null);
 
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+
   const handleApprove = (id: string) => {
     setPendingRequests(prev => prev.filter(req => req.id !== id));
   };
 
-  const handleClubFileUpload = (e: ChangeEvent<HTMLInputElement>, type: 'logo' | 'banner') => {
+  const handleClubFileUpload = async (e: ChangeEvent<HTMLInputElement>, type: 'logo' | 'banner') => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setClubRegistry(prev => ({ ...prev, [type]: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    if (type === 'logo') setIsUploadingLogo(true);
+    else setIsUploadingBanner(true);
+
+    try {
+      const result = await uploadImageToStorage(file, {
+        folder: 'clubs',
+        userId: 'club',
+      });
+
+      if (result.success && result.url) {
+        setClubRegistry(prev => ({ ...prev, [type]: result.url }));
+      } else {
+        alert(result.error || 'Erro no upload da imagem.');
+      }
+    } catch (err) {
+      console.error('Erro no upload do clube:', err);
+      alert('Falha ao processar a imagem do clube.');
+    } finally {
+      if (type === 'logo') setIsUploadingLogo(false);
+      else setIsUploadingBanner(false);
+      e.target.value = '';
     }
   };
 
@@ -450,10 +472,15 @@ export function MotoClubsList() {
                       />
                       
                       <div 
-                        onClick={() => clubLogoInputRef.current?.click()}
+                        onClick={() => !isUploadingLogo && clubLogoInputRef.current?.click()}
                         className="aspect-square bg-slate-950 border-2 border-dashed border-slate-800 hover:border-orange-500/50 rounded-[2rem] flex flex-col items-center justify-center gap-6 cursor-pointer transition-all group overflow-hidden relative shadow-inner"
                       >
-                        {clubRegistry.logo ? (
+                        {isUploadingLogo ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 size={32} className="text-orange-500 animate-spin" />
+                            <span className="text-[9px] font-black uppercase tracking-widest text-white">Enviando Brasão...</span>
+                          </div>
+                        ) : clubRegistry.logo ? (
                           <img src={clubRegistry.logo} className="w-full h-full object-contain p-8" alt="Club Logo" />
                         ) : (
                           <>
@@ -485,10 +512,15 @@ export function MotoClubsList() {
                     onChange={(e) => handleClubFileUpload(e, 'banner')}
                   />
                   <div 
-                    onClick={() => clubBannerInputRef.current?.click()}
+                    onClick={() => !isUploadingBanner && clubBannerInputRef.current?.click()}
                     className="w-full h-48 bg-slate-950 border-2 border-dashed border-slate-800 hover:border-orange-500/50 rounded-[2rem] flex flex-col items-center justify-center gap-4 cursor-pointer transition-all group overflow-hidden relative"
                   >
-                    {clubRegistry.banner ? (
+                    {isUploadingBanner ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 size={32} className="text-orange-500 animate-spin" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-white">Enviando Capa...</span>
+                      </div>
+                    ) : clubRegistry.banner ? (
                       <img src={clubRegistry.banner} className="w-full h-full object-cover" alt="Club Banner" />
                     ) : (
                       <>
@@ -745,7 +777,7 @@ export function MotoClubsList() {
             >
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-600 to-orange-400" />
               
-              <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-8 bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">Novo Recruta</h3>
+              <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-8">Novo Recruta</h3>
               
               <form onSubmit={handleAddMember} className="space-y-6">
                 <div className="space-y-3">

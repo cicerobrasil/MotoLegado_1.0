@@ -13,12 +13,16 @@ import {
   AlertCircle, 
   Plus, 
   ArrowLeft,
-  Loader2
+  Loader2,
+  Trash2,
+  UploadCloud,
+  CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { uploadImageToStorage } from '../lib/storage';
 
 export function ProfileSettings() {
   const navigate = useNavigate();
@@ -33,9 +37,36 @@ export function ProfileSettings() {
   const [city, setCity] = useState(profile?.city || '');
   const [state, setState] = useState(profile?.state || '');
   const [motorcycle, setMotorcycle] = useState(profile?.motorcycle || '');
+  const [motorcycleNickname, setMotorcycleNickname] = useState(
+    profile?.motorcycle_nickname || localStorage.getItem('motolegado_pilot_bike_nickname') || ''
+  );
+  const [motorcycleYear, setMotorcycleYear] = useState(
+    profile?.motorcycle_year || localStorage.getItem('motolegado_pilot_bike_year') || '2023'
+  );
+  const [motorcyclePlate, setMotorcyclePlate] = useState(
+    profile?.motorcycle_plate || localStorage.getItem('motolegado_pilot_bike_plate') || ''
+  );
+  const [motorcyclePhotos, setMotorcyclePhotos] = useState<string[]>(() => {
+    if (profile?.motorcycle_photos && profile.motorcycle_photos.length > 0) {
+      return profile.motorcycle_photos;
+    }
+    try {
+      const saved = localStorage.getItem('motolegado_pilot_bike_photos');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [isMemberOfClub, setIsMemberOfClub] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [uploadToast, setUploadToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  // Upload Loaders
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [uploadingBikeSlot, setUploadingBikeSlot] = useState<number | null>(null);
 
   const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || 'Piloto')}&background=ea580c&color=ffffff&bold=true`;
   const [personalLogo, setPersonalLogo] = useState<string | null>(profile?.personal_logo_url || null);
@@ -52,11 +83,27 @@ export function ProfileSettings() {
       setMotorcycle(profile.motorcycle || '');
       if (profile.avatar_url) setProfilePhoto(profile.avatar_url);
       if (profile.personal_logo_url) setPersonalLogo(profile.personal_logo_url);
+      if (profile.motorcycle_nickname) setMotorcycleNickname(profile.motorcycle_nickname);
+      if (profile.motorcycle_year) setMotorcycleYear(profile.motorcycle_year);
+      if (profile.motorcycle_plate) setMotorcyclePlate(profile.motorcycle_plate);
+      if (profile.motorcycle_photos && profile.motorcycle_photos.length > 0) {
+        setMotorcyclePhotos(profile.motorcycle_photos);
+      }
     }
   }, [profile]);
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const bikeInputRefs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null)
+  ];
+
+  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setUploadToast({ message, type });
+    setTimeout(() => setUploadToast(null), 3500);
+  };
 
   const tabs = [
     { id: 'piloto', label: 'PILOTO', icon: User },
@@ -85,16 +132,98 @@ export function ProfileSettings() {
     setPhone(formatted.substring(0, 15));
   };
 
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>, type: 'logo' | 'photo') => {
+  // Upload Real no Supabase Storage para Foto do Perfil ou Logotipo Pessoal
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>, type: 'logo' | 'photo') => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (type === 'logo') setPersonalLogo(reader.result as string);
-        else setProfilePhoto(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    if (type === 'logo') {
+      setIsUploadingLogo(true);
+    } else {
+      setIsUploadingPhoto(true);
     }
+
+    try {
+      const result = await uploadImageToStorage(file, {
+        folder: type === 'logo' ? 'logos' : 'avatars',
+        userId: user?.id || 'pilot',
+      });
+
+      if (result.success && result.url) {
+        if (type === 'logo') {
+          setPersonalLogo(result.url);
+          showToast(
+            result.isCloudStorage 
+              ? 'Logotipo enviado para o Supabase Storage com sucesso!' 
+              : 'Logotipo atualizado e salvo localmente!', 
+            'success'
+          );
+        } else {
+          setProfilePhoto(result.url);
+          showToast(
+            result.isCloudStorage 
+              ? 'Foto de perfil enviada para o Supabase Storage!' 
+              : 'Foto de perfil atualizada!', 
+            'success'
+          );
+        }
+      } else {
+        showToast(result.error || 'Erro ao processar o arquivo.', 'error');
+      }
+    } catch (err: any) {
+      console.error('Erro no upload:', err);
+      showToast('Falha no upload da imagem.', 'error');
+    } finally {
+      if (type === 'logo') setIsUploadingLogo(false);
+      else setIsUploadingPhoto(false);
+      // Limpar input para permitir reenvio do mesmo arquivo se necessário
+      e.target.value = '';
+    }
+  };
+
+  // Upload Real no Supabase Storage para Fotos da Motocicleta
+  const handleBikePhotoUpload = async (e: ChangeEvent<HTMLInputElement>, slotIndex: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingBikeSlot(slotIndex);
+    try {
+      const result = await uploadImageToStorage(file, {
+        folder: 'bikes',
+        userId: user?.id || 'pilot',
+      });
+
+      if (result.success && result.url) {
+        setMotorcyclePhotos(prev => {
+          const next = [...prev];
+          next[slotIndex] = result.url;
+          return next;
+        });
+        showToast(
+          result.isCloudStorage
+            ? `Foto ${slotIndex + 1} da moto salva no Supabase Storage!`
+            : `Foto ${slotIndex + 1} da moto atualizada com sucesso!`,
+          'success'
+        );
+      } else {
+        showToast(result.error || 'Erro no upload da foto da moto.', 'error');
+      }
+    } catch (err: any) {
+      console.error('Erro no upload da foto da moto:', err);
+      showToast('Falha ao enviar a foto da moto.', 'error');
+    } finally {
+      setUploadingBikeSlot(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveBikePhoto = (slotIndex: number) => {
+    setMotorcyclePhotos(prev => {
+      const next = [...prev];
+      next.splice(slotIndex, 1);
+      return next;
+    });
+    showToast(`Foto ${slotIndex + 1} removida.`, 'info');
   };
 
   const handleSave = async () => {
@@ -102,6 +231,13 @@ export function ProfileSettings() {
     setSaveSuccess(false);
 
     try {
+      // Salvar metadados localmente como garantia imediata
+      localStorage.setItem('motolegado_pilot_bike_nickname', motorcycleNickname);
+      localStorage.setItem('motolegado_pilot_bike_year', motorcycleYear);
+      localStorage.setItem('motolegado_pilot_bike_plate', motorcyclePlate);
+      localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(motorcyclePhotos));
+      localStorage.setItem('motolegado_pilot_bike', motorcycle);
+
       await updateProfile({
         name,
         phone,
@@ -110,14 +246,21 @@ export function ProfileSettings() {
         state,
         motorcycle,
         avatar_url: profilePhoto,
-        personal_logo_url: personalLogo || undefined
+        personal_logo_url: personalLogo || undefined,
+        motorcycle_nickname: motorcycleNickname,
+        motorcycle_year: motorcycleYear,
+        motorcycle_plate: motorcyclePlate,
+        motorcycle_photos: motorcyclePhotos,
       });
+
       setSaveSuccess(true);
+      showToast('Configurações salvas com sucesso!', 'success');
       setTimeout(() => {
         navigate('/profile');
-      }, 800);
+      }, 900);
     } catch (e) {
-      console.error(e);
+      console.error('Erro ao salvar perfil:', e);
+      showToast('Erro ao salvar as configurações.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -205,20 +348,29 @@ export function ProfileSettings() {
                 />
                 <div 
                   className="relative group cursor-pointer"
-                  onClick={() => photoInputRef.current?.click()}
+                  onClick={() => !isUploadingPhoto && photoInputRef.current?.click()}
                 >
-                  <div className="w-32 h-32 sm:w-44 sm:h-44 rounded-full bg-slate-900 border-4 border-slate-800 overflow-hidden group-hover:border-orange-500 transition-all duration-700 shadow-[0_0_50px_rgba(0,0,0,0.5)] group-hover:shadow-[0_0_30px_rgba(255,85,0,0.2)]">
+                  <div className="w-32 h-32 sm:w-44 sm:h-44 rounded-full bg-slate-900 border-4 border-slate-800 overflow-hidden group-hover:border-orange-500 transition-all duration-700 shadow-[0_0_50px_rgba(0,0,0,0.5)] group-hover:shadow-[0_0_30px_rgba(255,85,0,0.2)] relative">
                     <img 
                       src={profilePhoto} 
                       alt="Profile" 
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     />
+                    {isUploadingPhoto && (
+                      <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center gap-2 z-20">
+                        <Loader2 size={32} className="text-orange-500 animate-spin" />
+                        <span className="text-[9px] font-black text-white uppercase tracking-widest text-center px-2">Enviando ao Storage...</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="absolute inset-0 rounded-full bg-slate-900/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                  <div className="absolute inset-0 rounded-full bg-slate-900/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all z-10">
                     <Camera size={28} className="text-white drop-shadow-lg" />
                   </div>
                 </div>
-                <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.4em] text-slate-500">Toque para enviar foto de perfil</p>
+                <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.4em] text-slate-500 flex items-center gap-1.5">
+                  <UploadCloud size={13} className="text-orange-500" />
+                  <span>Toque para enviar foto de perfil (Câmera ou Galeria)</span>
+                </p>
               </div>
 
               {/* Main Fields Grid */}
@@ -333,7 +485,23 @@ export function ProfileSettings() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Logo / Símbolo Pessoal</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Logo / Símbolo Pessoal</label>
+                      {personalLogo && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPersonalLogo(null);
+                            showToast('Logotipo removido.', 'info');
+                          }}
+                          className="text-[9px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1"
+                        >
+                          <Trash2 size={12} />
+                          <span>Remover</span>
+                        </button>
+                      )}
+                    </div>
                     <input 
                       type="file" 
                       ref={logoInputRef} 
@@ -342,19 +510,24 @@ export function ProfileSettings() {
                       onChange={(e) => handleFileUpload(e, 'logo')}
                     />
                     <div 
-                      className="border-2 border-dashed border-slate-800/30 rounded-3xl p-6 sm:p-10 flex flex-col items-center justify-center gap-3 hover:border-orange-500/50 transition-all cursor-pointer group bg-slate-900/10 hover:bg-slate-900/20"
-                      onClick={() => logoInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-800/40 rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center gap-3 hover:border-orange-500/50 transition-all cursor-pointer group bg-slate-900/20 hover:bg-slate-900/40 relative overflow-hidden"
+                      onClick={() => !isUploadingLogo && logoInputRef.current?.click()}
                     >
-                      <div className="w-12 h-12 rounded-full bg-slate-950 flex items-center justify-center text-slate-600 group-hover:text-orange-500 transition-all border border-slate-800 relative overflow-hidden">
-                        {personalLogo ? (
+                      <div className="w-16 h-16 rounded-2xl bg-slate-950 flex items-center justify-center text-slate-600 group-hover:text-orange-500 transition-all border border-slate-800 relative overflow-hidden shadow-inner">
+                        {isUploadingLogo ? (
+                          <Loader2 size={24} className="text-orange-500 animate-spin" />
+                        ) : personalLogo ? (
                           <img src={personalLogo} className="w-full h-full object-cover" alt="Personal Logo" />
                         ) : (
-                          <Camera size={20} />
+                          <Camera size={24} />
                         )}
                       </div>
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 group-hover:text-white transition-colors">
-                        {personalLogo ? 'Alterar Logo' : 'Selecionar Imagem'}
-                      </p>
+                      <div className="text-center">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-white transition-colors">
+                          {isUploadingLogo ? 'Enviando ao Storage...' : personalLogo ? 'Alterar Logo' : 'Enviar Brasão / Símbolo'}
+                        </p>
+                        <p className="text-[8px] text-slate-600 font-bold uppercase tracking-wider mt-0.5">JPG, PNG ou WebP</p>
+                      </div>
                     </div>
                   </div>
                   
@@ -530,47 +703,166 @@ export function ProfileSettings() {
           {activeTab === 'motocicleta' && (
             <div className="md:col-span-2 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-4 group">
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Apelido da Máquina</label>
-                  <input type="text" placeholder="Ex: Black Widow" className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white" />
+                  <input 
+                    type="text" 
+                    value={motorcycleNickname} 
+                    onChange={(e) => setMotorcycleNickname(e.target.value)}
+                    placeholder="Ex: Black Widow, Trovão Negro..." 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                  />
                 </div>
-                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-4 group">
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Marca / Modelo</label>
-                  <input type="text" defaultValue="Harley-Davidson Iron 883" className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white" />
+                  <input 
+                    type="text" 
+                    value={motorcycle} 
+                    onChange={(e) => setMotorcycle(e.target.value)}
+                    placeholder="Ex: Harley-Davidson Iron 883, BMW GS 1250" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                  />
                 </div>
-                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-4 group">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Ano</label>
-                  <input type="text" defaultValue="2022" className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white" />
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Ano de Fabricação</label>
+                  <input 
+                    type="text" 
+                    value={motorcycleYear} 
+                    onChange={(e) => setMotorcycleYear(e.target.value)}
+                    placeholder="Ex: 2023" 
+                    maxLength={4}
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                  />
                 </div>
-                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-4 group">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Placa</label>
-                  <input type="text" defaultValue="ABC-1D23" className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all uppercase backdrop-blur-sm text-white" />
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Placa (Identificação)</label>
+                  <input 
+                    type="text" 
+                    value={motorcyclePlate} 
+                    onChange={(e) => setMotorcyclePlate(e.target.value.toUpperCase())}
+                    placeholder="Ex: ABC-1D23" 
+                    maxLength={8}
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all uppercase backdrop-blur-sm text-white placeholder:text-slate-700" 
+                  />
                 </div>
               </div>
 
               <div className="space-y-6">
-                <div className="flex items-center gap-3 ml-2">
-                  <div className="w-8 h-8 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center">
-                    <Camera size={14} className="text-orange-500" />
+                <div className="flex items-center justify-between ml-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center">
+                      <Camera size={14} className="text-orange-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300">Galeria da Motocicleta (Até 3 fotos)</h3>
+                      <p className="text-[8px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">Armazenamento oficial no Supabase Storage</p>
+                    </div>
                   </div>
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Galeria da Moto (3 fotos)</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="aspect-square border-2 border-dashed border-slate-800/60 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 hover:border-orange-500/50 transition-all cursor-pointer group bg-slate-900/40 hover:bg-slate-900/50 hover:scale-[1.02]">
-                      <div className="w-12 h-12 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-600 group-hover:text-orange-500 group-hover:scale-110 transition-all">
-                        <Camera size={20} />
+                  {[0, 1, 2].map((slotIdx) => {
+                    const hasPhoto = !!motorcyclePhotos[slotIdx];
+                    const isUploading = uploadingBikeSlot === slotIdx;
+
+                    return (
+                      <div key={slotIdx} className="space-y-2">
+                        <input
+                          type="file"
+                          ref={bikeInputRefs[slotIdx]}
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => handleBikePhotoUpload(e, slotIdx)}
+                        />
+
+                        <div 
+                          className={cn(
+                            "aspect-square rounded-[2rem] border-2 flex flex-col items-center justify-center transition-all cursor-pointer group relative overflow-hidden",
+                            hasPhoto 
+                              ? "border-slate-800 bg-slate-950 shadow-lg" 
+                              : "border-dashed border-slate-800/80 bg-slate-900/30 hover:border-orange-500/50 hover:bg-slate-900/50 hover:scale-[1.02]"
+                          )}
+                          onClick={() => {
+                            if (!isUploading) {
+                              bikeInputRefs[slotIdx].current?.click();
+                            }
+                          }}
+                        >
+                          {isUploading ? (
+                            <div className="flex flex-col items-center gap-2">
+                              <Loader2 size={28} className="text-orange-500 animate-spin" />
+                              <p className="text-[8px] font-black uppercase tracking-widest text-white">Enviando...</p>
+                            </div>
+                          ) : hasPhoto ? (
+                            <>
+                              <img 
+                                src={motorcyclePhotos[slotIdx]} 
+                                alt={`Moto Foto ${slotIdx + 1}`} 
+                                className="w-full h-full object-cover rounded-[1.9rem] transition-transform duration-500 group-hover:scale-105" 
+                              />
+                              <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-2 backdrop-blur-xs p-4">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-white flex items-center gap-1.5">
+                                  <Camera size={14} className="text-orange-500" />
+                                  Trocar Foto
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveBikePhoto(slotIdx);
+                                  }}
+                                  className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 text-white text-[8px] font-black uppercase tracking-wider rounded-xl transition-colors flex items-center gap-1 mt-1 shadow-md"
+                                >
+                                  <Trash2 size={10} />
+                                  Excluir
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-12 h-12 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-600 group-hover:text-orange-500 group-hover:scale-110 transition-all">
+                                <Camera size={20} />
+                              </div>
+                              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 group-hover:text-white transition-colors mt-2">
+                                Foto {slotIdx + 1}
+                              </p>
+                              <span className="text-[7px] font-bold text-slate-600 uppercase tracking-widest">Tirar ou escolher</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 group-hover:text-white transition-colors">Foto {i}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
           )}
         </motion.div>
       </AnimatePresence>
+
+      {/* Floating Status Notification Toast */}
+      {uploadToast && (
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.95 }}
+          className={cn(
+            "fixed bottom-24 right-6 z-50 px-5 py-3 rounded-2xl border shadow-2xl flex items-center gap-3 backdrop-blur-md",
+            uploadToast.type === 'success' && "bg-slate-900/95 border-emerald-500/40 text-emerald-400 shadow-emerald-950/40",
+            uploadToast.type === 'error' && "bg-slate-900/95 border-red-500/40 text-red-400 shadow-red-950/40",
+            uploadToast.type === 'info' && "bg-slate-900/95 border-orange-500/40 text-orange-400 shadow-orange-950/40"
+          )}
+        >
+          {uploadToast.type === 'success' ? (
+            <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+          ) : uploadToast.type === 'error' ? (
+            <AlertCircle size={16} className="text-red-400 shrink-0" />
+          ) : (
+            <UploadCloud size={16} className="text-orange-400 shrink-0" />
+          )}
+          <span className="text-xs font-black uppercase tracking-wider">{uploadToast.message}</span>
+        </motion.div>
+      )}
 
       <footer className="sticky bottom-0 z-30 -mx-8 -mb-8 px-8 py-5 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_-10px_30px_rgba(0,0,0,0.8)]">
         <button

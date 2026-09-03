@@ -36,7 +36,8 @@ import {
   Navigation,
   Star,
   ArrowLeft,
-  Loader2
+  Loader2,
+  Database
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -124,7 +125,7 @@ const PARTNER_CATEGORIES: Partner['category'][] = [
 ];
 
 export function CommandCenter() {
-  const { profile, loading, user } = useAuth();
+  const { profile, loading, user, isSupabaseConfigured } = useAuth();
   const navigate = useNavigate();
   const isAdmin = profile?.role === 'admin';
 
@@ -939,6 +940,19 @@ export function CommandCenter() {
                 <Lock size={12} />
                 ADMIN SUPREMO ATIVO
               </span>
+              {isSupabaseConfigured ? (
+                <span className="px-3.5 py-1.5 bg-emerald-950/80 border border-emerald-500/50 text-emerald-400 text-[10px] font-black uppercase rounded-full tracking-widest flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <Database size={12} />
+                  SUPABASE CONECTADO
+                </span>
+              ) : (
+                <span className="px-3.5 py-1.5 bg-amber-950/80 border border-amber-500/50 text-amber-400 text-[10px] font-black uppercase rounded-full tracking-widest flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  <Database size={12} />
+                  MODO LOCAL / DEMO
+                </span>
+              )}
             </div>
 
             <h1 className="text-3xl md:text-5xl font-black italic uppercase tracking-tight text-white drop-shadow-md">
