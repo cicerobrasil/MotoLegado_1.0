@@ -27,6 +27,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { PWAInstallButton } from './PWAInstallButton';
+import { LogoMark } from './LogoMark';
+import { BrandKitModal } from './BrandKitModal';
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -39,6 +41,7 @@ export function LandingPage() {
   } = useAuth();
 
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showBrandKit, setShowBrandKit] = useState(false);
   const [loginTab, setLoginTab] = useState<'login' | 'register'>('login');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -241,16 +244,14 @@ export function LandingPage() {
               window.scrollTo({ top: 0, behavior: 'smooth' });
               document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
             }} 
-            className="flex items-center gap-3 cursor-pointer text-left group"
+            className="flex items-center gap-3.5 cursor-pointer text-left group"
           >
-            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-700 rounded-xl flex items-center justify-center shadow-[0_4px_25px_rgba(234,88,12,0.4)] group-hover:scale-105 transition-transform">
-              <span className="text-slate-950 font-black text-2xl italic leading-none ml-0.5">M</span>
-            </div>
+            <LogoMark size="lg" />
             <div>
               <span className="font-black italic uppercase text-2xl tracking-tighter text-white">
                 MOTO<span className="text-orange-500">LEGADO</span>
               </span>
-              <span className="hidden sm:inline-block ml-2 px-2 py-0.5 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[8px] font-black uppercase rounded-full tracking-widest">
+              <span className="hidden sm:inline-block ml-2.5 px-2 py-0.5 bg-orange-500/15 border border-orange-500/35 text-orange-400 text-[9px] font-black uppercase rounded-full tracking-widest">
                 SaaS PLATFORM
               </span>
             </div>
@@ -632,7 +633,7 @@ export function LandingPage() {
             }}
             className="flex items-center gap-3 cursor-pointer text-left group"
           >
-            <div className="w-8 h-8 bg-orange-600 group-hover:bg-orange-500 rounded-lg flex items-center justify-center font-black text-slate-950 text-base italic transition-colors">M</div>
+            <LogoMark size="sm" />
             <div>
               <span className="font-black italic uppercase text-lg text-white">MOTO<span className="text-orange-500">LEGADO</span></span>
               <p className="text-[9px] uppercase tracking-wider text-slate-600">SaaS Platform for Riders © 2026</p>
@@ -642,11 +643,17 @@ export function LandingPage() {
           <div className="flex flex-wrap items-center justify-center gap-6 font-bold uppercase text-[10px] tracking-widest text-slate-400">
             <a href="#recursos" className="hover:text-white transition-colors">Recursos</a>
             <a href="#planos" className="hover:text-white transition-colors">Planos</a>
+            <button onClick={() => setShowBrandKit(true)} className="text-orange-400 hover:text-orange-300 transition-colors cursor-pointer flex items-center gap-1.5">
+              <span>Baixar Emblema</span>
+            </button>
             <button onClick={() => setShowLoginModal(true)} className="hover:text-orange-500 transition-colors cursor-pointer">Acessar App</button>
             <button onClick={() => setShowLoginModal(true)} className="hover:text-orange-500 transition-colors cursor-pointer">Painel Admin</button>
           </div>
         </div>
       </footer>
+
+      {/* BRAND KIT MODAL */}
+      <BrandKitModal isOpen={showBrandKit} onClose={() => setShowBrandKit(false)} />
 
       {/* LOGIN / PILOT SESSION MODAL */}
       <AnimatePresence>
@@ -665,17 +672,17 @@ export function LandingPage() {
                 <X size={16} />
               </button>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[9px] font-black uppercase rounded-full">
-                    <User size={12} />
+              <div className="flex items-center gap-4">
+                <LogoMark size="xl" />
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[9px] font-black uppercase rounded-full">
+                    <User size={11} />
                     <span>Acesso do Piloto</span>
                   </div>
+                  <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white">
+                    INICIAR SESSÃO NO <span className="text-orange-500">MOTOLEGADO</span>
+                  </h3>
                 </div>
-
-                <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white">
-                  INICIAR SESSÃO NO <span className="text-orange-500">MOTOLEGADO</span>
-                </h3>
               </div>
 
               {/* Status & Error Alerts */}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Smartphone, Download, Share2, PlusSquare, X, CheckCircle2 } from 'lucide-react';
+import { Smartphone, Download, Share2, PlusSquare, X, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { cn } from '../lib/utils';
@@ -185,6 +185,15 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
                     </div>
                   </>
                 )}
+              </div>
+
+              {/* Selo de Segurança e Verificação */}
+              <div className="mt-4 p-3 rounded-2xl bg-emerald-950/30 border border-emerald-500/20 flex items-start gap-2.5">
+                <ShieldCheck size={18} className="text-emerald-400 shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-relaxed text-slate-300">
+                  <span className="font-bold text-emerald-400 block">Tecnologia PWA Oficial & Segura</span>
+                  O MotoLegado roda direto do navegador oficial. Não instala arquivos executáveis estranhos, não lê suas fotos ou arquivos e não ocupa espaço de armazenamento.
+                </div>
               </div>
 
               {/* Footer */}

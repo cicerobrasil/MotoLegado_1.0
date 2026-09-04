@@ -1,68 +1,95 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0f172a" />
-      <stop offset="50%" stop-color="#090d16" />
-      <stop offset="100%" stop-color="#020617" />
-    </linearGradient>
-    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ff7828" />
+    <!-- Vibrant orange gradient -->
+    <linearGradient id="primaryOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff8533" />
       <stop offset="50%" stop-color="#ea580c" />
       <stop offset="100%" stop-color="#c2410c" />
     </linearGradient>
-    <linearGradient id="shieldBorder" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#f97316" stop-opacity="0.9" />
-      <stop offset="50%" stop-color="#ea580c" stop-opacity="0.4" />
-      <stop offset="100%" stop-color="#ea580c" stop-opacity="0.1" />
+
+    <!-- Deep obsidian shield fill -->
+    <linearGradient id="darkArmor" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#182234" />
+      <stop offset="40%" stop-color="#0b111e" />
+      <stop offset="100%" stop-color="#030712" />
     </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+
+    <!-- Wing gradient -->
+    <linearGradient id="wingOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffedd5" />
+      <stop offset="20%" stop-color="#fb923c" />
+      <stop offset="65%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#9a3412" />
+    </linearGradient>
+
+    <!-- Glow effect -->
+    <filter id="orangeGlow" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="8" result="blur" />
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
   </defs>
 
-  <!-- Background container -->
-  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" />
+  <!-- Base Dark Squircle Plate with Electric Orange Accent Border -->
+  <rect x="18" y="18" width="476" height="476" rx="100" fill="#070c16" stroke="url(#primaryOrange)" stroke-width="6" />
+  <rect x="24" y="24" width="464" height="464" rx="94" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="1.5" />
 
-  <!-- Outer subtle tech ring -->
-  <circle cx="256" cy="256" r="224" fill="none" stroke="#ea580c" stroke-opacity="0.2" stroke-width="2" stroke-dasharray="12 8" />
-  
-  <!-- Outer Shield Crest -->
-  <path d="M 256 64 L 400 128 C 400 280 256 392 256 424 C 256 392 112 280 112 128 Z" 
-        fill="#0d1424" stroke="url(#shieldBorder)" stroke-width="6" stroke-linejoin="round" />
-
-  <!-- Inner Shield Glow -->
-  <path d="M 256 86 L 380 142 C 380 268 256 364 256 392 C 256 364 132 268 132 142 Z" 
-        fill="#090d16" stroke="#ea580c" stroke-width="2" stroke-opacity="0.5" />
-
-  <!-- Stylized Biker Wings -->
-  <g fill="url(#orangeGrad)" opacity="0.95">
-    <!-- Left Wing Feathers -->
-    <path d="M 230 190 L 140 180 C 170 205 210 215 230 218 Z" />
-    <path d="M 226 226 L 152 230 C 180 248 214 252 226 254 Z" />
-    <path d="M 224 262 L 168 274 C 190 286 216 288 224 288 Z" />
-
-    <!-- Right Wing Feathers -->
-    <path d="M 282 190 L 372 180 C 342 205 302 215 282 218 Z" />
-    <path d="M 286 226 L 360 230 C 332 248 298 252 286 254 Z" />
-    <path d="M 288 262 L 344 274 C 322 286 296 288 288 288 Z" />
+  <!-- Outer Protective Armor Shield -->
+  <g id="shield">
+    <!-- Shield Outer Edge -->
+    <path d="M 256 46 L 436 108 C 436 298 256 428 256 458 C 256 428 76 298 76 108 Z" 
+          fill="url(#darkArmor)" stroke="url(#primaryOrange)" stroke-width="8" stroke-linejoin="round" />
+    
+    <!-- Shield Inner Bevel Line -->
+    <path d="M 256 64 L 418 120 C 418 284 256 398 256 432 C 256 398 94 284 94 120 Z" 
+          fill="none" stroke="#ffffff" stroke-opacity="0.25" stroke-width="2" />
   </g>
 
-  <!-- Central Motorcycle Headlight / Piston Cog -->
-  <circle cx="256" cy="236" r="48" fill="#1e293b" stroke="#ea580c" stroke-width="6" filter="url(#glow)" />
-  <circle cx="256" cy="236" r="36" fill="#090d16" stroke="#fb923c" stroke-width="3" />
-  <circle cx="256" cy="236" r="18" fill="url(#orangeGrad)" />
+  <!-- Symmetrical Biker Wings (Triple blade) -->
+  <g id="wings" fill="url(#wingOrange)" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round">
+    <!-- Left Wing -->
+    <path d="M 226 178 L 102 152 C 140 190 200 212 226 216 Z" />
+    <path d="M 222 224 L 114 224 C 154 254 202 260 222 262 Z" />
+    <path d="M 220 270 L 132 284 C 168 304 206 306 220 306 Z" />
 
-  <!-- Compass Star / Speedometer needle -->
-  <polygon points="256,196 261,232 256,228 251,232" fill="#ffffff" />
-  <polygon points="256,276 261,240 256,244 251,240" fill="#f97316" />
+    <!-- Right Wing -->
+    <path d="M 286 178 L 410 152 C 372 190 312 212 286 216 Z" />
+    <path d="M 290 224 L 398 224 C 358 254 310 260 290 262 Z" />
+    <path d="M 292 270 L 380 284 C 344 304 306 306 292 306 Z" />
+  </g>
 
-  <!-- Speedometer tick marks -->
-  <line x1="230" y1="218" x2="222" y2="212" stroke="#f97316" stroke-width="3" stroke-linecap="round" />
-  <line x1="282" y1="218" x2="290" y2="212" stroke="#f97316" stroke-width="3" stroke-linecap="round" />
-  <line x1="256" y1="202" x2="256" y2="194" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
+  <!-- Central Projector Headlight / Speedometer Core -->
+  <g id="headlight-core">
+    <!-- Outer Neon Ring -->
+    <circle cx="256" cy="240" r="58" fill="#070c16" stroke="url(#primaryOrange)" stroke-width="7" filter="url(#orangeGlow)" />
+    <!-- White Rim Ring -->
+    <circle cx="256" cy="240" r="50" fill="#0b111e" stroke="#ffffff" stroke-width="3" />
+    <!-- Inner Lens Ring -->
+    <circle cx="256" cy="240" r="42" fill="url(#darkArmor)" stroke="#ea580c" stroke-width="3" />
 
-  <!-- Lower Banner Typography: MOTO LEGADO -->
-  <path d="M 180 340 L 332 340 L 320 372 L 256 384 L 192 372 Z" fill="#ea580c" />
-  <text x="256" y="362" text-anchor="middle" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="19" letter-spacing="3">MOTOLEGADO</text>
+    <!-- Center Glowing Lens Orb -->
+    <circle cx="256" cy="240" r="28" fill="url(#primaryOrange)" stroke="#ffedd5" stroke-width="3" />
+    <circle cx="256" cy="240" r="16" fill="#ffedd5" />
+
+    <!-- Vertical Projector Light Beam -->
+    <line x1="256" y1="188" x2="256" y2="218" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
+    <line x1="256" y1="262" x2="256" y2="292" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
+    <line x1="204" y1="240" x2="228" y2="240" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
+    <line x1="308" y1="240" x2="284" y2="240" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
+  </g>
+
+  <!-- Lower Banner Ribbon with MOTOLEGADO -->
+  <g id="banner">
+    <!-- Banner Plate -->
+    <path d="M 124 358 L 388 358 L 364 410 L 256 438 L 148 410 Z" 
+          fill="url(#primaryOrange)" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" filter="url(#orangeGlow)" />
+    
+    <!-- Banner Inner Trim -->
+    <path d="M 132 364 L 380 364 L 358 404 L 256 428 L 154 404 Z" 
+          fill="none" stroke="#ffedd5" stroke-opacity="0.4" stroke-width="1.5" />
+
+    <!-- Pure Crisp White MOTOLEGADO Text -->
+    <text x="256" y="398" text-anchor="middle" fill="#ffffff" 
+          font-family="'Impact', 'Arial Black', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-weight="900" font-size="28" font-style="italic" letter-spacing="3.5">MOTOLEGADO</text>
+  </g>
 </svg>

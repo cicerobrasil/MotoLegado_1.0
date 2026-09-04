@@ -1,4 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+import fs from 'fs';
+import path from 'path';
+import sharp from 'sharp';
+
+// MotoLegado Crest Emblem (Shield + Wings + Headlight Core + MOTOLEGADO Ribbon)
+// Clean, authoritative biker crest without the letter 'M'
+const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
     <!-- Vibrant orange gradient -->
     <linearGradient id="primaryOrange" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -93,3 +99,53 @@
           font-weight="900" font-size="28" font-style="italic" letter-spacing="3.5">MOTOLEGADO</text>
   </g>
 </svg>
+`;
+
+async function main() {
+  const publicDir = path.resolve('public');
+
+  console.log('Generating updated SVG icon...');
+  fs.writeFileSync(path.join(publicDir, 'icon.svg'), svgContent, 'utf-8');
+  fs.writeFileSync(path.join(publicDir, 'icon-maskable.svg'), svgContent, 'utf-8');
+
+  console.log('Rendering PNG icons with sharp...');
+  const svgBuffer = Buffer.from(svgContent);
+
+  // 1. Favicon 32x32
+  await sharp(svgBuffer).resize(32, 32).png().toFile(path.join(publicDir, 'favicon-32x32.png'));
+
+  // 2. Apple Touch Icon 180x180
+  await sharp(svgBuffer).resize(180, 180).png().toFile(path.join(publicDir, 'apple-touch-icon.png'));
+
+  // 3. PWA 192x192
+  await sharp(svgBuffer).resize(192, 192).png().toFile(path.join(publicDir, 'pwa-192x192.png'));
+
+  // 4. PWA 512x512
+  await sharp(svgBuffer).resize(512, 512).png().toFile(path.join(publicDir, 'pwa-512x512.png'));
+
+  // 5. PWA Maskable 512x512
+  await sharp(svgBuffer).resize(512, 512).png().toFile(path.join(publicDir, 'pwa-maskable-512x512.png'));
+
+  // 6. High-Resolution Badge Downloads (1024px and 2048px Ultra HD)
+  await sharp(svgBuffer).resize(1024, 1024).png().toFile(path.join(publicDir, 'motolegado-emblema-1024.png'));
+  await sharp(svgBuffer).resize(2048, 2048).png().toFile(path.join(publicDir, 'motolegado-emblema-2048.png'));
+
+  // 7. Transparent Background Version (Without outer plate - pure shield, wings and ribbon)
+  const transparentSvg = svgContent
+    .replace(/<rect x="18" y="18"[^>]+>/, '')
+    .replace(/<rect x="24" y="24"[^>]+>/, '');
+
+  fs.writeFileSync(path.join(publicDir, 'motolegado-emblema-transparente.svg'), transparentSvg, 'utf-8');
+  const transparentSvgBuffer = Buffer.from(transparentSvg);
+
+  await sharp(transparentSvgBuffer).resize(1024, 1024).png().toFile(path.join(publicDir, 'motolegado-emblema-transparente-1024.png'));
+  await sharp(transparentSvgBuffer).resize(2048, 2048).png().toFile(path.join(publicDir, 'motolegado-emblema-transparente-2048.png'));
+
+  console.log('All brand kit assets and icons generated successfully!');
+}
+
+main().catch(err => {
+  console.error('Error generating icons:', err);
+  process.exit(1);
+});
+

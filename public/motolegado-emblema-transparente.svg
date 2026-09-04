@@ -30,8 +30,8 @@
   </defs>
 
   <!-- Base Dark Squircle Plate with Electric Orange Accent Border -->
-  <rect x="18" y="18" width="476" height="476" rx="100" fill="#070c16" stroke="url(#primaryOrange)" stroke-width="6" />
-  <rect x="24" y="24" width="464" height="464" rx="94" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="1.5" />
+  
+  
 
   <!-- Outer Protective Armor Shield -->
   <g id="shield">

@@ -14,7 +14,8 @@ import {
   Menu,
   X,
   BookOpen,
-  Crown
+  Crown,
+  Download
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
@@ -23,6 +24,8 @@ import { useAuth } from "../context/AuthContext";
 import { isUserProOrBonificado } from "../lib/permissions";
 import { UpgradeModal } from "./UpgradeModal";
 import { PWAInstallButton } from "./PWAInstallButton";
+import { LogoMark } from "./LogoMark";
+import { BrandKitModal } from "./BrandKitModal";
 
 interface MenuItem {
   icon: any;
@@ -56,6 +59,7 @@ export function Sidebar() {
   const { profile, isSupabaseConfigured, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isBrandKitOpen, setIsBrandKitOpen] = useState(false);
   const isVip = isUserProOrBonificado(profile);
 
   const pilotName = profile?.name || 'Piloto MotoLegado';
@@ -99,9 +103,7 @@ export function Sidebar() {
           }} 
           className="flex items-center gap-2.5"
         >
-          <div className="w-9 h-9 bg-orange-600 rounded-xl flex items-center justify-center shadow-[0_4px_20px_rgba(234,88,12,0.3)]">
-            <span className="text-slate-950 font-black text-lg italic leading-none ml-0.5">M</span>
-          </div>
+          <LogoMark size="sm" />
           <span className="font-black italic uppercase text-lg tracking-tighter text-white">
             Moto<span className="text-orange-500">Legado</span>
           </span>
@@ -149,9 +151,7 @@ export function Sidebar() {
             }} 
             className="flex items-center gap-3"
           >
-            <div className="w-10 h-10 bg-orange-600 rounded-xl flex items-center justify-center shadow-[0_4px_20px_rgba(234,88,12,0.3)] shrink-0">
-              <span className="text-slate-950 font-black text-xl italic leading-none ml-0.5">M</span>
-            </div>
+            <LogoMark size="md" />
             <h1 className="font-black italic uppercase text-xl tracking-tighter text-white">Moto<span className="text-orange-500">Legado</span></h1>
           </Link>
           <button 
@@ -237,6 +237,13 @@ export function Sidebar() {
 
           <div className="pt-2 border-t border-slate-800/40 flex flex-col gap-2">
             <button 
+              onClick={() => setIsBrandKitOpen(true)}
+              className="w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-orange-400 transition-colors py-1 cursor-pointer"
+            >
+              <Download size={14} className="text-orange-500" />
+              <span>Baixar Emblema / Kit</span>
+            </button>
+            <button 
               onClick={handleSignOut}
               className="w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-500 transition-colors py-1 cursor-pointer"
             >
@@ -270,6 +277,11 @@ export function Sidebar() {
       <UpgradeModal 
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
+      />
+
+      <BrandKitModal 
+        isOpen={isBrandKitOpen} 
+        onClose={() => setIsBrandKitOpen(false)} 
       />
     </>
   );
