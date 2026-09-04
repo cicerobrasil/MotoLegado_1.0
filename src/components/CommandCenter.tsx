@@ -42,7 +42,10 @@ import {
   Crown,
   Users,
   Zap,
-  Check
+  Check,
+  List,
+  LayoutGrid,
+  CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -261,6 +264,8 @@ export function CommandCenter() {
   const [pilotsList, setPilotsList] = useState<any[]>([]);
   const [pilotSearchText, setPilotSearchText] = useState('');
   const [pilotPlanFilter, setPilotPlanFilter] = useState<'todos' | 'gratuito' | 'bonificado' | 'pago'>('todos');
+  const [pilotViewMode, setPilotViewMode] = useState<'lista' | 'cards'>('lista');
+  const [selectedPilotIds, setSelectedPilotIds] = useState<string[]>([]);
   const [viewingPilotModal, setViewingPilotModal] = useState<any | null>(null);
   const [loadingPilots, setLoadingPilots] = useState(false);
 
@@ -493,6 +498,22 @@ export function CommandCenter() {
         : newPlan === 'pago'
         ? `🔥 ${targetPilot.name} agora possui assinatura Pro ativa.`
         : `🟢 Plano de ${targetPilot.name} redefinido para Gratuito.`,
+      'success'
+    );
+  };
+
+  const handleBatchUpdatePlan = async (newPlan: 'bonificado' | 'gratuito') => {
+    if (selectedPilotIds.length === 0) return;
+    const targetIds = [...selectedPilotIds];
+    for (const id of targetIds) {
+      await handleUpdatePlan(id, newPlan);
+    }
+    const count = targetIds.length;
+    setSelectedPilotIds([]);
+    showToast(
+      newPlan === 'bonificado'
+        ? `🎁 Modo Bonificado ativado para ${count} piloto(s) selecionado(s)!`
+        : `🟢 ${count} piloto(s) atualizados para Plano Gratuito.`,
       'success'
     );
   };
@@ -2827,9 +2848,9 @@ export function CommandCenter() {
               </div>
             </div>
 
-            {/* Filter & Search */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
-              <div className="relative w-full md:w-96">
+            {/* Filter, Search & View Switcher */}
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-4 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+              <div className="relative w-full lg:w-96">
                 <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   type="text"
@@ -2840,214 +2861,483 @@ export function CommandCenter() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 no-scrollbar">
-                <button
-                  onClick={() => setPilotPlanFilter('todos')}
-                  className={cn(
-                    "px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0",
-                    pilotPlanFilter === 'todos'
-                      ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
-                      : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
-                  )}
-                >
-                  Todos ({pilotsList.length})
-                </button>
-                <button
-                  onClick={() => setPilotPlanFilter('gratuito')}
-                  className={cn(
-                    "px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 flex items-center gap-1.5",
-                    pilotPlanFilter === 'gratuito'
-                      ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
-                      : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
-                  )}
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  Gratuito ({gratuitosCount})
-                </button>
-                <button
-                  onClick={() => setPilotPlanFilter('bonificado')}
-                  className={cn(
-                    "px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 flex items-center gap-1.5",
-                    pilotPlanFilter === 'bonificado'
-                      ? "bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20"
-                      : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
-                  )}
-                >
-                  <Gift size={13} className="text-amber-400" />
-                  Bonificado ({bonificadosCount})
-                </button>
-                <button
-                  onClick={() => setPilotPlanFilter('pago')}
-                  className={cn(
-                    "px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 flex items-center gap-1.5",
-                    pilotPlanFilter === 'pago'
-                      ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
-                      : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
-                  )}
-                >
-                  <Crown size={13} className="text-orange-400" />
-                  Assinantes Pro ({proCount})
-                </button>
+              <div className="flex flex-wrap items-center justify-between lg:justify-end gap-2.5 w-full lg:w-auto">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+                  <button
+                    onClick={() => setPilotPlanFilter('todos')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 cursor-pointer",
+                      pilotPlanFilter === 'todos'
+                        ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
+                        : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                    )}
+                  >
+                    Todos ({pilotsList.length})
+                  </button>
+                  <button
+                    onClick={() => setPilotPlanFilter('gratuito')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 flex items-center gap-1.5 cursor-pointer",
+                      pilotPlanFilter === 'gratuito'
+                        ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                        : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                    )}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    Gratuito ({gratuitosCount})
+                  </button>
+                  <button
+                    onClick={() => setPilotPlanFilter('bonificado')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 flex items-center gap-1.5 cursor-pointer",
+                      pilotPlanFilter === 'bonificado'
+                        ? "bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20"
+                        : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                    )}
+                  >
+                    <Gift size={13} className="text-amber-400" />
+                    Bonificado ({bonificadosCount})
+                  </button>
+                  <button
+                    onClick={() => setPilotPlanFilter('pago')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 flex items-center gap-1.5 cursor-pointer",
+                      pilotPlanFilter === 'pago'
+                        ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
+                        : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                    )}
+                  >
+                    <Crown size={13} className="text-orange-400" />
+                    Assinantes Pro ({proCount})
+                  </button>
+                </div>
+
+                {/* View Switcher: Lista vs Cards */}
+                <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPilotViewMode('lista')}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer",
+                      pilotViewMode === 'lista'
+                        ? "bg-amber-500 text-slate-950 shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    )}
+                    title="Exibição em Lista (Tabela)"
+                  >
+                    <List size={14} />
+                    <span className="hidden sm:inline">Lista</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPilotViewMode('cards')}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer",
+                      pilotViewMode === 'cards'
+                        ? "bg-amber-500 text-slate-950 shadow-sm"
+                        : "text-slate-400 hover:text-white"
+                    )}
+                    title="Exibição em Cards"
+                  >
+                    <LayoutGrid size={14} />
+                    <span className="hidden sm:inline">Cards</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Pilots Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pilotsList
-                .filter(p => {
-                  const query = pilotSearchText.toLowerCase();
-                  const matchesSearch = 
-                    (p.name && p.name.toLowerCase().includes(query)) ||
-                    (p.email && p.email.toLowerCase().includes(query)) ||
-                    (p.motorcycle && p.motorcycle.toLowerCase().includes(query)) ||
-                    (p.city && p.city.toLowerCase().includes(query)) ||
-                    (p.club_name && p.club_name.toLowerCase().includes(query));
+            {/* Batch Selection Action Bar */}
+            {selectedPilotIds.length > 0 && (
+              <div className="bg-gradient-to-r from-amber-950/50 via-slate-900 to-amber-950/50 border border-amber-500/50 rounded-2xl p-3.5 px-5 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+                <div className="flex items-center gap-2.5 text-xs text-amber-300 font-bold">
+                  <CheckCircle2 size={16} className="text-amber-400" />
+                  <span>
+                    <strong className="text-white font-black text-sm">{selectedPilotIds.length}</strong> piloto(s) selecionado(s)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleBatchUpdatePlan('bonificado')}
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+                  >
+                    <Gift size={13} />
+                    <span>Bonificar Selecionados</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBatchUpdatePlan('gratuito')}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <UserX size={13} className="text-rose-400" />
+                    <span>Remover Bonificação</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPilotIds([])}
+                    className="px-2.5 py-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              </div>
+            )}
 
-                  if (!matchesSearch) return false;
+            {/* Pilots Display Area */}
+            {(() => {
+              const displayedPilots = pilotsList.filter(p => {
+                const query = pilotSearchText.toLowerCase();
+                const matchesSearch = 
+                  (p.name && p.name.toLowerCase().includes(query)) ||
+                  (p.email && p.email.toLowerCase().includes(query)) ||
+                  (p.motorcycle && p.motorcycle.toLowerCase().includes(query)) ||
+                  (p.city && p.city.toLowerCase().includes(query)) ||
+                  (p.club_name && p.club_name.toLowerCase().includes(query));
 
-                  if (pilotPlanFilter === 'gratuito') return p.plan_type === 'gratuito' || (!p.plan_type && !p.is_pro);
-                  if (pilotPlanFilter === 'bonificado') return p.plan_type === 'bonificado';
-                  if (pilotPlanFilter === 'pago') return p.plan_type === 'pago' || (p.is_pro && p.plan_type !== 'bonificado' && p.role !== 'admin');
-                  return true;
-                })
-                .map(pilot => {
-                  const isBonificado = pilot.plan_type === 'bonificado';
-                  const isPro = pilot.plan_type === 'pago' || (pilot.is_pro && !isBonificado && pilot.role !== 'admin');
-                  const isGratuito = !isBonificado && !isPro && pilot.role !== 'admin';
-                  const isSelf = pilot.id === profile?.id || pilot.email === profile?.email;
+                if (!matchesSearch) return false;
 
-                  return (
-                    <div
-                      key={pilot.id}
-                      className={cn(
-                        "bg-slate-950/80 border rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 hover:border-slate-700 relative overflow-hidden",
-                        isBonificado
-                          ? "border-amber-500/50 shadow-lg shadow-amber-500/5 bg-gradient-to-b from-amber-950/20 to-slate-950/90"
-                          : isPro
-                          ? "border-orange-500/40 shadow-lg shadow-orange-500/5"
-                          : "border-slate-800/80"
-                      )}
-                    >
-                      {/* Top status banner */}
-                      <div className="flex items-start justify-between gap-3 mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
-                            {pilot.avatar_url ? (
-                              <img src={pilot.avatar_url} alt={pilot.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-base font-black text-amber-400">
-                                {pilot.name ? pilot.name.slice(0, 2).toUpperCase() : 'ML'}
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <h3 className="text-sm font-bold text-white tracking-tight">{pilot.name}</h3>
-                              {isSelf && (
-                                <span className="text-[9px] font-black uppercase bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
-                                  Você
+                if (pilotPlanFilter === 'gratuito') return p.plan_type === 'gratuito' || (!p.plan_type && !p.is_pro);
+                if (pilotPlanFilter === 'bonificado') return p.plan_type === 'bonificado';
+                if (pilotPlanFilter === 'pago') return p.plan_type === 'pago' || (p.is_pro && p.plan_type !== 'bonificado' && p.role !== 'admin');
+                return true;
+              });
+
+              if (displayedPilots.length === 0) return null;
+
+              if (pilotViewMode === 'lista') {
+                return (
+                  <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs min-w-[920px] border-collapse">
+                        <thead>
+                          <tr className="bg-slate-900/90 border-b border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            <th className="py-3.5 px-4 w-12 text-center">
+                              <input
+                                type="checkbox"
+                                checked={displayedPilots.length > 0 && selectedPilotIds.length === displayedPilots.length}
+                                onChange={() => {
+                                  if (selectedPilotIds.length === displayedPilots.length) {
+                                    setSelectedPilotIds([]);
+                                  } else {
+                                    setSelectedPilotIds(displayedPilots.map(p => p.id));
+                                  }
+                                }}
+                                className="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500/20 cursor-pointer w-4 h-4"
+                                title="Selecionar todos os pilotos visíveis"
+                              />
+                            </th>
+                            <th className="py-3.5 px-4">Piloto</th>
+                            <th className="py-3.5 px-4">Motocicleta & Clube</th>
+                            <th className="py-3.5 px-4">Localização & Nível</th>
+                            <th className="py-3.5 px-4 text-center">Status Atual</th>
+                            <th className="py-3.5 px-4 text-center min-w-[220px]">
+                              <div className="flex items-center justify-center gap-1.5 text-amber-400">
+                                <Gift size={13} />
+                                <span>Caixa de Bonificação</span>
+                              </div>
+                            </th>
+                            <th className="py-3.5 px-4 text-right">Ficha</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 font-medium">
+                          {displayedPilots.map((pilot) => {
+                            const isBonificado = pilot.plan_type === 'bonificado';
+                            const isPro = pilot.plan_type === 'pago' || (pilot.is_pro && !isBonificado && pilot.role !== 'admin');
+                            const isAdmin = pilot.role === 'admin';
+                            const isSelf = pilot.id === profile?.id || pilot.email === profile?.email;
+                            const isSelected = selectedPilotIds.includes(pilot.id);
+
+                            return (
+                              <tr
+                                key={pilot.id}
+                                className={cn(
+                                  "hover:bg-slate-900/50 transition-colors",
+                                  isBonificado && "bg-amber-950/15 hover:bg-amber-950/25",
+                                  isSelected && "bg-amber-500/10"
+                                )}
+                              >
+                                {/* Checkbox Seleção */}
+                                <td className="py-3.5 px-4 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      setSelectedPilotIds(prev => 
+                                        prev.includes(pilot.id) ? prev.filter(id => id !== pilot.id) : [...prev, pilot.id]
+                                      );
+                                    }}
+                                    className="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500/20 cursor-pointer w-4 h-4"
+                                  />
+                                </td>
+
+                                {/* Identificação do Piloto */}
+                                <td className="py-3.5 px-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
+                                      {pilot.avatar_url ? (
+                                        <img src={pilot.avatar_url} alt={pilot.name} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <span className="text-xs font-black text-amber-400">
+                                          {pilot.name ? pilot.name.slice(0, 2).toUpperCase() : 'ML'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-bold text-white tracking-tight">{pilot.name}</span>
+                                        {isSelf && (
+                                          <span className="text-[9px] font-black uppercase bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
+                                            Você
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[11px] text-slate-400 font-mono">{pilot.email}</div>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* Motocicleta & Moto Clube */}
+                                <td className="py-3.5 px-4">
+                                  <div className="font-semibold text-slate-200">{pilot.motorcycle || 'Moto não informada'}</div>
+                                  <div className="text-[11px] text-amber-400/90">{pilot.club_name || 'Piloto Independente'}</div>
+                                </td>
+
+                                {/* Localização & Nível */}
+                                <td className="py-3.5 px-4 text-slate-300">
+                                  <div>{pilot.city ? `${pilot.city}, ${pilot.state || 'BR'}` : 'Brasil'}</div>
+                                  <div className="text-[10px] text-slate-500">{pilot.points || 0} pts • Nível {pilot.tier || 'Bronze'}</div>
+                                </td>
+
+                                {/* Status do Plano */}
+                                <td className="py-3.5 px-4 text-center">
+                                  {isAdmin ? (
+                                    <span className="inline-flex px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase tracking-wider items-center gap-1">
+                                      <ShieldCheck size={11} /> Admin
+                                    </span>
+                                  ) : isBonificado ? (
+                                    <span className="inline-flex px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black uppercase tracking-wider items-center gap-1 shadow-sm shadow-amber-500/20">
+                                      <Gift size={11} className="text-amber-400" /> Bonificado VIP
+                                    </span>
+                                  ) : isPro ? (
+                                    <span className="inline-flex px-2.5 py-1 rounded-lg bg-orange-500/20 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase tracking-wider items-center gap-1">
+                                      <Crown size={11} /> Assinante Pro
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-wider items-center gap-1">
+                                      <CheckCircle size={11} /> Gratuito
+                                    </span>
+                                  )}
+                                </td>
+
+                                {/* Caixa de Bonificação Interativa */}
+                                <td className="py-3.5 px-4 text-center">
+                                  <div className="flex items-center justify-center">
+                                    {isAdmin ? (
+                                      <span className="text-[11px] text-slate-500 italic font-medium">
+                                        Privilégio Total
+                                      </span>
+                                    ) : (
+                                      <label
+                                        className={cn(
+                                          "relative inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl border cursor-pointer transition-all select-none shadow-sm",
+                                          isBonificado 
+                                            ? "bg-amber-500/20 border-amber-500/60 hover:bg-amber-500/30 text-amber-300 shadow-amber-500/10" 
+                                            : "bg-slate-900 border-slate-700/80 hover:border-amber-500/60 hover:bg-slate-850 text-slate-400 hover:text-white"
+                                        )}
+                                        title={isBonificado ? "Clique para desativar a bonificação" : "Clique para marcar e ativar Modo Bonificado Pro"}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isBonificado}
+                                          onChange={() => {
+                                            handleUpdatePlan(pilot.id, isBonificado ? 'gratuito' : 'bonificado');
+                                          }}
+                                          className="sr-only peer"
+                                        />
+                                        <div className={cn(
+                                          "w-5 h-5 rounded-md border flex items-center justify-center transition-all shrink-0",
+                                          isBonificado 
+                                            ? "bg-amber-500 border-amber-400 text-slate-950 font-black shadow-sm" 
+                                            : "border-slate-600 bg-slate-950"
+                                        )}>
+                                          {isBonificado && <Check size={13} className="stroke-[3]" />}
+                                        </div>
+                                        <span className="text-[11px] font-black uppercase tracking-wider whitespace-nowrap">
+                                          {isBonificado ? 'Bonificado Ativo' : 'Habilitar Bônus'}
+                                        </span>
+                                      </label>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* Ficha Completa */}
+                                <td className="py-3.5 px-4 text-right">
+                                  <button
+                                    onClick={() => setViewingPilotModal(pilot)}
+                                    className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                                    title="Ver ficha completa do piloto"
+                                  >
+                                    <Eye size={15} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              }
+
+              {/* Cards Grid */}
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {displayedPilots.map(pilot => {
+                    const isBonificado = pilot.plan_type === 'bonificado';
+                    const isPro = pilot.plan_type === 'pago' || (pilot.is_pro && !isBonificado && pilot.role !== 'admin');
+                    const isGratuito = !isBonificado && !isPro && pilot.role !== 'admin';
+                    const isSelf = pilot.id === profile?.id || pilot.email === profile?.email;
+
+                    return (
+                      <div
+                        key={pilot.id}
+                        className={cn(
+                          "bg-slate-950/80 border rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 hover:border-slate-700 relative overflow-hidden",
+                          isBonificado
+                            ? "border-amber-500/50 shadow-lg shadow-amber-500/5 bg-gradient-to-b from-amber-950/20 to-slate-950/90"
+                            : isPro
+                            ? "border-orange-500/40 shadow-lg shadow-orange-500/5"
+                            : "border-slate-800/80"
+                        )}
+                      >
+                        {/* Top status banner */}
+                        <div className="flex items-start justify-between gap-3 mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
+                              {pilot.avatar_url ? (
+                                <img src={pilot.avatar_url} alt={pilot.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-base font-black text-amber-400">
+                                  {pilot.name ? pilot.name.slice(0, 2).toUpperCase() : 'ML'}
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-slate-400 truncate max-w-[180px]">{pilot.email}</p>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <h3 className="text-sm font-bold text-white tracking-tight">{pilot.name}</h3>
+                                {isSelf && (
+                                  <span className="text-[9px] font-black uppercase bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
+                                    Você
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-400 truncate max-w-[180px]">{pilot.email}</p>
+                            </div>
                           </div>
-                        </div>
 
-                        {/* Plan Badge */}
-                        <div>
-                          {pilot.role === 'admin' ? (
-                            <span className="px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                              <ShieldCheck size={11} /> Admin
-                            </span>
-                          ) : isBonificado ? (
-                            <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm shadow-amber-500/20 animate-pulse">
-                              <Gift size={11} className="text-amber-400" /> Bonificado Pro
-                            </span>
-                          ) : isPro ? (
-                            <span className="px-2.5 py-1 rounded-lg bg-orange-500/20 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                              <Crown size={11} /> Assinante Pro
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                              <CheckCircle size={11} /> Gratuito
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Pilot details */}
-                      <div className="space-y-2 py-3 border-y border-slate-900 text-xs">
-                        <div className="flex items-center justify-between text-slate-400">
-                          <span className="text-slate-500">Motocicleta:</span>
-                          <span className="font-medium text-slate-200 truncate max-w-[180px]">
-                            {pilot.motorcycle || 'Não informada'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-slate-400">
-                          <span className="text-slate-500">Localização:</span>
-                          <span className="font-medium text-slate-300">
-                            {pilot.city ? `${pilot.city}, ${pilot.state || 'BR'}` : 'Brasil'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-slate-400">
-                          <span className="text-slate-500">Moto Clube:</span>
-                          <span className="font-medium text-amber-400/90 truncate max-w-[180px]">
-                            {pilot.club_name || 'Piloto Independente'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-slate-400">
-                          <span className="text-slate-500">Experiência:</span>
-                          <span className="font-medium text-slate-300">
-                            {pilot.points || 0} pts • Nível {pilot.tier || 'Bronze'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Bonificado Info Notice if applicable */}
-                      {isBonificado && (
-                        <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300/90 flex items-start gap-2">
-                          <Sparkles size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                          {/* Plan Badge */}
                           <div>
-                            <span className="font-bold">Acesso Pro Total Sem Cobrança</span>
-                            <p className="text-[10px] text-slate-400 mt-0.5">
-                              Concedido por: {pilot.bonificado_by || 'Comando MotoLegado'}
-                            </p>
+                            {pilot.role === 'admin' ? (
+                              <span className="px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                <ShieldCheck size={11} /> Admin
+                              </span>
+                            ) : isBonificado ? (
+                              <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm shadow-amber-500/20 animate-pulse">
+                                <Gift size={11} className="text-amber-400" /> Bonificado Pro
+                              </span>
+                            ) : isPro ? (
+                              <span className="px-2.5 py-1 rounded-lg bg-orange-500/20 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                <Crown size={11} /> Assinante Pro
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                <CheckCircle size={11} /> Gratuito
+                              </span>
+                            )}
                           </div>
                         </div>
-                      )}
 
-                      {/* Action buttons */}
-                      <div className="mt-4 pt-3 flex flex-wrap items-center gap-2">
-                        {isBonificado ? (
-                          <button
-                            onClick={() => handleUpdatePlan(pilot.id, 'gratuito')}
-                            className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-300 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors"
-                          >
-                            <UserX size={13} className="text-rose-400" />
-                            Remover Bonificação
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleUpdatePlan(pilot.id, 'bonificado')}
-                            className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/20 font-sans"
-                          >
-                            <Gift size={14} />
-                            Habilitar Bonificado
-                          </button>
+                        {/* Pilot details */}
+                        <div className="space-y-2 py-3 border-y border-slate-900 text-xs">
+                          <div className="flex items-center justify-between text-slate-400">
+                            <span className="text-slate-500">Motocicleta:</span>
+                            <span className="font-medium text-slate-200 truncate max-w-[180px]">
+                              {pilot.motorcycle || 'Não informada'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-slate-400">
+                            <span className="text-slate-500">Localização:</span>
+                            <span className="font-medium text-slate-300">
+                              {pilot.city ? `${pilot.city}, ${pilot.state || 'BR'}` : 'Brasil'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-slate-400">
+                            <span className="text-slate-500">Moto Clube:</span>
+                            <span className="font-medium text-amber-400/90 truncate max-w-[180px]">
+                              {pilot.club_name || 'Piloto Independente'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-slate-400">
+                            <span className="text-slate-500">Experiência:</span>
+                            <span className="font-medium text-slate-300">
+                              {pilot.points || 0} pts • Nível {pilot.tier || 'Bronze'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Bonificado Info Notice if applicable */}
+                        {isBonificado && (
+                          <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300/90 flex items-start gap-2">
+                            <Sparkles size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold">Acesso Pro Total Sem Cobrança</span>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                Concedido por: {pilot.bonificado_by || 'Comando MotoLegado'}
+                              </p>
+                            </div>
+                          </div>
                         )}
 
-                        <button
-                          onClick={() => setViewingPilotModal(pilot)}
-                          className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors"
-                          title="Ver detalhes do cadastro"
-                        >
-                          <Eye size={16} />
-                        </button>
+                        {/* Action buttons with interactive checkbox box */}
+                        <div className="mt-4 pt-3 flex flex-wrap items-center gap-2">
+                          <label
+                            className={cn(
+                              "flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-black uppercase tracking-wider cursor-pointer transition-all select-none",
+                              isBonificado
+                                ? "bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30"
+                                : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isBonificado}
+                              onChange={() => handleUpdatePlan(pilot.id, isBonificado ? 'gratuito' : 'bonificado')}
+                              className="sr-only"
+                            />
+                            <div className={cn(
+                              "w-4 h-4 rounded border flex items-center justify-center",
+                              isBonificado ? "bg-amber-500 border-amber-400 text-slate-950" : "bg-slate-900/30 border-slate-950/50"
+                            )}>
+                              {isBonificado && <Check size={12} className="stroke-[3]" />}
+                            </div>
+                            <span>{isBonificado ? 'Remover Bonificação' : 'Habilitar Bonificado'}</span>
+                          </label>
+
+                          <button
+                            onClick={() => setViewingPilotModal(pilot)}
+                            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+                            title="Ver detalhes do cadastro"
+                          >
+                            <Eye size={16} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-            </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Empty state if search returns nothing */}
             {pilotsList.filter(p => {

@@ -379,8 +379,8 @@ export function LandingPage() {
               {
                 icon: Store,
                 title: "Rede de Parceiros Credenciados",
-                desc: "Oficinas, lojas de motopeças e points temáticos com descontos exclusivos para membros e pontuação no perfil.",
-                badge: "Descontos Reais"
+                desc: "Oficinas, pontos de apoio e points temáticos na estrada homologados para acolher motociclistas com infraestrutura segura.",
+                badge: "Pontos de Apoio"
               },
               {
                 icon: Map,
@@ -515,9 +515,9 @@ export function LandingPage() {
                     "Registros ILIMITADOS no Diário de Bordo",
                     "Fundação e Gestão Completa de Moto Clube",
                     "Mural Privado e Candidaturas de Integrantes",
-                    "Acesso aos Descontos da Rede de Parceiros",
                     "Criação de Eventos Coletivos",
                     "Crachá Digital VIP e Insígnias Exclusivas",
+                    "Exportação de Relatórios de Viagem",
                     "Suporte Prioritário VIP 24/7",
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-3 text-xs text-white font-semibold">
@@ -558,7 +558,6 @@ export function LandingPage() {
                   { name: "Fotos e Anexos por Viagem", free: "Até 3 por diário", pro: "Ilimitado (HD)" },
                   { name: "Criar e Fundar Moto Clube", free: "Não incluso", pro: "Incluído (1 Clube)" },
                   { name: "Acesso ao Mural Restrito do Clube", free: "Apenas Leitura", pro: "Publicação & Gestão" },
-                  { name: "Descontos na Rede de Parceiros", free: "Até 5%", pro: "Até 20% Exclusivo" },
                   { name: "Crachá Digital de Piloto Oficial", free: "Padrão", pro: "Dourado VIP + QR Code" },
                   { name: "Exportação de Histórico de Viagens", free: "Não", pro: "Sim (PDF / CSV)" },
                 ].map((row, idx) => (
@@ -601,7 +600,7 @@ export function LandingPage() {
                 location: "Curitiba / PR"
               },
               {
-                quote: "A rede de parceiros parceiros me garantiu 15% de desconto na troca dos pneus da minha GS em uma viagem longa. Valeu demais!",
+                quote: "Os pontos de apoio cadastrados salvaram minha viagem quando precisei de socorro mecânico rápido na serra. Infraestrutura nota 10!",
                 author: "Marcos 'Coruja' - MotoLegado Pro",
                 location: "Belo Horizonte / MG"
               },

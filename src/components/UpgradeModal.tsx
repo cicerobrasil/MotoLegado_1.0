@@ -60,7 +60,7 @@ const FEATURE_MESSAGES: Record<UpgradeFeatureTrigger, { title: string; desc: str
   },
   geral: {
     title: 'Evolua sua Experiência no MotoLegado',
-    desc: 'Desbloqueie o potencial máximo da nossa plataforma com o Plano VIP Pro: diário ilimitado, radares, rotas GPX e descontos exclusivos.'
+    desc: 'Desbloqueie o potencial máximo da nossa plataforma com o Plano VIP Pro: diário ilimitado, radares, rotas GPX e recursos exclusivos.'
   }
 };
 
@@ -292,7 +292,7 @@ export function UpgradeModal({ isOpen, onClose, feature = 'geral', onSuccess }: 
                     <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Fundar e Gerenciar Moto Clube</strong></li>
                     <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Criar & Agendar Eventos Oficiais</strong></li>
                     <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Criar & Publicar Roteiros</strong></li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Descontos VIP de até 20%</strong></li>
+                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Exportação de Relatórios de Viagem</strong></li>
                   </ul>
                 </div>
               </div>
