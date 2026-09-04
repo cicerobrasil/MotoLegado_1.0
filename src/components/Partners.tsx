@@ -25,11 +25,15 @@ import {
   MessageSquare,
   Star,
   ShieldCheck,
-  Globe
+  Globe,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { isUserProOrBonificado } from '../lib/permissions';
+import { UpgradeModal } from './UpgradeModal';
 
 export interface PartnerManager {
   name: string;
@@ -96,6 +100,10 @@ const CATEGORIES: Partner['category'][] = [
 ];
 
 export function Partners() {
+  const { profile } = useAuth();
+  const isVip = isUserProOrBonificado(profile);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -519,15 +527,41 @@ export function Partners() {
                   <div className="p-6 space-y-6 flex-1 flex flex-col justify-between">
                     
                     {/* Discount Special Tag */}
-                    <div className="bg-gradient-to-r from-orange-600/10 via-orange-500/5 to-transparent border-l-4 border-orange-500 p-4 rounded-r-2xl space-y-1">
-                      <div className="flex items-center gap-2 text-[9px] font-black uppercase text-orange-500 tracking-[0.2em]">
-                        <Percent size={13} />
-                        BENEFÍCIO ATIVO DO MOTOLEGADO
+                    {isVip ? (
+                      <div className="bg-gradient-to-r from-orange-600/10 via-orange-500/5 to-transparent border-l-4 border-orange-500 p-4 rounded-r-2xl space-y-1">
+                        <div className="flex items-center gap-2 text-[9px] font-black uppercase text-orange-500 tracking-[0.2em]">
+                          <Percent size={13} />
+                          BENEFÍCIO ATIVO DO MOTOLEGADO
+                        </div>
+                        <p className="text-sm font-black text-white italic tracking-tight leading-snug">
+                          "{pt.discount}"
+                        </p>
                       </div>
-                      <p className="text-sm font-black text-white italic tracking-tight leading-snug">
-                        "{pt.discount}"
-                      </p>
-                    </div>
+                    ) : (
+                      <div className="bg-gradient-to-r from-amber-600/10 via-amber-500/5 to-transparent border-l-4 border-amber-500/60 p-4 rounded-r-2xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-amber-400 tracking-[0.2em]">
+                            <Lock size={12} />
+                            DESCONTO EXCLUSIVO VIP PRO
+                          </div>
+                          <span className="text-[8px] font-black uppercase bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">VIP / BONIFICADO</span>
+                        </div>
+                        <p className="text-xs font-bold text-slate-400 blur-xs select-none">
+                          {pt.discount}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsUpgradeModalOpen(true);
+                          }}
+                          className="text-[10px] font-black uppercase text-orange-400 hover:text-orange-300 flex items-center gap-1.5 tracking-wider cursor-pointer"
+                        >
+                          <Sparkles size={11} />
+                          Desbloquear Descontos com Pro
+                        </button>
+                      </div>
+                    )}
 
                     {/* Latest News / Updates */}
                     <div className="space-y-2">
@@ -1079,15 +1113,38 @@ export function Partners() {
                   </div>
 
                   {/* Benefício Motolegado */}
-                  <div className="bg-gradient-to-r from-orange-600/20 via-orange-500/10 to-transparent border-l-4 border-orange-500 p-4 rounded-r-2xl space-y-1">
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-orange-500 tracking-[0.2em]">
-                      <Percent size={14} />
-                      BENEFÍCIO MOTOLEGADO
+                  {isVip ? (
+                    <div className="bg-gradient-to-r from-orange-600/20 via-orange-500/10 to-transparent border-l-4 border-orange-500 p-4 rounded-r-2xl space-y-1">
+                      <div className="flex items-center gap-2 text-[10px] font-black uppercase text-orange-500 tracking-[0.2em]">
+                        <Percent size={14} />
+                        BENEFÍCIO MOTOLEGADO
+                      </div>
+                      <p className="text-sm font-black text-white italic">
+                        "{selectedPartner.discount}"
+                      </p>
                     </div>
-                    <p className="text-sm font-black text-white italic">
-                      "{selectedPartner.discount}"
-                    </p>
-                  </div>
+                  ) : (
+                    <div className="bg-gradient-to-r from-amber-600/20 via-amber-500/10 to-transparent border-l-4 border-amber-500/60 p-4 rounded-r-2xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-400 tracking-[0.2em]">
+                          <Lock size={14} />
+                          BENEFÍCIO EXCLUSIVO PRO
+                        </div>
+                        <span className="text-[8px] font-black uppercase bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">VIP / BONIFICADO</span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-400 blur-xs select-none">
+                        {selectedPartner.discount}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setIsUpgradeModalOpen(true)}
+                        className="w-full py-2.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Sparkles size={12} />
+                        Liberar Cupons e Descontos VIP
+                      </button>
+                    </div>
+                  )}
 
                   {/* Novidades e Atualizações */}
                   {selectedPartner.news && (
@@ -1119,6 +1176,12 @@ export function Partners() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <UpgradeModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+        feature="desconto_vip" 
+      />
     </div>
   );
 }

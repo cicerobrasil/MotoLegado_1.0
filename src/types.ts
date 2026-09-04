@@ -86,3 +86,13 @@ export interface CommunityPost {
     createdAt: string;
   }>;
 }
+
+export type PlanType = 'gratuito' | 'pago' | 'bonificado';
+
+export const FREE_PLAN_FEATURES = [
+  "Acesso ao Dashboard e Feed de Notícias",
+  "Diário de Bordo (Até 5 registros por mês)",
+  "Visualização de Eventos e Roteiros Públicos",
+  "Perfil de Piloto com Gamificação Básica",
+  "Suporte Comunitário na Plataforma"
+] as const;

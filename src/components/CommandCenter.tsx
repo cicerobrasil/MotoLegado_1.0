@@ -37,12 +37,18 @@ import {
   Star,
   ArrowLeft,
   Loader2,
-  Database
+  Database,
+  Gift,
+  Crown,
+  Users,
+  Zap,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Partner } from './Partners';
 import { CommunityPost, Route } from '../types';
+import { supabase } from '../lib/supabase';
 
 // Helper to format date cleanly
 function formatDisplayDate(dateStr?: string) {
@@ -125,11 +131,11 @@ const PARTNER_CATEGORIES: Partner['category'][] = [
 ];
 
 export function CommandCenter() {
-  const { profile, loading, user, isSupabaseConfigured } = useAuth();
+  const { profile, loading, user, isSupabaseConfigured, updateUserPlan } = useAuth();
   const navigate = useNavigate();
   const isAdmin = profile?.role === 'admin';
 
-  const [activeTab, setActiveTab] = useState<'eventos' | 'clubes' | 'roteiros' | 'comunidade' | 'parceiros' | 'telemetria'>('eventos');
+  const [activeTab, setActiveTab] = useState<'eventos' | 'clubes' | 'roteiros' | 'comunidade' | 'parceiros' | 'telemetria' | 'bonificados'>('eventos');
   
   // Routes Moderation State
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -249,6 +255,246 @@ export function CommandCenter() {
       time: 'Agora mesmo (' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')'
     };
     setAuditLogs(prev => [newLog, ...prev]);
+  };
+
+  // Pilots & Bonificados State
+  const [pilotsList, setPilotsList] = useState<any[]>([]);
+  const [pilotSearchText, setPilotSearchText] = useState('');
+  const [pilotPlanFilter, setPilotPlanFilter] = useState<'todos' | 'gratuito' | 'bonificado' | 'pago'>('todos');
+  const [viewingPilotModal, setViewingPilotModal] = useState<any | null>(null);
+  const [loadingPilots, setLoadingPilots] = useState(false);
+
+  // Carregar e sincronizar lista de pilotos
+  const loadPilots = async () => {
+    setLoadingPilots(true);
+    let pilots: any[] = [];
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && data && data.length > 0) {
+          pilots = data.map((p: any) => ({
+            ...p,
+            plan_type: p.plan_type || (p.is_pro ? 'pago' : 'gratuito')
+          }));
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar perfis do Supabase:', err);
+      }
+    }
+
+    if (pilots.length === 0) {
+      const stored = localStorage.getItem('motolegado_admin_pilots');
+      if (stored) {
+        try {
+          pilots = JSON.parse(stored);
+        } catch (e) {
+          pilots = [];
+        }
+      }
+    }
+
+    if (pilots.length === 0) {
+      pilots = [
+        {
+          id: profile?.id || 'pilot_current',
+          name: profile?.name || 'Cícero Ranieri',
+          email: profile?.email || 'ciceroranieri@gmail.com',
+          motorcycle: profile?.motorcycle || 'BMW R 1250 GS',
+          city: profile?.city || 'São Paulo',
+          state: profile?.state || 'SP',
+          club_name: profile?.club_name || 'Estrada Real Moto Clube',
+          points: profile?.points || 450,
+          tier: profile?.tier || 'Ouro',
+          role: profile?.role || 'admin',
+          is_pro: true,
+          plan_type: profile?.plan_type || 'pago',
+          avatar_url: profile?.avatar_url || 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?auto=format&fit=crop&q=80&w=200',
+          created_at: new Date().toISOString()
+        },
+        {
+          id: 'pilot_demo_1',
+          name: 'Carlos Alberto Mendes',
+          email: 'carlos.mendes@estrada.com.br',
+          motorcycle: 'Triumph Tiger 900 Rally Pro',
+          city: 'Belo Horizonte',
+          state: 'MG',
+          club_name: 'Fantasmas do Asfalto MC',
+          points: 180,
+          tier: 'Prata',
+          role: 'pilot',
+          is_pro: false,
+          plan_type: 'gratuito',
+          avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
+          created_at: '2025-01-15T10:30:00Z'
+        },
+        {
+          id: 'pilot_demo_2',
+          name: 'Renata Albuquerque',
+          email: 'renata.moto@gmail.com',
+          motorcycle: 'Harley-Davidson Fat Boy 114',
+          city: 'Curitiba',
+          state: 'PR',
+          club_name: 'Ladies of the Road PR',
+          points: 320,
+          tier: 'Ouro',
+          role: 'pilot',
+          is_pro: true,
+          plan_type: 'bonificado',
+          bonificado_at: '2025-02-10T14:20:00Z',
+          bonificado_by: 'Comando MotoLegado',
+          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+          created_at: '2025-01-10T12:00:00Z'
+        },
+        {
+          id: 'pilot_demo_3',
+          name: 'Marcos Vinícius Siqueira',
+          email: 'marcos.v@rota66.com',
+          motorcycle: 'Yamaha MT-09 Tracer',
+          city: 'Campinas',
+          state: 'SP',
+          club_name: 'Irmandade Custom Brasil',
+          points: 95,
+          tier: 'Bronze',
+          role: 'pilot',
+          is_pro: false,
+          plan_type: 'gratuito',
+          avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200',
+          created_at: '2025-02-01T09:15:00Z'
+        },
+        {
+          id: 'pilot_demo_4',
+          name: 'Fernando Guimarães',
+          email: 'fguimaraes@terra.com.br',
+          motorcycle: 'Honda Africa Twin CRF 1100L',
+          city: 'Florianópolis',
+          state: 'SC',
+          club_name: 'Águias da Serra MC',
+          points: 510,
+          tier: 'Diamante',
+          role: 'pilot',
+          is_pro: true,
+          plan_type: 'pago',
+          avatar_url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200',
+          created_at: '2024-12-05T08:00:00Z'
+        },
+        {
+          id: 'pilot_demo_5',
+          name: 'Juliana Castro',
+          email: 'juliana.adv@castromoto.com',
+          motorcycle: 'Royal Enfield Interceptor 650',
+          city: 'Ribeirão Preto',
+          state: 'SP',
+          club_name: 'Café & Curvas Coletivo',
+          points: 140,
+          tier: 'Bronze',
+          role: 'pilot',
+          is_pro: false,
+          plan_type: 'gratuito',
+          avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
+          created_at: '2025-02-18T16:45:00Z'
+        }
+      ];
+    }
+
+    if (profile && profile.email) {
+      const idx = pilots.findIndex(p => p.id === profile.id || p.email === profile.email);
+      const currentEntry = {
+        id: profile.id,
+        name: profile.name || 'Piloto MotoLegado',
+        email: profile.email,
+        motorcycle: profile.motorcycle || 'Motocicleta não informada',
+        city: profile.city || 'São Paulo',
+        state: profile.state || 'SP',
+        club_name: profile.club_name || 'Comunidade MotoLegado',
+        points: profile.points || 0,
+        tier: profile.tier || 'Bronze',
+        role: profile.role || 'admin',
+        is_pro: profile.is_pro,
+        plan_type: profile.plan_type || (profile.is_pro ? 'pago' : 'gratuito'),
+        bonificado_at: profile.bonificado_at,
+        bonificado_by: profile.bonificado_by,
+        avatar_url: profile.avatar_url,
+        created_at: new Date().toISOString()
+      };
+      if (idx >= 0) {
+        pilots[idx] = { ...pilots[idx], ...currentEntry };
+      } else {
+        pilots.unshift(currentEntry);
+      }
+    }
+
+    setPilotsList(pilots);
+    localStorage.setItem('motolegado_admin_pilots', JSON.stringify(pilots));
+    setLoadingPilots(false);
+  };
+
+  useEffect(() => {
+    loadPilots();
+  }, [profile]);
+
+  const handleUpdatePlan = async (pilotId: string, newPlan: 'gratuito' | 'pago' | 'bonificado') => {
+    const targetPilot = pilotsList.find(p => p.id === pilotId);
+    if (!targetPilot) return;
+
+    const now = new Date().toISOString();
+    const isPro = newPlan === 'pago' || newPlan === 'bonificado';
+
+    const updatedList = pilotsList.map(p => {
+      if (p.id === pilotId) {
+        return {
+          ...p,
+          plan_type: newPlan,
+          is_pro: isPro,
+          bonificado_at: newPlan === 'bonificado' ? now : undefined,
+          bonificado_by: newPlan === 'bonificado' ? (profile?.name || 'Comando MotoLegado') : undefined
+        };
+      }
+      return p;
+    });
+
+    setPilotsList(updatedList);
+    localStorage.setItem('motolegado_admin_pilots', JSON.stringify(updatedList));
+
+    if (updateUserPlan) {
+      await updateUserPlan(pilotId, newPlan);
+    }
+
+    if (isSupabaseConfigured) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({
+            plan_type: newPlan,
+            is_pro: isPro,
+            bonificado_at: newPlan === 'bonificado' ? now : null,
+            bonificado_by: newPlan === 'bonificado' ? (profile?.name || 'Comando MotoLegado') : null
+          })
+          .eq('id', pilotId);
+      } catch (err: any) {
+        console.warn('Erro ao atualizar plano no Supabase:', err);
+      }
+    }
+
+    const logAction = newPlan === 'bonificado'
+      ? `MODO BONIFICADO: Concedido acesso VIP Pro a ${targetPilot.name} (${targetPilot.email})`
+      : newPlan === 'pago'
+      ? `PLANO PRO ATIVADO: Piloto ${targetPilot.name} definido como Pro`
+      : `PLANO REVERTIDO: Piloto ${targetPilot.name} retornou ao Plano Gratuito`;
+
+    addAuditLog(logAction);
+
+    showToast(
+      newPlan === 'bonificado'
+        ? `🎁 Modo Bonificado ativado para ${targetPilot.name}! Acesso Pro liberado sem custos.`
+        : newPlan === 'pago'
+        ? `🔥 ${targetPilot.name} agora possui assinatura Pro ativa.`
+        : `🟢 Plano de ${targetPilot.name} redefinido para Gratuito.`,
+      'success'
+    );
   };
 
   // Load events from LocalStorage
@@ -831,6 +1077,9 @@ export function CommandCenter() {
   const pendingReportsCount = reports.filter(r => r.status === 'pendente').length;
   const pendingPostsCount = communityPosts.filter(p => p.status === 'pendente').length;
   const pendingPartnersCount = partnerRequests.filter(p => p.status === 'pendente').length + allPartners.filter(p => p.status === 'pendente').length;
+  const bonificadosCount = pilotsList.filter(p => p.plan_type === 'bonificado').length;
+  const gratuitosCount = pilotsList.filter(p => p.plan_type === 'gratuito' || (!p.plan_type && !p.is_pro)).length;
+  const proCount = pilotsList.filter(p => p.plan_type === 'pago' || (p.is_pro && p.plan_type !== 'bonificado' && p.role !== 'admin')).length;
 
   const totalPendingAll = pendingEventsCount + pendingClubsCount + pendingRoutesCount + pendingReportsCount + pendingPostsCount + pendingPartnersCount;
 
@@ -1000,7 +1249,7 @@ export function CommandCenter() {
       </AnimatePresence>
 
       {/* STATS OVERVIEW CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <button 
           onClick={() => setActiveTab('eventos')}
           className={cn(
@@ -1085,14 +1334,35 @@ export function CommandCenter() {
           )}
         >
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">PARCEIROS & EMPRESAS</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">PARCEIROS & CONVÊNIOS</span>
             <Store size={18} className="text-amber-400" />
           </div>
           <div className="text-3xl font-black italic text-white mb-1">
             {pendingPartnersCount} <span className="text-xs font-normal text-slate-400 uppercase italic">Aguardando</span>
           </div>
           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-            Credenciamento de convênios
+            Credenciamento de empresas
+          </div>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('bonificados')}
+          className={cn(
+            "bento-card p-5 text-left transition-all border group relative overflow-hidden",
+            activeTab === 'bonificados' ? "border-amber-500 bg-amber-950/20 shadow-lg shadow-amber-950/30" : "border-slate-800/80 hover:border-slate-700 bg-slate-900/40"
+          )}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 flex items-center gap-1">
+              <Sparkles size={12} className="text-amber-400" /> MODO BONIFICADO
+            </span>
+            <Gift size={18} className="text-amber-400" />
+          </div>
+          <div className="text-3xl font-black italic text-white mb-1">
+            {bonificadosCount} <span className="text-xs font-normal text-amber-400 uppercase italic">VIP Pro</span>
+          </div>
+          <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1">
+            <CheckCircle size={10} className="text-emerald-500" /> {gratuitosCount} gratuitos elegíveis
           </div>
         </button>
       </div>
@@ -1105,6 +1375,7 @@ export function CommandCenter() {
           { id: 'roteiros', label: 'Moderação Roteiros', icon: Navigation, badge: pendingRoutesCount },
           { id: 'comunidade', label: 'Comunidade & Feed', icon: MessageSquare, badge: pendingReportsCount },
           { id: 'parceiros', label: 'Credenciamento Parceiros', icon: Store, badge: pendingPartnersCount },
+          { id: 'bonificados', label: 'Modo Bonificado (Planos)', icon: Gift, badge: bonificadosCount },
           { id: 'telemetria', label: 'Logs & Telemetria', icon: Activity }
         ].map((tab) => (
           <button
@@ -2462,6 +2733,350 @@ export function CommandCenter() {
                 ))}
               </div>
             </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* TAB CONTENT: MODO BONIFICADO & GESTÃO DE PLANOS */}
+      {activeTab === 'bonificados' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
+            
+            {/* Header */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                    <Gift size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black italic uppercase text-white tracking-tight flex items-center gap-2">
+                      PAINEL DE GESTÃO DE PLANOS & MODO BONIFICADO
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Conceda acesso Pro integral (telemetria, Moto Clubes, rotas ilimitadas e benefícios) sem cobrança para pilotos parceiros ou lideranças.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={loadPilots}
+                  disabled={loadingPilots}
+                  className="px-4 py-2.5 rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-800/80 hover:bg-slate-800 text-slate-200 text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-sm"
+                >
+                  <Activity size={15} className={cn("text-amber-400", loadingPilots && "animate-spin")} />
+                  {loadingPilots ? 'Sincronizando...' : 'Sincronizar Pilotos'}
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black uppercase text-slate-400">TOTAL DE PILOTOS</span>
+                  <Users size={16} className="text-slate-400" />
+                </div>
+                <div className="text-2xl font-black italic text-white">{pilotsList.length}</div>
+                <div className="text-[10px] text-slate-500 mt-1">Motociclistas cadastrados na rede</div>
+              </div>
+
+              <div className="bg-slate-950 p-5 rounded-2xl border border-amber-500/30 bg-amber-950/10">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black uppercase text-amber-400">MODO BONIFICADO (VIP)</span>
+                  <Gift size={16} className="text-amber-400" />
+                </div>
+                <div className="text-2xl font-black italic text-amber-300">{bonificadosCount}</div>
+                <div className="text-[10px] text-amber-400/80 mt-1">Acesso Pro 100% liberado sem mensalidade</div>
+              </div>
+
+              <div className="bg-slate-950 p-5 rounded-2xl border border-emerald-500/20 bg-emerald-950/10">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black uppercase text-emerald-400">MODO GRATUITO</span>
+                  <CheckCircle size={16} className="text-emerald-400" />
+                </div>
+                <div className="text-2xl font-black italic text-emerald-300">{gratuitosCount}</div>
+                <div className="text-[10px] text-emerald-400/80 mt-1">Elegíveis para bonificação com 1 clique</div>
+              </div>
+
+              <div className="bg-slate-950 p-5 rounded-2xl border border-orange-500/20 bg-orange-950/10">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black uppercase text-orange-400">ASSINANTES PRO</span>
+                  <Crown size={16} className="text-orange-400" />
+                </div>
+                <div className="text-2xl font-black italic text-orange-300">{proCount}</div>
+                <div className="text-[10px] text-orange-400/80 mt-1">Assinaturas pagas comerciais</div>
+              </div>
+            </div>
+
+            {/* Informational Banner: Itens do Modo Gratuito */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle size={13} /> Itens Liberados no Modo Gratuito (Plano Asfalto)
+                </span>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
+                  <span className="flex items-center gap-1.5"><span className="text-emerald-400">✓</span> Acesso ao Dashboard e Feed de Notícias</span>
+                  <span className="flex items-center gap-1.5"><span className="text-emerald-400">✓</span> Diário de Bordo (Até 5 registros por mês)</span>
+                  <span className="flex items-center gap-1.5"><span className="text-emerald-400">✓</span> Visualização de Eventos e Roteiros Públicos</span>
+                  <span className="flex items-center gap-1.5"><span className="text-emerald-400">✓</span> Perfil de Piloto com Gamificação Básica</span>
+                  <span className="flex items-center gap-1.5"><span className="text-emerald-400">✓</span> Suporte Comunitário na Plataforma</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Search */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+              <div className="relative w-full md:w-96">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nome, e-mail, moto, cidade ou clube..."
+                  value={pilotSearchText}
+                  onChange={(e) => setPilotSearchText(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 no-scrollbar">
+                <button
+                  onClick={() => setPilotPlanFilter('todos')}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0",
+                    pilotPlanFilter === 'todos'
+                      ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20"
+                      : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                  )}
+                >
+                  Todos ({pilotsList.length})
+                </button>
+                <button
+                  onClick={() => setPilotPlanFilter('gratuito')}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 flex items-center gap-1.5",
+                    pilotPlanFilter === 'gratuito'
+                      ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                      : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                  )}
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  Gratuito ({gratuitosCount})
+                </button>
+                <button
+                  onClick={() => setPilotPlanFilter('bonificado')}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 flex items-center gap-1.5",
+                    pilotPlanFilter === 'bonificado'
+                      ? "bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20"
+                      : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                  )}
+                >
+                  <Gift size={13} className="text-amber-400" />
+                  Bonificado ({bonificadosCount})
+                </button>
+                <button
+                  onClick={() => setPilotPlanFilter('pago')}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 flex items-center gap-1.5",
+                    pilotPlanFilter === 'pago'
+                      ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
+                      : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                  )}
+                >
+                  <Crown size={13} className="text-orange-400" />
+                  Assinantes Pro ({proCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Pilots Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pilotsList
+                .filter(p => {
+                  const query = pilotSearchText.toLowerCase();
+                  const matchesSearch = 
+                    (p.name && p.name.toLowerCase().includes(query)) ||
+                    (p.email && p.email.toLowerCase().includes(query)) ||
+                    (p.motorcycle && p.motorcycle.toLowerCase().includes(query)) ||
+                    (p.city && p.city.toLowerCase().includes(query)) ||
+                    (p.club_name && p.club_name.toLowerCase().includes(query));
+
+                  if (!matchesSearch) return false;
+
+                  if (pilotPlanFilter === 'gratuito') return p.plan_type === 'gratuito' || (!p.plan_type && !p.is_pro);
+                  if (pilotPlanFilter === 'bonificado') return p.plan_type === 'bonificado';
+                  if (pilotPlanFilter === 'pago') return p.plan_type === 'pago' || (p.is_pro && p.plan_type !== 'bonificado' && p.role !== 'admin');
+                  return true;
+                })
+                .map(pilot => {
+                  const isBonificado = pilot.plan_type === 'bonificado';
+                  const isPro = pilot.plan_type === 'pago' || (pilot.is_pro && !isBonificado && pilot.role !== 'admin');
+                  const isGratuito = !isBonificado && !isPro && pilot.role !== 'admin';
+                  const isSelf = pilot.id === profile?.id || pilot.email === profile?.email;
+
+                  return (
+                    <div
+                      key={pilot.id}
+                      className={cn(
+                        "bg-slate-950/80 border rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 hover:border-slate-700 relative overflow-hidden",
+                        isBonificado
+                          ? "border-amber-500/50 shadow-lg shadow-amber-500/5 bg-gradient-to-b from-amber-950/20 to-slate-950/90"
+                          : isPro
+                          ? "border-orange-500/40 shadow-lg shadow-orange-500/5"
+                          : "border-slate-800/80"
+                      )}
+                    >
+                      {/* Top status banner */}
+                      <div className="flex items-start justify-between gap-3 mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
+                            {pilot.avatar_url ? (
+                              <img src={pilot.avatar_url} alt={pilot.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-base font-black text-amber-400">
+                                {pilot.name ? pilot.name.slice(0, 2).toUpperCase() : 'ML'}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <h3 className="text-sm font-bold text-white tracking-tight">{pilot.name}</h3>
+                              {isSelf && (
+                                <span className="text-[9px] font-black uppercase bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
+                                  Você
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400 truncate max-w-[180px]">{pilot.email}</p>
+                          </div>
+                        </div>
+
+                        {/* Plan Badge */}
+                        <div>
+                          {pilot.role === 'admin' ? (
+                            <span className="px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                              <ShieldCheck size={11} /> Admin
+                            </span>
+                          ) : isBonificado ? (
+                            <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm shadow-amber-500/20 animate-pulse">
+                              <Gift size={11} className="text-amber-400" /> Bonificado Pro
+                            </span>
+                          ) : isPro ? (
+                            <span className="px-2.5 py-1 rounded-lg bg-orange-500/20 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                              <Crown size={11} /> Assinante Pro
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                              <CheckCircle size={11} /> Gratuito
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Pilot details */}
+                      <div className="space-y-2 py-3 border-y border-slate-900 text-xs">
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span className="text-slate-500">Motocicleta:</span>
+                          <span className="font-medium text-slate-200 truncate max-w-[180px]">
+                            {pilot.motorcycle || 'Não informada'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span className="text-slate-500">Localização:</span>
+                          <span className="font-medium text-slate-300">
+                            {pilot.city ? `${pilot.city}, ${pilot.state || 'BR'}` : 'Brasil'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span className="text-slate-500">Moto Clube:</span>
+                          <span className="font-medium text-amber-400/90 truncate max-w-[180px]">
+                            {pilot.club_name || 'Piloto Independente'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span className="text-slate-500">Experiência:</span>
+                          <span className="font-medium text-slate-300">
+                            {pilot.points || 0} pts • Nível {pilot.tier || 'Bronze'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Bonificado Info Notice if applicable */}
+                      {isBonificado && (
+                        <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300/90 flex items-start gap-2">
+                          <Sparkles size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold">Acesso Pro Total Sem Cobrança</span>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              Concedido por: {pilot.bonificado_by || 'Comando MotoLegado'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="mt-4 pt-3 flex flex-wrap items-center gap-2">
+                        {isBonificado ? (
+                          <button
+                            onClick={() => handleUpdatePlan(pilot.id, 'gratuito')}
+                            className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-300 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            <UserX size={13} className="text-rose-400" />
+                            Remover Bonificação
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleUpdatePlan(pilot.id, 'bonificado')}
+                            className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/20 font-sans"
+                          >
+                            <Gift size={14} />
+                            Habilitar Bonificado
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => setViewingPilotModal(pilot)}
+                          className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+                          title="Ver detalhes do cadastro"
+                        >
+                          <Eye size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Empty state if search returns nothing */}
+            {pilotsList.filter(p => {
+              const query = pilotSearchText.toLowerCase();
+              return (
+                (p.name && p.name.toLowerCase().includes(query)) ||
+                (p.email && p.email.toLowerCase().includes(query)) ||
+                (p.motorcycle && p.motorcycle.toLowerCase().includes(query)) ||
+                (p.city && p.city.toLowerCase().includes(query)) ||
+                (p.club_name && p.club_name.toLowerCase().includes(query))
+              );
+            }).length === 0 && (
+              <div className="text-center py-16 bg-slate-950/40 border border-slate-800/60 rounded-3xl space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500">
+                  <Search size={22} />
+                </div>
+                <h3 className="text-base font-black italic uppercase text-white">NENHUM PILOTO LOCALIZADO</h3>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  Nenhum cadastro de piloto corresponde aos critérios de busca ou filtro selecionados.
+                </p>
+                <button
+                  onClick={() => { setPilotSearchText(''); setPilotPlanFilter('todos'); }}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-black uppercase rounded-xl transition-colors"
+                >
+                  Limpar Filtros
+                </button>
+              </div>
+            )}
+
           </div>
         </motion.div>
       )}
@@ -4044,6 +4659,164 @@ export function CommandCenter() {
               <div className="flex justify-center gap-3 pt-2">
                 <button onClick={() => setDeleteConfirmPost(null)} className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-black uppercase">Cancelar</button>
                 <button onClick={handleConfirmDeletePost} className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black uppercase shadow-lg shadow-rose-600/20">Excluir Permanentemente</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PILOT PROFILE & PLAN DETAILS MODAL */}
+      <AnimatePresence>
+        {viewingPilotModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-6"
+            >
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center">
+                    {viewingPilotModal.avatar_url ? (
+                      <img src={viewingPilotModal.avatar_url} alt={viewingPilotModal.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-lg font-black text-amber-400">
+                        {viewingPilotModal.name?.slice(0, 2).toUpperCase() || 'ML'}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      {viewingPilotModal.name}
+                      {viewingPilotModal.role === 'admin' && (
+                        <span className="text-[9px] font-black uppercase bg-orange-500/20 border border-orange-500/30 text-orange-400 px-2 py-0.5 rounded-md">
+                          Admin
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-slate-400 font-mono">{viewingPilotModal.email}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setViewingPilotModal(null)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Status Banner */}
+              <div className={cn(
+                "p-4 rounded-2xl border flex items-center justify-between",
+                viewingPilotModal.plan_type === 'bonificado'
+                  ? "bg-amber-950/20 border-amber-500/40 text-amber-300"
+                  : viewingPilotModal.plan_type === 'pago' || viewingPilotModal.is_pro
+                  ? "bg-orange-950/20 border-orange-500/40 text-orange-300"
+                  : "bg-emerald-950/20 border-emerald-500/30 text-emerald-300"
+              )}>
+                <div className="flex items-center gap-2.5">
+                  {viewingPilotModal.plan_type === 'bonificado' ? (
+                    <Gift size={20} className="text-amber-400" />
+                  ) : viewingPilotModal.plan_type === 'pago' || viewingPilotModal.is_pro ? (
+                    <Crown size={20} className="text-orange-400" />
+                  ) : (
+                    <CheckCircle size={20} className="text-emerald-400" />
+                  )}
+                  <div>
+                    <span className="text-xs font-black uppercase tracking-wider block">
+                      {viewingPilotModal.plan_type === 'bonificado'
+                        ? 'Modo Bonificado Ativo (VIP Sem Custo)'
+                        : viewingPilotModal.plan_type === 'pago' || viewingPilotModal.is_pro
+                        ? 'Assinatura Pro Comercial Ativa'
+                        : 'Plano Gratuito (Asfalto)'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      {viewingPilotModal.plan_type === 'bonificado'
+                        ? 'Acesso total a telemetria, criação de eventos e clubes liberado pelo ADM.'
+                        : 'Permissões e recursos de acordo com o plano do motociclista.'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Details table */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2.5 text-xs">
+                <div className="flex justify-between items-center text-slate-400 border-b border-slate-900 pb-2">
+                  <span className="text-slate-500 font-bold uppercase text-[10px]">Motocicleta Principal</span>
+                  <span className="text-white font-medium">{viewingPilotModal.motorcycle || 'Não informada'}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-400 border-b border-slate-900 pb-2">
+                  <span className="text-slate-500 font-bold uppercase text-[10px]">Localidade</span>
+                  <span className="text-white font-medium">
+                    {viewingPilotModal.city ? `${viewingPilotModal.city}, ${viewingPilotModal.state || 'BR'}` : 'Brasil'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-slate-400 border-b border-slate-900 pb-2">
+                  <span className="text-slate-500 font-bold uppercase text-[10px]">Moto Clube Afiliado</span>
+                  <span className="text-amber-400 font-medium">{viewingPilotModal.club_name || 'Piloto Independente'}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-400 border-b border-slate-900 pb-2">
+                  <span className="text-slate-500 font-bold uppercase text-[10px]">Pontuação & Patente</span>
+                  <span className="text-white font-medium">{viewingPilotModal.points || 0} pts • Nível {viewingPilotModal.tier || 'Bronze'}</span>
+                </div>
+                {viewingPilotModal.bonificado_at && (
+                  <div className="flex justify-between items-center text-slate-400 pt-1">
+                    <span className="text-amber-400/90 font-bold uppercase text-[10px]">Data de Bonificação</span>
+                    <span className="text-amber-300 font-mono text-[11px]">{formatDisplayDate(viewingPilotModal.bonificado_at)}</span>
+                  </div>
+                )}
+                {viewingPilotModal.plan_type !== 'bonificado' && !viewingPilotModal.is_pro && (
+                  <div className="pt-2 border-t border-slate-900">
+                    <span className="text-slate-500 font-bold uppercase text-[9px] block mb-1.5">
+                      Itens Liberados no Modo Gratuito:
+                    </span>
+                    <ul className="space-y-1 text-[11px] text-slate-300">
+                      <li className="flex items-center gap-1.5"><Check size={12} className="text-emerald-400 shrink-0" /> Acesso ao Dashboard e Feed de Notícias</li>
+                      <li className="flex items-center gap-1.5"><Check size={12} className="text-emerald-400 shrink-0" /> Diário de Bordo (Até 5 registros por mês)</li>
+                      <li className="flex items-center gap-1.5"><Check size={12} className="text-emerald-400 shrink-0" /> Visualização de Eventos e Roteiros Públicos</li>
+                      <li className="flex items-center gap-1.5"><Check size={12} className="text-emerald-400 shrink-0" /> Perfil de Piloto com Gamificação Básica</li>
+                      <li className="flex items-center gap-1.5"><Check size={12} className="text-emerald-400 shrink-0" /> Suporte Comunitário na Plataforma</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons inside modal */}
+              <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-800">
+                {viewingPilotModal.plan_type !== 'bonificado' ? (
+                  <button
+                    onClick={() => {
+                      handleUpdatePlan(viewingPilotModal.id, 'bonificado');
+                      setViewingPilotModal({ ...viewingPilotModal, plan_type: 'bonificado', is_pro: true });
+                    }}
+                    className="flex-1 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black uppercase rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+                  >
+                    <Gift size={15} /> Ativar Modo Bonificado
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      handleUpdatePlan(viewingPilotModal.id, 'gratuito');
+                      setViewingPilotModal({ ...viewingPilotModal, plan_type: 'gratuito', is_pro: false });
+                    }}
+                    className="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-black uppercase rounded-xl flex items-center justify-center gap-2"
+                  >
+                    <UserX size={15} className="text-rose-400" /> Reverter para Gratuito
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setViewingPilotModal(null)}
+                  className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-black uppercase rounded-xl"
+                >
+                  Fechar
+                </button>
               </div>
             </motion.div>
           </motion.div>

@@ -446,7 +446,7 @@ export function LandingPage() {
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">O que está incluído:</p>
                   {[
                     "Acesso ao Dashboard e Feed de Notícias",
-                    "Diário de Bordo (Até 10 registros por mês)",
+                    "Diário de Bordo (Até 5 registros por mês)",
                     "Visualização de Eventos e Roteiros Públicos",
                     "Perfil de Piloto com Gamificação Básica",
                     "Suporte Comunitário na Plataforma",
@@ -532,7 +532,7 @@ export function LandingPage() {
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-medium">
                 {[
-                  { name: "Registros no Diário de Bordo", free: "Até 10 / mês", pro: "Ilimitado" },
+                  { name: "Registros no Diário de Bordo", free: "Até 5 / mês", pro: "Ilimitado" },
                   { name: "Fotos e Anexos por Viagem", free: "Até 3 por diário", pro: "Ilimitado (HD)" },
                   { name: "Criar e Fundar Moto Clube", free: "Não incluso", pro: "Incluído (1 Clube)" },
                   { name: "Acesso ao Mural Restrito do Clube", free: "Apenas Leitura", pro: "Publicação & Gestão" },
@@ -747,10 +747,13 @@ export function LandingPage() {
                 <span>Continuar com o Google</span>
               </button>
 
-              <div className="relative flex items-center justify-center">
-                <div className="border-t border-slate-800 w-full"></div>
-                <span className="bg-slate-900 px-3 text-[9px] font-black uppercase tracking-widest text-slate-500">ou com e-mail</span>
-                <div className="border-t border-slate-800 w-full"></div>
+              {/* Divider between Google and Email */}
+              <div className="relative flex items-center justify-center my-1">
+                <div className="flex-1 border-t border-slate-800"></div>
+                <span className="shrink-0 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap select-none">
+                  ou acesse com e-mail
+                </span>
+                <div className="flex-1 border-t border-slate-800"></div>
               </div>
 
               {/* Login / Register Tab Toggle */}

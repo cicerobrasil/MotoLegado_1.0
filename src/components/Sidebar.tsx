@@ -13,12 +13,15 @@ import {
   Store,
   Menu,
   X,
-  BookOpen
+  BookOpen,
+  Crown
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../context/AuthContext";
+import { isUserProOrBonificado } from "../lib/permissions";
+import { UpgradeModal } from "./UpgradeModal";
 import { PWAInstallButton } from "./PWAInstallButton";
 
 interface MenuItem {
@@ -52,6 +55,8 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { profile, isSupabaseConfigured, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const isVip = isUserProOrBonificado(profile);
 
   const pilotName = profile?.name || 'Piloto MotoLegado';
   const pilotTier = profile?.tier || 'Bronze';
@@ -201,13 +206,34 @@ export function Sidebar() {
                 <p className="text-[9px] text-orange-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
                   <span>🛡️</span> COMANDO • ADMIN
                 </p>
+              ) : profile?.plan_type === 'bonificado' ? (
+                <p className="text-[9px] text-amber-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
+                  <span>🎁</span> BONIFICADO • VIP PRO
+                </p>
+              ) : (profile?.plan_type === 'pago' || profile?.is_pro) ? (
+                <p className="text-[9px] text-orange-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
+                  <span>🔥</span> PILOTO PRO • VIP
+                </p>
               ) : (
                 <p className="text-[9px] text-emerald-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
-                  <span>{isSupabaseConfigured ? '🟢' : '🥈'}</span> Piloto {pilotTier} • {pilotPoints} PTS
+                  <span>🟢</span> ASFALTO • {pilotTier} ({pilotPoints} PTS)
                 </p>
               )}
             </div>
           </Link>
+
+          {(!isVip || isAdmin) && (
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                setIsUpgradeModalOpen(true);
+              }}
+              className="w-full py-2.5 px-3 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-slate-950 rounded-xl font-black uppercase text-[10px] tracking-wider transition-all shadow-lg shadow-orange-600/20 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Crown size={13} />
+              <span>{isAdmin ? "Testar Checkout VIP (Mercado Pago)" : "Assinar Pro / VIP"}</span>
+            </button>
+          )}
 
           <div className="pt-2 border-t border-slate-800/40 flex flex-col gap-2">
             <button 
@@ -240,6 +266,11 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <UpgradeModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+      />
     </>
   );
 }

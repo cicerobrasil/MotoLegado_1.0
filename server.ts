@@ -59,6 +59,137 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
     }
   });
 
+  // Mercado Pago Payment Endpoints
+  const MP_ACCESS_TOKEN = process.env.MERCADO_PAGO_ACCESS_TOKEN || 'TEST-6424334975348522-090410-0d461243a45ab335dec330d892e804de-76393886';
+  const MP_PUBLIC_KEY = process.env.MERCADO_PAGO_PUBLIC_KEY || 'TEST-21b10ecf-53bc-4ff4-82cc-0a3e2ab1966c';
+
+  app.get('/api/payments/config', (req, res) => {
+    res.json({
+      publicKey: MP_PUBLIC_KEY,
+      configured: Boolean(MP_ACCESS_TOKEN)
+    });
+  });
+
+  // Create PIX Payment directly with Mercado Pago API
+  app.post('/api/payments/create-pix', async (req, res) => {
+    try {
+      const { plan, email, name, userId } = req.body;
+      const amount = plan === 'yearly' ? 299.00 : 29.90;
+      const description = `MotoLegado VIP Pro - Plano ${plan === 'yearly' ? 'Anual' : 'Mensal'}`;
+
+      // No ambiente de testes do Mercado Pago, o e-mail do pagador não pode ser igual ao do vendedor (collector)
+      let payerEmail = (email || '').trim().toLowerCase();
+      if (!payerEmail || payerEmail.includes('ciceroranieri') || !payerEmail.includes('@')) {
+        payerEmail = 'comprador.teste@motolegado.com.br';
+      }
+
+      const nameParts = (name || 'Piloto MotoLegado').trim().split(' ');
+      const firstName = nameParts[0] || 'Piloto';
+      const lastName = nameParts.slice(1).join(' ') || 'MotoLegado';
+
+      const payload = {
+        transaction_amount: amount,
+        description: description,
+        payment_method_id: 'pix',
+        payer: {
+          email: payerEmail,
+          first_name: firstName,
+          last_name: lastName,
+          identification: {
+            type: 'CPF',
+            number: '19119119100'
+          }
+        },
+        metadata: {
+          user_id: userId || 'piloto-local',
+          plan_cycle: plan || 'monthly',
+          plan_type: 'pago'
+        }
+      };
+
+      const idempotencyKey = `motolegado-${userId || 'anon'}-${Date.now()}`;
+
+      const mpResponse = await fetch('https://api.mercadopago.com/v1/payments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': idempotencyKey
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data: any = await mpResponse.json();
+
+      if (!mpResponse.ok) {
+        console.error('Erro na API do Mercado Pago ao criar PIX:', data);
+        return res.status(mpResponse.status).json({
+          error: data.message || 'Falha ao gerar cobrança PIX no Mercado Pago',
+          details: data
+        });
+      }
+
+      const qrCode = data.point_of_interaction?.transaction_data?.qr_code;
+      const qrCodeBase64 = data.point_of_interaction?.transaction_data?.qr_code_base64;
+      const ticketUrl = data.point_of_interaction?.transaction_data?.ticket_url;
+
+      res.json({
+        paymentId: data.id,
+        status: data.status,
+        qrCode: qrCode,
+        qrCodeBase64: qrCodeBase64,
+        ticketUrl: ticketUrl,
+        amount: data.transaction_amount,
+        expiresAt: data.date_of_expiration
+      });
+    } catch (err: any) {
+      console.error('Erro no endpoint create-pix:', err);
+      res.status(500).json({ error: 'Erro interno ao processar pagamento.', details: err?.message || String(err) });
+    }
+  });
+
+  // Query payment status directly from Mercado Pago
+  app.get('/api/payments/status/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${MP_ACCESS_TOKEN}`
+        }
+      });
+
+      const data: any = await mpResponse.json();
+      if (!mpResponse.ok) {
+        return res.status(mpResponse.status).json({ error: 'Falha ao consultar status', details: data });
+      }
+
+      res.json({
+        id: data.id,
+        status: data.status,
+        statusDetail: data.status_detail,
+        isApproved: data.status === 'approved',
+        metadata: data.metadata
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Erro ao consultar status do pagamento', details: err?.message || String(err) });
+    }
+  });
+
+  // Webhook for Mercado Pago payment notifications
+  app.post('/api/payments/webhook', async (req, res) => {
+    try {
+      const { data } = req.body;
+      const paymentId = data?.id || req.query['data.id'] || req.query.id;
+      if (paymentId) {
+        console.log(`[Mercado Pago Webhook] Notificação recebida para o pagamento ID ${paymentId}`);
+      }
+      res.status(200).send('OK');
+    } catch (err) {
+      console.error('Erro no webhook:', err);
+      res.status(200).send('OK');
+    }
+  });
+
   // Vite middleware for development or static serving for production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

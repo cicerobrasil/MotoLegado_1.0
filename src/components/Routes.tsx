@@ -2,18 +2,33 @@ import React, { useState, useEffect } from 'react';
 import { 
   MapPin, Star, Clock, ArrowRight, Plus, Search, Sparkles, Navigation, 
   ExternalLink, RefreshCw, Check, Fuel, Info, X, Heart, Award,
-  ShieldAlert, CheckCircle, XCircle
+  ShieldAlert, CheckCircle, XCircle, Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Route, RouteDifficulty, RouteRatingMetrics, RouteReview } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { isUserProOrBonificado } from '../lib/permissions';
+import { UpgradeModal } from './UpgradeModal';
 
 export function Routes() {
+  const { profile } = useAuth();
+  const isVip = isUserProOrBonificado(profile);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
   const [routes, setRoutes] = useState<Route[]>([]);
   const [activeFilter, setActiveFilter] = useState<'todos' | 'populares' | 'favoritos' | 'meus' | 'moderacao'>('todos');
   const [searchText, setSearchText] = useState('');
   
   // Modals & Notifications state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const handleOpenCreateRoute = () => {
+    if (!isVip) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+    setIsCreateModalOpen(true);
+  };
   const [selectedRouteDetail, setSelectedRouteDetail] = useState<Route | null>(null);
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -376,11 +391,11 @@ export function Routes() {
         </div>
 
         <button 
-          onClick={() => setIsCreateModalOpen(true)}
-          className="w-full lg:w-auto px-7 py-3.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white rounded-2xl text-xs font-black tracking-widest uppercase italic transition-all hover:scale-105 active:scale-95 shadow-lg shadow-orange-600/30 flex items-center justify-center gap-2.5"
+          onClick={handleOpenCreateRoute}
+          className="w-full lg:w-auto px-7 py-3.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white rounded-2xl text-xs font-black tracking-widest uppercase italic transition-all hover:scale-105 active:scale-95 shadow-lg shadow-orange-600/30 flex items-center justify-center gap-2.5 cursor-pointer"
         >
-          <Plus size={18} />
-          CRIAR NOVO ROTEIRO
+          {isVip ? <Plus size={18} /> : <Lock size={16} className="text-amber-300" />}
+          {isVip ? "CRIAR NOVO ROTEIRO" : "CRIAR ROTEIRO (VIP PRO)"}
         </button>
       </header>
 
@@ -586,10 +601,11 @@ export function Routes() {
             </p>
             {activeFilter !== 'moderacao' && (
               <button 
-                onClick={() => setIsCreateModalOpen(true)}
-                className="mt-2 px-6 py-2.5 bg-orange-600 text-white rounded-xl text-xs font-black uppercase tracking-wider italic"
+                onClick={handleOpenCreateRoute}
+                className="mt-2 px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider italic flex items-center gap-2 mx-auto cursor-pointer"
               >
-                Criar Roteiro Agora
+                {isVip ? <Plus size={14} /> : <Lock size={14} className="text-amber-300" />}
+                <span>{isVip ? "Criar Roteiro Agora" : "Criar Roteiro (VIP Pro)"}</span>
               </button>
             )}
           </div>
@@ -1294,6 +1310,11 @@ export function Routes() {
         )}
       </AnimatePresence>
 
+      <UpgradeModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+        feature="criar_roteiro" 
+      />
     </div>
   );
 }

@@ -20,12 +20,16 @@ import {
   Sparkles,
   Tablet as Motorcycle,
   Settings,
-  Loader2
+  Loader2,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { uploadImageToStorage } from '../lib/storage';
+import { useAuth } from '../context/AuthContext';
+import { isUserProOrBonificado } from '../lib/permissions';
+import { UpgradeModal } from './UpgradeModal';
 
 export interface ClubItem {
   id: string | number;
@@ -41,7 +45,19 @@ export interface ClubItem {
 
 export function MotoClubsList() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const isVip = isUserProOrBonificado(profile);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
   const [activeMainTab, setActiveMainTab] = useState<'explorar' | 'gestao'>('explorar');
+
+  const handleOpenGestaoTab = () => {
+    if (!isVip) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+    setActiveMainTab('gestao');
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [clubs, setClubs] = useState<ClubItem[]>(() => {
     try {
@@ -200,7 +216,7 @@ export function MotoClubsList() {
         </button>
 
         <button
-          onClick={() => setActiveMainTab('gestao')}
+          onClick={handleOpenGestaoTab}
           className={cn(
             "flex-1 flex flex-col items-center justify-center gap-2 py-4 px-2 transition-all relative group",
             activeMainTab === 'gestao' ? "text-orange-500" : "text-slate-500 hover:text-white"
@@ -210,8 +226,12 @@ export function MotoClubsList() {
             "flex items-center gap-2 font-black italic uppercase tracking-[0.2em] text-[10px] transition-all",
             activeMainTab === 'gestao' ? "scale-110" : "scale-100 opacity-70 group-hover:opacity-100"
           )}>
-            <Settings size={14} className={cn(activeMainTab === 'gestao' ? "text-orange-500" : "text-slate-400")} />
-            GESTÃO DO MEU CLUBE
+            {isVip ? (
+              <Settings size={14} className={cn(activeMainTab === 'gestao' ? "text-orange-500" : "text-slate-400")} />
+            ) : (
+              <Lock size={13} className="text-amber-400" />
+            )}
+            <span>GESTÃO DO MEU CLUBE {isVip ? '' : '(PRO)'}</span>
           </div>
           {activeMainTab === 'gestao' && (
             <motion.div 
@@ -307,13 +327,37 @@ export function MotoClubsList() {
                   <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.4em]">SEJA O PRIMEIRO A REGISTRAR SEU CLUBE NA COMUNIDADE</p>
                 </div>
                 <button
-                  onClick={() => setActiveMainTab('gestao')}
-                  className="px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-600/20 cursor-pointer"
+                  onClick={handleOpenGestaoTab}
+                  className="px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-600/20 cursor-pointer flex items-center gap-2 mx-auto"
                 >
-                  Cadastrar Meu Moto Clube
+                  {isVip ? <Plus size={14} /> : <Lock size={13} className="text-amber-300" />}
+                  <span>{isVip ? "Cadastrar Meu Moto Clube" : "Cadastrar Moto Clube (VIP Pro)"}</span>
                 </button>
               </div>
             )}
+          </motion.div>
+        ) : !isVip ? (
+          <motion.div
+            key="gestao-pane-locked"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-slate-900/40 border border-orange-500/30 rounded-[2.5rem] p-12 text-center max-w-2xl mx-auto space-y-6 my-8"
+          >
+            <div className="w-16 h-16 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mx-auto text-orange-400">
+              <Lock size={28} />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black italic uppercase text-white">FUNDAÇÃO E GESTÃO DE MOTO CLUBE</h3>
+              <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
+                No Plano Gratuito você tem permissão para explorar todos os Moto Clubes públicos e enviar sua candidatura como membro. Para fundar seu próprio clube, nomear diretoria, definir estatutos e ter mural restrito, ative o MotoLegado Pro ou solicite o Modo Bonificado.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsUpgradeModalOpen(true)}
+              className="px-8 py-3.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-slate-950 font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-lg shadow-orange-600/20 cursor-pointer"
+            >
+              Liberar Fundação de Moto Clube
+            </button>
           </motion.div>
         ) : (
           <motion.div
@@ -831,6 +875,12 @@ export function MotoClubsList() {
           </div>
         )}
       </AnimatePresence>
+
+      <UpgradeModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+        feature="criar_clube" 
+      />
     </div>
   );
 }

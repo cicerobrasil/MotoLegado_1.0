@@ -25,10 +25,15 @@ import {
   Info,
   Edit3,
   Trash2,
-  XCircle
+  XCircle,
+  Lock,
+  Crown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
+import { isUserProOrBonificado } from '../lib/permissions';
+import { UpgradeModal } from './UpgradeModal';
 
 // Helper to format date cleanly
 function formatDisplayDate(dateStr?: string) {
@@ -185,8 +190,20 @@ export const CATEGORY_COVER_SUGGESTIONS: Record<string, { title: string; url: st
 };
 
 export function Events() {
+  const { profile } = useAuth();
+  const isVip = isUserProOrBonificado(profile);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
   const [events, setEvents] = useState<MotoEvent[]>([]);
   const [activeTab, setActiveTab] = useState<'explorar' | 'meus' | 'criar'>('explorar');
+
+  const handleOpenCreateTab = () => {
+    if (!isVip) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+    setActiveTab(activeTab === 'criar' ? 'explorar' : 'criar');
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [showToast, setShowToast] = useState<{message: string, type: 'success' | 'info'} | null>(null);
@@ -492,11 +509,15 @@ export function Events() {
         {/* Action button inside header */}
         <div className="flex flex-wrap items-center gap-3 self-start md:self-end">
           <button
-            onClick={() => setActiveTab(activeTab === 'criar' ? 'explorar' : 'criar')}
+            onClick={handleOpenCreateTab}
             className="px-6 py-3 bg-slate-900 border border-orange-500/30 text-orange-500 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-orange-600 hover:text-white hover:border-orange-500 transition-all flex items-center justify-center gap-2 group shadow-xl shadow-orange-600/5"
           >
-            <Plus size={14} className="group-hover:rotate-90 transition-transform duration-300" />
-            {activeTab === 'criar' ? "Ver Eventos" : "Agendar Evento"}
+            {isVip ? (
+              <Plus size={14} className="group-hover:rotate-90 transition-transform duration-300" />
+            ) : (
+              <Lock size={14} className="text-amber-400" />
+            )}
+            {activeTab === 'criar' ? "Ver Eventos" : isVip ? "Agendar Evento" : "Agendar Evento (VIP Pro)"}
           </button>
         </div>
       </header>
@@ -871,7 +892,7 @@ export function Events() {
         </button>
 
         <button
-          onClick={() => setActiveTab('criar')}
+          onClick={handleOpenCreateTab}
           className={cn(
             "flex-1 flex flex-col items-center justify-center gap-2 py-4 px-2 transition-all relative group",
             activeTab === 'criar' ? "text-orange-500" : "text-slate-500 hover:text-white"
@@ -881,8 +902,8 @@ export function Events() {
             "flex items-center gap-2 font-black italic uppercase tracking-[0.2em] text-[10px] transition-all",
             activeTab === 'criar' ? "scale-110" : "scale-100 opacity-70 group-hover:opacity-100"
           )}>
-            <Plus size={13} />
-            AGENDAR
+            {isVip ? <Plus size={13} /> : <Lock size={12} className="text-amber-400" />}
+            <span>AGENDAR {isVip ? '' : '(PRO)'}</span>
           </div>
           {activeTab === 'criar' && (
             <motion.div 
@@ -1190,7 +1211,30 @@ export function Events() {
         )}
 
         {/* TAB 3: CADASTRO / CRIAR SEU EVENTO */}
-        {activeTab === 'criar' && (
+        {activeTab === 'criar' && !isVip ? (
+          <motion.div
+            key="criar-tab-locked"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-slate-900/40 border border-orange-500/30 rounded-[2.5rem] p-12 text-center max-w-2xl mx-auto space-y-6 my-8"
+          >
+            <div className="w-16 h-16 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mx-auto text-orange-400">
+              <Lock size={28} />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black italic uppercase text-white">RECURSO EXCLUSIVO PRO / BONIFICADO</h3>
+              <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
+                No Plano Gratuito você tem acesso à visualização de todos os eventos públicos e confirmação de presença. Para cadastrar e agendar eventos coletivos para a comunidade, ative o MotoLegado Pro ou solicite o Modo Bonificado à administração.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsUpgradeModalOpen(true)}
+              className="px-8 py-3.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-slate-950 font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-lg shadow-orange-600/20 cursor-pointer"
+            >
+              Desbloquear Agendamento de Eventos
+            </button>
+          </motion.div>
+        ) : activeTab === 'criar' && (
           <motion.div
             key="criar-tab"
             initial={{ opacity: 0, y: 15 }}
@@ -2003,6 +2047,12 @@ export function Events() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <UpgradeModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+        feature="criar_evento" 
+      />
     </div>
   );
 }

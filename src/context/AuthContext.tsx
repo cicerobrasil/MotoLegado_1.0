@@ -18,6 +18,10 @@ export interface PilotProfile {
   points: number;
   tier: string;
   is_pro: boolean;
+  plan_type: 'gratuito' | 'pago' | 'bonificado';
+  bonificado_at?: string;
+  bonificado_by?: string;
+  club_name?: string;
   role: 'pilot' | 'moderator' | 'admin';
   avatar_url: string;
   personal_logo_url?: string;
@@ -36,6 +40,7 @@ interface AuthContextType {
   signInWithGoogleQuick: (email?: string, name?: string, avatarUrl?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<PilotProfile>) => Promise<{ error: Error | null }>;
+  updateUserPlan: (userId: string, newPlan: 'gratuito' | 'pago' | 'bonificado') => Promise<{ error: Error | null }>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
 }
@@ -85,12 +90,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let userPoints = typeof data.points === 'number' ? data.points : 0;
         let userTier = data.tier || 'Bronze';
         const assignedRole = checkIfAdmin(userEmail || data.email, data.name, data.role);
+        const planType: 'gratuito' | 'pago' | 'bonificado' = data.plan_type || (data.is_pro ? 'pago' : 'gratuito');
+        const isPro = assignedRole === 'admin' || planType === 'pago' || planType === 'bonificado';
         
         const normalizedProfile = {
           ...data,
           points: userPoints,
           tier: userTier,
           role: assignedRole,
+          plan_type: planType,
+          is_pro: isPro,
+          bonificado_at: data.bonificado_at,
+          bonificado_by: data.bonificado_by,
           avatar_url: data.avatar_url && !data.avatar_url.includes('56ceb5ecca61') 
             ? data.avatar_url 
             : getCleanAvatar(data.name || userEmail || 'Piloto'),
@@ -98,9 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setProfile(normalizedProfile);
         localStorage.setItem('motolegado_pilot_name', data.name);
+        localStorage.setItem('motolegado_pilot_plan', planType);
       } else {
         const defaultName = userEmail ? userEmail.split('@')[0] : 'Piloto MotoLegado';
         const assignedRole = checkIfAdmin(userEmail, defaultName);
+        const planType: 'gratuito' | 'pago' | 'bonificado' = assignedRole === 'admin' ? 'pago' : 'gratuito';
         // Criar perfil padrão limpo com 0 pontos para novo usuário
         const newProfile: PilotProfile = {
           id: userId,
@@ -110,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           points: 0,
           tier: 'Bronze',
           is_pro: assignedRole === 'admin',
+          plan_type: planType,
           role: assignedRole,
           avatar_url: getCleanAvatar(defaultName),
         };
@@ -120,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         setProfile(newProfile);
         localStorage.setItem('motolegado_pilot_name', defaultName);
+        localStorage.setItem('motolegado_pilot_plan', planType);
       }
     } catch (err) {
       console.error('Exceção ao buscar perfil:', err);
@@ -137,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (storedEmail && storedName) {
         const assignedRole = checkIfAdmin(storedEmail, storedName);
+        const storedPlan = (localStorage.getItem('motolegado_pilot_plan') as 'gratuito' | 'pago' | 'bonificado') || (assignedRole === 'admin' ? 'pago' : 'gratuito');
         setProfile({
           id: 'local-pilot-' + storedEmail,
           name: storedName,
@@ -144,7 +160,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           motorcycle: localStorage.getItem('motolegado_pilot_bike') || '',
           points: 0,
           tier: 'Bronze',
-          is_pro: assignedRole === 'admin',
+          is_pro: assignedRole === 'admin' || storedPlan === 'pago' || storedPlan === 'bonificado',
+          plan_type: storedPlan,
           role: assignedRole,
           avatar_url: getCleanAvatar(storedName),
         });
@@ -186,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Fallback de autenticação local limpa
       const name = email.split('@')[0];
       const assignedRole = checkIfAdmin(email, name);
+      const storedPlan = (localStorage.getItem('motolegado_pilot_plan') as 'gratuito' | 'pago' | 'bonificado') || (assignedRole === 'admin' ? 'pago' : 'gratuito');
       const customProfile: PilotProfile = { 
         id: 'local-pilot-' + email,
         email, 
@@ -193,7 +211,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         motorcycle: '',
         points: 0,
         tier: 'Bronze',
-        is_pro: assignedRole === 'admin',
+        is_pro: assignedRole === 'admin' || storedPlan === 'pago' || storedPlan === 'bonificado',
+        plan_type: storedPlan,
         role: assignedRole,
         avatar_url: getCleanAvatar(name),
       };
@@ -238,6 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         points: 0,
         tier: 'Bronze',
         is_pro: assignedRole === 'admin',
+        plan_type: assignedRole === 'admin' ? 'pago' : 'gratuito',
         role: assignedRole,
         avatar_url: getCleanAvatar(name),
       };
@@ -391,6 +411,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     avatarUrl?: string
   ): Promise<{ error: Error | null }> => {
     const assignedRole = checkIfAdmin(email, name);
+    const storedPlan = (localStorage.getItem('motolegado_pilot_plan') as 'gratuito' | 'pago' | 'bonificado') || (assignedRole === 'admin' ? 'pago' : 'gratuito');
+    const isPro = assignedRole === 'admin' || storedPlan === 'pago' || storedPlan === 'bonificado';
     const customProfile: PilotProfile = {
       id: 'google-pilot-' + email.replace(/[^a-zA-Z0-9]/g, '_'),
       name,
@@ -398,7 +420,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       motorcycle: localStorage.getItem('motolegado_pilot_bike') || '',
       points: 0,
       tier: 'Bronze',
-      is_pro: assignedRole === 'admin',
+      is_pro: isPro,
+      plan_type: storedPlan,
       role: assignedRole,
       avatar_url: avatarUrl || getCleanAvatar(name),
     };
@@ -406,6 +429,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(customProfile);
     localStorage.setItem('motolegado_pilot_name', name);
     localStorage.setItem('motolegado_pilot_email', email);
+    localStorage.setItem('motolegado_pilot_plan', storedPlan);
 
     if (isSupabaseConfigured) {
       try {
@@ -462,6 +486,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
+  // Atualizar plano de usuário (Gratuito, Pago, Bonificado)
+  const updateUserPlan = async (userId: string, newPlan: 'gratuito' | 'pago' | 'bonificado') => {
+    const isPro = newPlan === 'pago' || newPlan === 'bonificado';
+    const now = new Date().toISOString();
+    const updates: any = {
+      plan_type: newPlan,
+      is_pro: isPro,
+      ...(newPlan === 'bonificado' ? { bonificado_at: now } : {})
+    };
+
+    if (profile && (profile.id === userId || profile.email === userId)) {
+      const updated: PilotProfile = {
+        ...profile,
+        plan_type: newPlan,
+        is_pro: profile.role === 'admin' ? true : isPro,
+        ...(newPlan === 'bonificado' ? { bonificado_at: now } : {})
+      };
+      setProfile(updated);
+      localStorage.setItem('motolegado_pilot_plan', newPlan);
+    }
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', userId);
+
+        if (error) throw error;
+      } catch (err: any) {
+        console.warn('Erro ao atualizar plano no Supabase:', err.message);
+        return { error: err };
+      }
+    }
+
+    return { error: null };
+  };
+
   // Recuperação / Redefinição de Senha
   const resetPassword = async (email: string) => {
     if (!isSupabaseConfigured) {
@@ -500,6 +562,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogleQuick,
         signOut,
         updateProfile,
+        updateUserPlan,
         resetPassword,
         refreshProfile,
       }}

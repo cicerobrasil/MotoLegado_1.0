@@ -6,6 +6,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { uploadImageToStorage } from '../lib/storage';
+import { UpgradeModal } from './UpgradeModal';
 
 export interface LogEntry {
   id: string;
@@ -27,6 +28,7 @@ export function Logbook() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   // Form State
@@ -44,6 +46,28 @@ export function Logbook() {
   const [image, setImage] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const tripPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const pilotMotorcycle = profile?.motorcycle || '';
+
+  const isProOrBonificado = Boolean(
+    profile?.is_pro ||
+    profile?.plan_type === 'bonificado' ||
+    profile?.plan_type === 'pago' ||
+    profile?.role === 'admin'
+  );
+
+  // Contagem de registros do mês atual para validação do limite gratuito (até 5 registros por mês)
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const thisMonthLogsCount = logs.filter(l => l.date && l.date.startsWith(currentMonth)).length;
+  const isFreeLimitReached = !isProOrBonificado && thisMonthLogsCount >= 5;
+
+  const handleOpenForm = () => {
+    if (isFreeLimitReached) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+    setIsFormOpen(true);
+  };
 
   const handleTripPhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -536,8 +560,28 @@ export function Logbook() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {/* Plan Quota Badge */}
+          {!isProOrBonificado ? (
+            <div className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-mono flex items-center gap-2">
+              <span className="text-slate-400">Modo Gratuito:</span>
+              <span className={cn(
+                "font-bold",
+                thisMonthLogsCount >= 5 ? "text-rose-400 font-black" : "text-emerald-400"
+              )}>
+                {thisMonthLogsCount}/5 viagens este mês
+              </span>
+            </div>
+          ) : (
+            <div className="px-3.5 py-2 rounded-xl bg-amber-950/20 border border-amber-500/30 text-[11px] font-mono text-amber-300 flex items-center gap-2">
+              <Sparkles size={13} className="text-amber-400" />
+              <span className="font-bold">
+                Viagens Ilimitadas ({profile?.plan_type === 'bonificado' ? '🎁 Modo Bonificado' : '🔥 Pro VIP'})
+              </span>
+            </div>
+          )}
+
           <button 
-            onClick={() => setIsFormOpen(true)}
+            onClick={handleOpenForm}
             className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-white text-black rounded-xl text-[10px] sm:text-[11px] font-black tracking-[0.2em] uppercase italic transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)] flex items-center justify-center gap-2"
           >
             <Plus size={16} />
@@ -556,7 +600,7 @@ export function Logbook() {
           
           <div className="relative flex flex-col items-center text-center px-4 max-w-2xl">
             <div 
-              onClick={() => setIsFormOpen(true)}
+              onClick={handleOpenForm}
               className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-white mb-6 sm:mb-10 shadow-2xl group cursor-pointer hover:border-orange-500/50 transition-all"
             >
               <Send size={24} className="sm:w-8 sm:h-8 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
@@ -572,7 +616,7 @@ export function Logbook() {
             </p>
 
             <button 
-              onClick={() => setIsFormOpen(true)}
+              onClick={handleOpenForm}
               className="mt-8 sm:mt-12 flex items-center gap-2 text-[10px] font-black text-slate-700 uppercase tracking-widest hover:text-orange-500 transition-colors"
             >
               <Map size={14} />
@@ -670,6 +714,12 @@ export function Logbook() {
           </div>
         ))}
       </div>
+
+      <UpgradeModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+        feature="diario_ilimitado" 
+      />
     </div>
   );
 }

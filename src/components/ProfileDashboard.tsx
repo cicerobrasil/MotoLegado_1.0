@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, FileText, Lock, CheckCircle2, ShieldCheck, BookOpen } from 'lucide-react';
+import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, FileText, Lock, CheckCircle2, ShieldCheck, BookOpen, Sparkles, Crown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -174,6 +174,101 @@ export function ProfileDashboard() {
           </button>
         </div>
       </div>
+
+      {/* PLAN STATUS BANNER */}
+      {profile?.plan_type === 'bonificado' ? (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-amber-950/50 via-slate-900/90 to-slate-950 border-2 border-amber-500/50 rounded-3xl p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl shadow-amber-950/20"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+              <Sparkles className="text-amber-400" size={24} />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-black uppercase tracking-wider text-white flex items-center gap-1.5">
+                  ⭐ MODO BONIFICADO ATIVO
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-widest">
+                  VIP SEM CUSTO
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+                Seu acesso completo ao <strong>Plano Pro</strong> foi bonificado pela Diretoria MotoLegado. Você desfruta de todos os recursos pagos (Diário ilimitado, gestão de Moto Clubes, telemetria e descontos) sem nenhuma cobrança.
+              </p>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-black uppercase tracking-widest shrink-0">
+            <Crown size={14} className="text-amber-400" />
+            <span>Acesso Pro 100% Liberado</span>
+          </div>
+        </motion.div>
+      ) : (profile?.plan_type === 'pago' || profile?.is_pro) ? (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-orange-950/40 via-slate-900/80 to-slate-950 border border-orange-500/40 rounded-3xl p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg shadow-orange-950/20"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center shrink-0">
+              <Zap className="text-orange-400" size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-black uppercase tracking-wider text-white">
+                  🔥 PLANO MOTOLEGADO PRO ATIVO
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-orange-500 text-slate-950 text-[10px] font-black uppercase tracking-widest">
+                  PRO
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                Sua assinatura Pro está ativa com todos os recursos de telemetria, viagens ilimitadas e gestão completa de sedes e clubes.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      ) : (
+        <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-5 sm:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center shrink-0">
+                <ShieldCheck className="text-slate-400" size={20} />
+              </div>
+              <div>
+                <span className="text-xs font-black uppercase tracking-widest text-slate-300">
+                  🟢 PLANO ASFALTO (MODO GRATUITO)
+                </span>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Acesso comunitário padrão. Pilotos associados ou membros de moto clubes parceiros podem receber o <strong>Modo Bonificado</strong> da Administração.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-800/80">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-2.5">
+              Itens liberados no Modo Gratuito:
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
+              {[
+                "Acesso ao Dashboard e Feed de Notícias",
+                "Diário de Bordo (Até 5 registros por mês)",
+                "Visualização de Eventos e Roteiros Públicos",
+                "Perfil de Piloto com Gamificação Básica",
+                "Suporte Comunitário na Plataforma"
+              ].map((item, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-slate-300">
+                  <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                  <span className="font-medium">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* 1. TOP ROW STATS (High Density) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
