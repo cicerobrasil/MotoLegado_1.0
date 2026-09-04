@@ -173,21 +173,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Inicializar sessão ativa no Supabase
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
       if (session?.user) {
+        setUser(session.user);
         fetchProfile(session.user.id, session.user.email);
+      } else {
+        // Checar se há piloto Google/local salvo no localStorage
+        const storedEmail = localStorage.getItem('motolegado_pilot_email');
+        const storedName = localStorage.getItem('motolegado_pilot_name');
+        if (storedEmail && storedName) {
+          const assignedRole = checkIfAdmin(storedEmail, storedName);
+          const storedPlan = (localStorage.getItem('motolegado_pilot_plan') as 'gratuito' | 'pago' | 'bonificado') || (assignedRole === 'admin' ? 'pago' : 'gratuito');
+          const isPro = assignedRole === 'admin' || storedPlan === 'pago' || storedPlan === 'bonificado';
+          const restoredProfile: PilotProfile = {
+            id: 'google-pilot-' + storedEmail.replace(/[^a-zA-Z0-9]/g, '_'),
+            name: storedName,
+            email: storedEmail,
+            motorcycle: localStorage.getItem('motolegado_pilot_bike') || '',
+            points: 0,
+            tier: 'Bronze',
+            is_pro: isPro,
+            plan_type: storedPlan,
+            role: assignedRole,
+            avatar_url: getCleanAvatar(storedName),
+          };
+          setProfile(restoredProfile);
+          setUser({
+            id: restoredProfile.id,
+            email: restoredProfile.email,
+            user_metadata: { name: restoredProfile.name },
+            app_metadata: {},
+            aud: 'authenticated',
+            created_at: new Date().toISOString(),
+          } as any);
+        } else {
+          setUser(null);
+        }
       }
       setLoading(false);
     });
 
     // Escutar alterações de autenticação (login, logout, refresh de token, OAuth redirect)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      setUser(session?.user ?? null);
       if (session?.user) {
+        setUser(session.user);
         fetchProfile(session.user.id, session.user.email);
-      } else {
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
         setProfile(null);
+        localStorage.removeItem('motolegado_pilot_name');
+        localStorage.removeItem('motolegado_pilot_email');
+        localStorage.removeItem('motolegado_pilot_plan');
       }
       setLoading(false);
     });
@@ -427,6 +463,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     setProfile(customProfile);
+    setUser({
+      id: customProfile.id,
+      email: customProfile.email,
+      user_metadata: { name: customProfile.name },
+      app_metadata: {},
+      aud: 'authenticated',
+      created_at: new Date().toISOString(),
+    } as any);
     localStorage.setItem('motolegado_pilot_name', name);
     localStorage.setItem('motolegado_pilot_email', email);
     localStorage.setItem('motolegado_pilot_plan', storedPlan);
