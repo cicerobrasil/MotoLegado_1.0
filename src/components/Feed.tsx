@@ -347,7 +347,7 @@ export function Feed() {
       <header className="border-b border-slate-800/80 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl sm:text-5xl font-black italic uppercase tracking-tighter text-white">
-            COMUNIDADE <span className="text-amber-500">MOTOLEGADO</span>
+            COMUNIDADE <span className="text-[#ff751f]">MOTOLEGADO</span>
           </h1>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.25em] mt-2 flex items-center gap-2">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -356,14 +356,11 @@ export function Feed() {
         </div>
 
         {/* Feed View Switcher */}
-        <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 self-start md:self-auto">
+        <div className="flex items-center gap-2 bg-[#001b3d] p-1.5 rounded-2xl border border-[#1e293b] self-start md:self-auto">
           <button
             onClick={() => setFeedViewTab('mural')}
             className={cn(
-              "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-2",
-              feedViewTab === 'mural'
-                ? "bg-amber-600 text-white shadow-lg shadow-amber-600/20"
-                : "text-slate-400 hover:text-white"
+              feedViewTab === 'mural' ? "btn-filter-active" : "btn-filter-inactive"
             )}
           >
             <Sparkles size={14} /> Mural da Comunidade ({approvedPosts.length})
@@ -372,15 +369,13 @@ export function Feed() {
           <button
             onClick={() => setFeedViewTab('meus_posts')}
             className={cn(
-              "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-2 relative",
-              feedViewTab === 'meus_posts'
-                ? "bg-amber-600 text-white shadow-lg shadow-amber-600/20"
-                : "text-slate-400 hover:text-white"
+              feedViewTab === 'meus_posts' ? "btn-filter-active" : "btn-filter-inactive",
+              "relative"
             )}
           >
             <Clock size={14} /> Em Moderação
             {pendingUserPostsCount > 0 && (
-              <span className="bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded-full text-[8px] font-extrabold animate-pulse">
+              <span className="bg-black/30 text-white px-1.5 py-0.5 rounded-full text-[8px] font-black">
                 {pendingUserPostsCount}
               </span>
             )}
@@ -438,13 +433,10 @@ export function Feed() {
                       type="button"
                       onClick={() => setSelectedCategory(cat)}
                       className={cn(
-                        "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border flex items-center gap-1.5",
-                        selectedCategory === cat 
-                          ? "bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-600/20" 
-                          : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
+                        selectedCategory === cat ? "btn-filter-active" : "btn-filter-inactive"
                       )}
                     >
-                      {selectedCategory === cat && <Check size={10} />}
+                      {selectedCategory === cat && <Check size={12} />}
                       {cat}
                     </button>
                   ))}
@@ -558,9 +550,10 @@ export function Feed() {
 
                 <button 
                   type="submit"
-                  className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-amber-600/20 flex items-center justify-center gap-2 active:scale-95"
+                  className="btn-primary"
                 >
-                  ENVIAR PARA MODERAÇÃO <Send size={14} />
+                  <span>ENVIAR PARA MODERAÇÃO</span>
+                  <Send size={14} />
                 </button>
               </div>
 
@@ -603,7 +596,7 @@ export function Feed() {
 
         {/* CATEGORY FILTER PILLS */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-amber-500 shrink-0">
+          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-[#ff751f] shrink-0">
             <Filter size={16} />
           </div>
 
@@ -613,10 +606,7 @@ export function Feed() {
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
                 className={cn(
-                  "px-5 py-2.5 rounded-full text-[10px] font-black tracking-widest uppercase italic transition-all whitespace-nowrap border",
-                  activeCategory === cat 
-                    ? "bg-amber-600 text-white border-amber-500 shadow-lg shadow-amber-600/20" 
-                    : "bg-slate-900/60 text-slate-400 hover:text-white border-slate-800"
+                  activeCategory === cat ? "btn-filter-active" : "btn-filter-inactive"
                 )}
               >
                 {cat}

@@ -14,8 +14,7 @@ import {
   Menu,
   X,
   BookOpen,
-  Crown,
-  Download
+  Crown
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
@@ -25,7 +24,7 @@ import { isUserProOrBonificado } from "../lib/permissions";
 import { UpgradeModal } from "./UpgradeModal";
 import { PWAInstallButton } from "./PWAInstallButton";
 import { LogoMark } from "./LogoMark";
-import { BrandKitModal } from "./BrandKitModal";
+import { AccessibilityButton } from "./AccessibilityButton";
 
 interface MenuItem {
   icon: any;
@@ -59,7 +58,6 @@ export function Sidebar() {
   const { profile, isSupabaseConfigured, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const [isBrandKitOpen, setIsBrandKitOpen] = useState(false);
   const isVip = isUserProOrBonificado(profile);
 
   const pilotName = profile?.name || 'Piloto MotoLegado';
@@ -94,29 +92,28 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile Top Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 flex items-center justify-between px-4 z-40">
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#00273d]/95 backdrop-blur-md border-b border-[#1e293b] flex items-center justify-between px-4 z-40">
         <Link 
           to="/dashboard" 
           onClick={() => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
             document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
           }} 
-          className="flex items-center gap-2.5"
+          className="flex items-center"
+          aria-label="MotoLegado Início"
         >
           <LogoMark size="sm" />
-          <span className="font-black italic uppercase text-lg tracking-tighter text-white">
-            Moto<span className="text-orange-500">Legado</span>
-          </span>
         </Link>
 
         <div className="flex items-center gap-2">
+          <AccessibilityButton variant="compact" />
           <PWAInstallButton variant="header" />
-          <Link to="/profile" className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden">
+          <Link to="/profile" className="w-8 h-8 rounded-lg bg-[#001b3d] border border-[#1e293b] overflow-hidden">
             <img src={pilotAvatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
           </Link>
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 hover:text-white hover:border-orange-500 transition-colors cursor-pointer"
+            className="w-10 h-10 rounded-xl bg-[#001b3d] border border-[#1e293b] flex items-center justify-center text-slate-300 hover:text-white hover:border-[#ff751f] transition-colors cursor-pointer"
             aria-label="Abrir Menu"
           >
             {isOpen ? <X size={20} /> : <Menu size={20} />}
@@ -132,14 +129,14 @@ export function Sidebar() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setIsOpen(false)}
-            className="lg:hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-45"
+            className="lg:hidden fixed inset-0 bg-[#001b3d]/80 backdrop-blur-sm z-45"
           />
         )}
       </AnimatePresence>
 
       {/* Sidebar Container (Desktop static + Mobile Sliding Drawer) */}
       <aside className={cn(
-        "fixed left-0 top-0 w-64 h-screen bg-slate-950 border-r border-slate-800/60 flex flex-col z-50 transition-transform duration-300 lg:translate-x-0",
+        "fixed left-0 top-0 w-64 h-screen bg-[#00273d] border-r border-[#1e293b] flex flex-col z-50 transition-transform duration-300 lg:translate-x-0",
         isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}>
         <div className="p-6 lg:p-8 flex items-center justify-between gap-3">
@@ -149,14 +146,14 @@ export function Sidebar() {
               window.scrollTo({ top: 0, behavior: 'smooth' });
               document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
             }} 
-            className="flex items-center gap-3"
+            className="flex items-center"
+            aria-label="MotoLegado Início"
           >
             <LogoMark size="md" />
-            <h1 className="font-black italic uppercase text-xl tracking-tighter text-white">Moto<span className="text-orange-500">Legado</span></h1>
           </Link>
           <button 
             onClick={() => setIsOpen(false)}
-            className="lg:hidden text-slate-500 hover:text-white cursor-pointer"
+            className="lg:hidden text-slate-400 hover:text-white cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -173,16 +170,16 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 group relative",
                   isActive 
-                    ? "bg-orange-600/10 text-orange-500 font-black italic uppercase text-xs tracking-widest" 
-                    : "text-slate-500 hover:text-white font-bold uppercase text-[10px] tracking-widest"
+                    ? "bg-[#ff751f]/15 text-[#ff751f] font-black italic uppercase text-xs tracking-widest shadow-sm" 
+                    : "text-slate-300 hover:text-white hover:bg-white/5 font-bold uppercase text-[10px] tracking-widest"
                 )}
               >
-                <item.icon size={18} className={cn(isActive ? "text-orange-500" : "group-hover:text-orange-400 group-hover:scale-110 transition-all")} />
+                <item.icon size={18} className={cn(isActive ? "text-[#ff751f]" : "group-hover:text-[#ff751f] group-hover:scale-110 transition-all")} />
                 <span>{item.label}</span>
                 {isActive && (
                   <motion.div 
                     layoutId="active-pill"
-                    className="absolute left-0 w-1 h-6 bg-orange-600 rounded-r-full shadow-[0_0_10px_rgba(255,85,0,0.5)]"
+                    className="absolute left-0 w-1 h-6 bg-[#ff751f] rounded-r-full shadow-[0_0_10px_rgba(255,117,31,0.6)]"
                   />
                 )}
               </Link>
@@ -195,15 +192,15 @@ export function Sidebar() {
           <PWAInstallButton variant="sidebar" />
         </div>
 
-        <div className="p-6 border-t border-slate-800/60 bg-slate-900/10 backdrop-blur-md space-y-4">
+        <div className="p-6 border-t border-[#1e293b] bg-[#001b3d]/60 backdrop-blur-md space-y-4">
           <Link to="/profile" onClick={() => setIsOpen(false)} className="flex items-center gap-3 group cursor-pointer decoration-none">
-            <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden group-hover:border-orange-500 transition-all shadow-lg shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-[#001b3d] border border-[#1e293b] overflow-hidden group-hover:border-[#ff751f] transition-all shadow-lg shrink-0">
               <img src={pilotAvatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-black uppercase italic tracking-tight text-white group-hover:text-amber-400 transition-colors truncate">{pilotName}</p>
+              <p className="text-xs font-black uppercase italic tracking-tight text-[#e2e8f0] group-hover:text-amber-400 transition-colors truncate">{pilotName}</p>
               {isAdmin ? (
-                <p className="text-[9px] text-orange-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
+                <p className="text-[9px] text-[#ff751f] font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
                   <span>🛡️</span> COMANDO • ADMIN
                 </p>
               ) : profile?.plan_type === 'bonificado' ? (
@@ -211,7 +208,7 @@ export function Sidebar() {
                   <span>🎁</span> BONIFICADO • VIP PRO
                 </p>
               ) : (profile?.plan_type === 'pago' || profile?.is_pro) ? (
-                <p className="text-[9px] text-orange-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
+                <p className="text-[9px] text-[#ff751f] font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
                   <span>🔥</span> PILOTO PRO • VIP
                 </p>
               ) : (
@@ -228,24 +225,17 @@ export function Sidebar() {
                 setIsOpen(false);
                 setIsUpgradeModalOpen(true);
               }}
-              className="w-full py-2.5 px-3 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-slate-950 rounded-xl font-black uppercase text-[10px] tracking-wider transition-all shadow-lg shadow-orange-600/20 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full btn-primary py-2.5 px-3"
             >
-              <Crown size={13} />
-              <span>{isAdmin ? "Testar Checkout VIP (Mercado Pago)" : "Assinar Pro / VIP"}</span>
+              <Crown size={14} />
+              <span>Assine aqui!</span>
             </button>
           )}
 
-          <div className="pt-2 border-t border-slate-800/40 flex flex-col gap-2">
-            <button 
-              onClick={() => setIsBrandKitOpen(true)}
-              className="w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-orange-400 transition-colors py-1 cursor-pointer"
-            >
-              <Download size={14} className="text-orange-500" />
-              <span>Baixar Emblema / Kit</span>
-            </button>
+          <div className="pt-2 border-t border-[#1e293b] flex flex-col gap-2">
             <button 
               onClick={handleSignOut}
-              className="w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-500 transition-colors py-1 cursor-pointer"
+              className="w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-400 transition-colors py-1 cursor-pointer"
             >
               <LogOut size={14} />
               <span>Encerrar Sessão</span>
@@ -255,7 +245,7 @@ export function Sidebar() {
       </aside>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 flex items-center justify-around px-2 z-40 shadow-2xl">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#00273d]/95 backdrop-blur-xl border-t border-[#1e293b] flex items-center justify-around px-2 z-40 shadow-2xl">
         {BOTTOM_NAV_ITEMS.map((item) => {
           const isActive = location.pathname === item.path;
           return (
@@ -264,10 +254,10 @@ export function Sidebar() {
               to={item.path}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-colors",
-                isActive ? "text-orange-500 font-black" : "text-slate-500 hover:text-slate-300 font-bold"
+                isActive ? "text-[#ff751f] font-black" : "text-slate-300 hover:text-white font-bold"
               )}
             >
-              <item.icon size={18} className={cn(isActive ? "text-orange-500 scale-110" : "")} />
+              <item.icon size={18} className={cn(isActive ? "text-[#ff751f] scale-110" : "")} />
               <span className="text-[9px] uppercase tracking-tighter truncate">{item.label}</span>
             </Link>
           );
@@ -277,11 +267,6 @@ export function Sidebar() {
       <UpgradeModal 
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
-      />
-
-      <BrandKitModal 
-        isOpen={isBrandKitOpen} 
-        onClose={() => setIsBrandKitOpen(false)} 
       />
     </>
   );

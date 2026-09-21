@@ -354,10 +354,10 @@ export function Partners() {
 
         <button
           onClick={() => setActiveTab(activeTab === 'register' ? 'browse' : 'register')}
-          className="px-6 py-3 bg-slate-900 border border-orange-500/30 text-orange-500 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-orange-600 hover:text-white hover:border-orange-500 transition-all flex items-center justify-center gap-2 group self-start md:self-end shadow-xl"
+          className="btn-primary self-start md:self-end"
         >
-          <Plus size={14} className="group-hover:rotate-90 transition-transform duration-300" />
-          {activeTab === 'register' ? "Listar Parceiros" : "Cadastrar Meu Estabelecimento"}
+          <Plus size={16} className="group-hover:rotate-90 transition-transform duration-300" />
+          <span>{activeTab === 'register' ? "Listar Parceiros" : "Cadastrar Meu Estabelecimento"}</span>
         </button>
       </header>
 
@@ -428,10 +428,7 @@ export function Partners() {
                 <button
                   onClick={() => setSelectedCategory('Todos')}
                   className={cn(
-                    "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
-                    selectedCategory === 'Todos' 
-                      ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20" 
-                      : "bg-slate-900/60 border border-slate-800/40 text-slate-500 hover:text-white"
+                    selectedCategory === 'Todos' ? "btn-filter-active" : "btn-filter-inactive"
                   )}
                 >
                   Todos
@@ -441,10 +438,7 @@ export function Partners() {
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
                     className={cn(
-                      "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
-                      selectedCategory === cat 
-                        ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20" 
-                        : "bg-slate-900/60 border border-slate-800/40 text-slate-500 hover:text-white"
+                      selectedCategory === cat ? "btn-filter-active" : "btn-filter-inactive"
                     )}
                   >
                     {cat}
@@ -1138,10 +1132,10 @@ export function Partners() {
                       <button
                         type="button"
                         onClick={() => setIsUpgradeModalOpen(true)}
-                        className="w-full py-2.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                        className="w-full btn-primary text-[10px] py-2.5"
                       >
                         <Sparkles size={12} />
-                        Liberar Cupons e Descontos VIP
+                        <span>Liberar Cupons e Descontos VIP</span>
                       </button>
                     </div>
                   )}

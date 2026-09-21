@@ -392,10 +392,10 @@ export function Routes() {
 
         <button 
           onClick={handleOpenCreateRoute}
-          className="w-full lg:w-auto px-7 py-3.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white rounded-2xl text-xs font-black tracking-widest uppercase italic transition-all hover:scale-105 active:scale-95 shadow-lg shadow-orange-600/30 flex items-center justify-center gap-2.5 cursor-pointer"
+          className="w-full lg:w-auto btn-primary"
         >
-          {isVip ? <Plus size={18} /> : <Lock size={16} className="text-amber-300" />}
-          {isVip ? "CRIAR NOVO ROTEIRO" : "CRIAR ROTEIRO (VIP PRO)"}
+          {isVip ? <Plus size={16} /> : <Lock size={15} />}
+          <span>{isVip ? "CRIAR ROTEIRO AGORA" : "+ CRIAR ROTEIRO (VIP PRO)"}</span>
         </button>
       </header>
 
@@ -406,8 +406,8 @@ export function Routes() {
         <div className="relative flex-1 max-w-md">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
           <input 
-            type="text"
-            placeholder="Buscar por nome do roteiro, cidade ou atrações..."
+            type="text" 
+            placeholder="Buscar por nome do roteiro, cidade ou atrações..." 
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-2.5 pl-11 pr-4 text-xs font-bold text-white outline-none focus:border-orange-500 transition-all placeholder:text-slate-600"
@@ -426,10 +426,7 @@ export function Routes() {
               key={f.id}
               onClick={() => setActiveFilter(f.id as any)}
               className={cn(
-                "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap border flex items-center gap-2",
-                activeFilter === f.id
-                  ? "bg-orange-600 text-white border-orange-500 shadow-md shadow-orange-600/20"
-                  : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
+                activeFilter === f.id ? "btn-filter-active" : "btn-filter-inactive"
               )}
             >
               <span>{f.label}</span>
@@ -602,10 +599,10 @@ export function Routes() {
             {activeFilter !== 'moderacao' && (
               <button 
                 onClick={handleOpenCreateRoute}
-                className="mt-2 px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider italic flex items-center gap-2 mx-auto cursor-pointer"
+                className="btn-primary mx-auto"
               >
                 {isVip ? <Plus size={14} /> : <Lock size={14} className="text-amber-300" />}
-                <span>{isVip ? "Criar Roteiro Agora" : "Criar Roteiro (VIP Pro)"}</span>
+                <span>{isVip ? "+ CRIAR ROTEIRO AGORA" : "+ CRIAR ROTEIRO (VIP PRO)"}</span>
               </button>
             )}
           </div>

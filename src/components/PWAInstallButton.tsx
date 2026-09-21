@@ -45,24 +45,24 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           disabled={isInstalling}
           className={cn(
             "w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer group text-left",
-            "bg-gradient-to-r from-orange-600/15 via-orange-500/10 to-amber-500/5 border-orange-500/30 hover:border-orange-500/60 hover:from-orange-600/25",
+            "bg-orange-600 hover:bg-orange-500 text-white border-orange-500/30 shadow-lg shadow-orange-600/25 hover:scale-[1.02] active:scale-95",
             className
           )}
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-orange-600/20 border border-orange-500/40 flex items-center justify-center text-orange-400 group-hover:scale-105 group-hover:bg-orange-600 group-hover:text-white transition-all shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-black/20 flex items-center justify-center text-white shrink-0">
               <Smartphone size={16} />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase italic tracking-wider text-white group-hover:text-orange-400 transition-colors">
+              <p className="text-xs font-black uppercase italic tracking-wider text-white">
                 Instalar no Celular
               </p>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">
+              <p className="text-[9px] font-bold text-orange-100 uppercase tracking-widest truncate">
                 App PWA • Sem Loja
               </p>
             </div>
           </div>
-          <Download size={14} className="text-orange-400 group-hover:translate-y-0.5 transition-transform shrink-0" />
+          <Download size={14} className="text-white group-hover:translate-y-0.5 transition-transform shrink-0" />
         </button>
       )}
 
@@ -71,11 +71,11 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           type="button"
           onClick={handleInstallClick}
           className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-600/20 border border-orange-500/40 text-orange-400 hover:bg-orange-600 hover:text-white transition-all text-[10px] font-black uppercase tracking-wider cursor-pointer",
+            "btn-primary text-xs py-2 px-3.5",
             className
           )}
         >
-          <Smartphone size={13} />
+          <Smartphone size={14} />
           <span>Instalar App</span>
         </button>
       )}
@@ -85,7 +85,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           type="button"
           onClick={handleInstallClick}
           className={cn(
-            "w-9 h-9 rounded-xl bg-orange-600/20 border border-orange-500/40 text-orange-400 flex items-center justify-center hover:bg-orange-600 hover:text-white transition-all cursor-pointer",
+            "w-9 h-9 rounded-xl bg-orange-600 hover:bg-orange-500 text-white flex items-center justify-center shadow-md shadow-orange-600/20 hover:scale-105 active:scale-95 transition-all cursor-pointer",
             className
           )}
           title="Instalar MotoLegado no seu celular"

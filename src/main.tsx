@@ -2,21 +2,36 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import { registerSW } from 'virtual:pwa-register';
+import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 
-// Register PWA service worker with auto-update
-registerSW({
-  immediate: true,
-  onNeedRefresh() {
-    console.log('[MotoLegado PWA] Nova versão disponível');
-  },
-  onOfflineReady() {
-    console.log('[MotoLegado PWA] Aplicativo pronto para uso offline');
-  },
-});
+// Safe register PWA service worker (ignored in sandboxed preview iframes)
+try {
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    import('virtual:pwa-register').then(({ registerSW }) => {
+      registerSW({
+        immediate: false,
+        onNeedRefresh() {
+          console.log('[MotoLegado PWA] Nova versão disponível');
+        },
+        onOfflineReady() {
+          console.log('[MotoLegado PWA] Aplicativo pronto para uso offline');
+        },
+      });
+    }).catch(() => {
+      // PWA virtual module not active or restricted in iframe
+    });
+  }
+} catch {
+  // Ignore in restricted environments
+}
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  createRoot(rootElement).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </StrictMode>,
+  );
+}

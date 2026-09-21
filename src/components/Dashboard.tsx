@@ -123,14 +123,14 @@ export function Dashboard() {
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => navigate('/logbook')}
-            className="flex-1 sm:flex-initial px-4 sm:px-5 py-2.5 bg-slate-900 border border-slate-800 hover:border-orange-500/50 text-slate-200 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+            className="btn-secondary"
           >
-            <BookOpen size={15} className="text-orange-500" />
+            <BookOpen size={15} className="text-[#ff751f]" />
             <span>Diário ({logs.length})</span>
           </button>
           <button
             onClick={() => navigate('/events')}
-            className="flex-1 sm:flex-initial px-4 sm:px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-600/20"
+            className="btn-primary"
           >
             <Calendar size={15} />
             <span>Eventos ({checkedInEvents.length})</span>
@@ -157,10 +157,10 @@ export function Dashboard() {
 
             <button
               onClick={() => navigate('/logbook')}
-              className="hidden sm:flex items-center gap-2 text-xs font-black text-amber-400 hover:text-amber-300 uppercase tracking-wider bg-slate-950 px-4 py-2 rounded-xl border border-slate-800"
+              className="btn-primary self-start"
             >
-              <span>+ Novo Registro</span>
-              <ArrowUpRight size={14} />
+              <Plus size={15} />
+              <span>NOVO REGISTRO</span>
             </button>
           </div>
 

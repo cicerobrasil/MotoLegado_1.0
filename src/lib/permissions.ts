@@ -110,6 +110,24 @@ export function canCreateRoute(profile: PilotProfile | null | undefined): PlanPe
 }
 
 /**
+ * Validates permission to apply / join a Moto Clube (requires Pro or Bonificado)
+ */
+export function canApplyToMotoClub(profile: PilotProfile | null | undefined): PlanPermissionResult {
+  const isVip = isUserProOrBonificado(profile);
+  if (isVip) {
+    return {
+      allowed: true,
+      featureTitle: 'Ingresso em Moto Clube Oficial'
+    };
+  }
+  return {
+    allowed: false,
+    reason: 'Para se candidatar e fazer parte de um Moto Clube Oficial no MotoLegado, é necessário possuir uma assinatura Pro ativa ou Modo Bonificado.',
+    featureTitle: 'Ingresso em Moto Clube Oficial'
+  };
+}
+
+/**
  * Validates permission to access VIP partner discounts (over standard open community discounts)
  */
 export function canAccessVipPartnerDiscount(profile: PilotProfile | null | undefined): PlanPermissionResult {

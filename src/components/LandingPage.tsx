@@ -21,18 +21,106 @@ import {
   Database,
   Info,
   Eye,
-  EyeOff
+  EyeOff,
+  Users,
+  Crown,
+  MessageSquare,
+  Mail,
+  Building2,
+  Phone,
+  CreditCard,
+  QrCode,
+  Copy,
+  Check,
+  Lock,
+  ShieldAlert,
+  BadgeCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { PWAInstallButton } from './PWAInstallButton';
 import { LogoMark } from './LogoMark';
+import { AccessibilityButton } from './AccessibilityButton';
 import { BrandKitModal } from './BrandKitModal';
+
+interface ClubPackageOption {
+  id: 'esquadrao' | 'batalhao' | 'legiao';
+  name: string;
+  badge: string;
+  members: number;
+  priceMonthly: string;
+  priceMonthlyNumber: number;
+  costPerMember: string;
+  freeLeaders: number;
+  popular?: boolean;
+  features: string[];
+}
+
+const CLUB_PACKAGES: ClubPackageOption[] = [
+  {
+    id: 'esquadrao',
+    name: 'Pacote Esquadrão',
+    badge: 'PEQUENOS CLUBES & REGIONAIS',
+    members: 10,
+    priceMonthly: 'R$ 99,00',
+    priceMonthlyNumber: 99.00,
+    costPerMember: 'R$ 9,90',
+    freeLeaders: 1,
+    features: [
+      '10 Vagas Pro para Membros da Irmandade',
+      '★ 1 Vaga do Líder 100% Isento & Bonificado',
+      'Escudo Oficial Homologado no Mapa',
+      'Mural Restrito com Comunicados & Eventos',
+      'Painel de Gestão e Aprovação de Recrutas',
+      'Crachá Digital de Membro Oficial'
+    ]
+  },
+  {
+    id: 'batalhao',
+    name: 'Pacote Batalhão',
+    badge: 'MAIS ESCOLHIDO',
+    members: 25,
+    priceMonthly: 'R$ 199,00',
+    priceMonthlyNumber: 199.00,
+    costPerMember: 'R$ 7,96',
+    freeLeaders: 1,
+    popular: true,
+    features: [
+      '25 Vagas Pro para Membros da Irmandade',
+      '★ 1 Vaga do Líder 100% Isento & Bonificado',
+      'Todos os recursos do Pacote Esquadrão',
+      'Destaque no Diretório Nacional de Clubes',
+      'Mural de Estatísticas e Quilometragem Coletiva',
+      'Gestão de Cargos (Próspero, Meio-Escudo, Escudado)'
+    ]
+  },
+  {
+    id: 'legiao',
+    name: 'Pacote Legião',
+    badge: 'MÁXIMA ECONOMIA',
+    members: 50,
+    priceMonthly: 'R$ 349,00',
+    priceMonthlyNumber: 349.00,
+    costPerMember: 'R$ 6,98',
+    freeLeaders: 2,
+    features: [
+      '50 Vagas Pro para Membros da Irmandade',
+      '★ 2 Vagas de Diretoria 100% Isentas (Presidente + Vice)',
+      'Todos os recursos do Pacote Batalhão',
+      'Gestão de Subsedes Regionais e Facções',
+      'Notificações em Massa para todo o Pelotão',
+      'Suporte Executivo Prioritário via WhatsApp'
+    ]
+  }
+];
 
 export function LandingPage() {
   const navigate = useNavigate();
   const { 
+    user,
+    profile,
+    updateProfile,
     signInWithEmail, 
     signUpWithEmail, 
     signInWithGoogle, 
@@ -55,6 +143,32 @@ export function LandingPage() {
   const [pilotPassword, setPilotPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [bikeModel, setBikeModel] = useState('');
+
+  // Moto Club Packages State
+  const [selectedClubPackage, setSelectedClubPackage] = useState<ClubPackageOption | null>(null);
+  const [showClubCheckoutModal, setShowClubCheckoutModal] = useState(false);
+  const [showCustomQuoteModal, setShowCustomQuoteModal] = useState(false);
+
+  // Club Checkout Form State
+  const [checkoutClubName, setCheckoutClubName] = useState('');
+  const [checkoutClubCity, setCheckoutClubCity] = useState('');
+  const [checkoutLeaderName, setCheckoutLeaderName] = useState('');
+  const [checkoutLeaderPhone, setCheckoutLeaderPhone] = useState('');
+  const [checkoutLeaderEmail, setCheckoutLeaderEmail] = useState('');
+  const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState<'pix' | 'card'>('pix');
+  const [checkoutProcessing, setCheckoutProcessing] = useState(false);
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const [copiedPixKey, setCopiedPixKey] = useState(false);
+
+  // Custom Quote 50+ members State
+  const [quoteClubName, setQuoteClubName] = useState('');
+  const [quoteMembersCount, setQuoteMembersCount] = useState('');
+  const [quoteLeaderName, setQuoteLeaderName] = useState('');
+  const [quotePhone, setQuotePhone] = useState('');
+  const [quoteEmail, setQuoteEmail] = useState('');
+  const [quoteCity, setQuoteCity] = useState('');
+  const [quoteNotes, setQuoteNotes] = useState('');
+  const [quoteSubmitted, setQuoteSubmitted] = useState(false);
 
   const formatErrorMessage = (message?: string) => {
     if (!message) return 'Ocorreu um erro na autenticação.';
@@ -234,27 +348,20 @@ export function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-orange-500 selection:text-white relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#001b3d] text-[#e2e8f0] font-sans selection:bg-[#ff751f] selection:text-white relative overflow-x-hidden">
       
       {/* LANDING HEADER / NAVBAR */}
-      <nav className="fixed top-0 left-0 right-0 h-20 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/80 z-50 px-4 sm:px-8">
+      <nav className="fixed top-0 left-0 right-0 h-20 bg-[#001b3d]/90 backdrop-blur-xl border-b border-[#1e293b] z-50 px-4 sm:px-8">
         <div className="max-w-7xl mx-auto h-full flex items-center justify-between">
           <button 
             onClick={() => {
               window.scrollTo({ top: 0, behavior: 'smooth' });
               document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
             }} 
-            className="flex items-center gap-3.5 cursor-pointer text-left group"
+            className="flex items-center cursor-pointer text-left group"
+            aria-label="MotoLegado Início"
           >
             <LogoMark size="lg" />
-            <div>
-              <span className="font-black italic uppercase text-2xl tracking-tighter text-white">
-                MOTO<span className="text-orange-500">LEGADO</span>
-              </span>
-              <span className="hidden sm:inline-block ml-2.5 px-2 py-0.5 bg-orange-500/15 border border-orange-500/35 text-orange-400 text-[9px] font-black uppercase rounded-full tracking-widest">
-                SaaS PLATFORM
-              </span>
-            </div>
           </button>
 
           <div className="hidden md:flex items-center gap-8 text-xs font-black uppercase tracking-wider text-slate-400">
@@ -262,11 +369,12 @@ export function LandingPage() {
             <a href="#planos" className="hover:text-orange-400 transition-colors">Planos & Preços</a>
           </div>
 
-          <div className="flex items-center gap-2.5 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <AccessibilityButton variant="header" />
             <PWAInstallButton variant="header" />
             <button
               onClick={() => setShowLoginModal(true)}
-              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+              className="btn-secondary"
             >
               <User size={14} className="text-orange-500" />
               <span>Iniciar Sessão</span>
@@ -317,19 +425,19 @@ export function LandingPage() {
           >
             <button
               onClick={() => setShowLoginModal(true)}
-              className="w-full sm:w-auto px-8 py-4 bg-orange-600 hover:bg-orange-500 text-slate-950 font-black uppercase text-sm tracking-wider rounded-2xl shadow-[0_0_30px_rgba(234,88,12,0.4)] hover:shadow-[0_0_40px_rgba(234,88,12,0.6)] transition-all flex items-center justify-center gap-3 group cursor-pointer"
+              className="w-full sm:w-auto btn-primary py-3.5 px-8 text-sm"
             >
-              <Zap size={18} className="fill-slate-950" />
+              <Zap size={18} className="fill-white text-white" />
               <span>Iniciar Sessão do Piloto</span>
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </button>
 
             <a
               href="#planos"
-              className="w-full sm:w-auto px-8 py-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-white font-black uppercase text-sm tracking-wider rounded-2xl transition-all flex items-center justify-center gap-3"
+              className="w-full sm:w-auto btn-secondary py-3.5 px-8 text-sm"
             >
               <span>Ver Planos & Preços</span>
-              <ChevronRight size={16} className="text-slate-500" />
+              <ChevronRight size={16} className="text-slate-400" />
             </a>
           </motion.div>
 
@@ -354,9 +462,9 @@ export function LandingPage() {
       <section id="recursos" className="py-20 px-4 sm:px-8 border-b border-slate-800/60 relative">
         <div className="max-w-7xl mx-auto space-y-16">
           <div className="text-center space-y-3">
-            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-orange-500">MÓDULOS DE ALTA PERFORMANCE</h2>
+            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-[#ff751f]">MÓDULOS DE ALTA PERFORMANCE</h2>
             <h3 className="text-3xl sm:text-5xl font-black italic uppercase tracking-tighter text-white">
-              TUDO O QUE SEU GRUPO PRECISA NA <span className="text-amber-500">ESTRADA</span>
+              TUDO O QUE SEU GRUPO PRECISA NA <span className="text-[#ff751f]">ESTRADA</span>
             </h3>
             <p className="text-slate-400 text-sm max-w-2xl mx-auto">
               Desenvolvido com foco na rotina real do motociclista, desde a preparação do roteiro até o diário de memórias.
@@ -425,7 +533,7 @@ export function LandingPage() {
                   </p>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800/50 flex items-center justify-between text-[10px] font-black uppercase text-slate-500 tracking-widest group-hover:text-amber-400">
+                <div className="pt-4 border-t border-slate-800/50 flex items-center justify-between text-[10px] font-black uppercase text-slate-500 tracking-widest group-hover:text-[#ff751f]">
                   <span>Incluso no Sistema</span>
                   <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </div>
@@ -491,26 +599,26 @@ export function LandingPage() {
             </div>
 
             {/* PRO / MOTOLEGADO PLAN */}
-            <div className="bg-gradient-to-b from-orange-950/30 via-slate-900/80 to-slate-950 border-2 border-orange-500 rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between space-y-8 relative shadow-[0_0_50px_rgba(234,88,12,0.15)] transform md:-translate-y-2">
+            <div className="pricing-card-pro bg-slate-900/90 border-2 border-orange-500 rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between space-y-8 relative shadow-[0_10px_40px_rgba(234,88,12,0.2)] transform md:-translate-y-2">
               <div className="absolute -top-4 right-8 bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
                 RECOMENDADO
               </div>
 
               <div className="space-y-6">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase rounded-full tracking-widest">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-500/15 border border-orange-500/40 text-orange-400 text-[10px] font-black uppercase rounded-full tracking-widest">
                   <Sparkles size={12} />
                   PLANO MOTOLEGADO PRO (COMPLETO)
                 </div>
 
                 <div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl sm:text-5xl font-black italic text-amber-400 tracking-tight">R$ 29,90</span>
+                    <span className="text-4xl sm:text-5xl font-black italic text-orange-400 tracking-tight">R$ 29,90</span>
                     <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">/ mês</span>
                   </div>
-                  <p className="text-xs text-amber-200/70 mt-2">Para pilotos exigentes e administradores de Moto Clubes que desejam controle total.</p>
+                  <p className="pro-subtitle text-xs text-slate-300 mt-2 font-medium">Para pilotos exigentes e administradores de Moto Clubes que desejam controle total.</p>
                 </div>
 
-                <div className="space-y-3 pt-4 border-t border-orange-500/20">
+                <div className="space-y-3 pt-4 border-t border-orange-500/30">
                   <p className="text-[10px] font-black uppercase tracking-wider text-orange-400">Tudo do Plano Asfalto e mais:</p>
                   {[
                     "Registros ILIMITADOS no Diário de Bordo",
@@ -521,7 +629,7 @@ export function LandingPage() {
                     "Exportação de Relatórios de Viagem",
                     "Suporte Prioritário VIP 24/7",
                   ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-3 text-xs text-white font-semibold">
+                    <div key={i} className="flex items-center gap-3 text-xs text-slate-100 font-semibold pro-feature-item">
                       <CheckCircle2 size={16} className="text-orange-500 shrink-0" />
                       <span>{item}</span>
                     </div>
@@ -531,7 +639,7 @@ export function LandingPage() {
 
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-slate-950 font-black uppercase text-xs tracking-widest rounded-2xl shadow-[0_0_25px_rgba(234,88,12,0.4)] transition-all cursor-pointer"
+                className="w-full btn-primary py-3.5"
               >
                 Assinar Plano Legado Pro
               </button>
@@ -539,7 +647,7 @@ export function LandingPage() {
           </div>
 
           {/* Detailed Feature Comparison Table */}
-          <div className="mt-16 bg-slate-900/30 border border-slate-800/80 rounded-3xl p-6 md:p-8 overflow-x-auto">
+          <div className="comparison-table-container mt-16 bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 md:p-8 overflow-x-auto">
             <h4 className="text-lg font-black italic uppercase text-white mb-6 tracking-tight flex items-center gap-2">
               <Layers size={18} className="text-orange-500" />
               <span>Comparativo Detalhado de Recursos</span>
@@ -563,9 +671,9 @@ export function LandingPage() {
                   { name: "Exportação de Histórico de Viagens", free: "Não", pro: "Sim (PDF / CSV)" },
                 ].map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-900/50 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-white">{row.name}</td>
+                    <td className="py-3.5 px-4 font-bold text-white comparison-item-name">{row.name}</td>
                     <td className="py-3.5 px-4 text-center text-slate-400">{row.free}</td>
-                    <td className="py-3.5 px-4 text-center text-amber-400 font-bold bg-orange-500/5">{row.pro}</td>
+                    <td className="py-3.5 px-4 text-center text-orange-400 font-bold bg-orange-500/5">{row.pro}</td>
                   </tr>
                 ))}
               </tbody>
@@ -632,12 +740,10 @@ export function LandingPage() {
               document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             className="flex items-center gap-3 cursor-pointer text-left group"
+            aria-label="MotoLegado Início"
           >
             <LogoMark size="sm" />
-            <div>
-              <span className="font-black italic uppercase text-lg text-white">MOTO<span className="text-orange-500">LEGADO</span></span>
-              <p className="text-[9px] uppercase tracking-wider text-slate-600">SaaS Platform for Riders © 2026</p>
-            </div>
+            <p className="text-[9px] uppercase tracking-wider text-slate-500">Plataforma Oficial para Motociclistas © 2026</p>
           </button>
 
           <div className="flex flex-wrap items-center justify-center gap-6 font-bold uppercase text-[10px] tracking-widest text-slate-400">
@@ -667,22 +773,22 @@ export function LandingPage() {
             >
               <button
                 onClick={() => setShowLoginModal(false)}
-                className="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+                className="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
 
-              <div className="flex items-center gap-4">
-                <LogoMark size="xl" />
-                <div className="space-y-1">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <LogoMark size="md" />
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[9px] font-black uppercase rounded-full">
                     <User size={11} />
                     <span>Acesso do Piloto</span>
                   </div>
-                  <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white">
-                    INICIAR SESSÃO NO <span className="text-orange-500">MOTOLEGADO</span>
-                  </h3>
                 </div>
+                <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white">
+                  INICIAR SESSÃO
+                </h3>
               </div>
 
               {/* Status & Error Alerts */}
@@ -794,7 +900,7 @@ export function LandingPage() {
                   }}
                   className={cn(
                     "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-                    loginTab === 'login' ? "bg-orange-600 text-slate-950 font-black shadow-md" : "text-slate-400 hover:text-white"
+                    loginTab === 'login' ? "bg-orange-600 text-white font-black shadow-md" : "text-slate-400 hover:text-white"
                   )}
                 >
                   Entrar com Conta
@@ -807,7 +913,7 @@ export function LandingPage() {
                   }}
                   className={cn(
                     "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-                    loginTab === 'register' ? "bg-orange-600 text-slate-950 font-black shadow-md" : "text-slate-400 hover:text-white"
+                    loginTab === 'register' ? "bg-orange-600 text-white font-black shadow-md" : "text-slate-400 hover:text-white"
                   )}
                 >
                   Criar Cadastro
@@ -882,7 +988,7 @@ export function LandingPage() {
                 <button
                   type="submit"
                   disabled={authLoading}
-                  className="w-full py-3.5 bg-orange-600 hover:bg-orange-500 text-slate-950 font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
+                  className="w-full btn-primary py-3.5 mt-2 disabled:opacity-50"
                 >
                   {authLoading ? (
                     <>

@@ -25,6 +25,7 @@ import { FREE_PLAN_FEATURES } from '../types';
 export type UpgradeFeatureTrigger = 
   | 'diario_ilimitado'
   | 'criar_clube'
+  | 'membro_clube'
   | 'criar_evento'
   | 'criar_roteiro'
   | 'desconto_vip'
@@ -45,6 +46,10 @@ const FEATURE_MESSAGES: Record<UpgradeFeatureTrigger, { title: string; desc: str
   criar_clube: {
     title: 'Fundação e Gestão Completa de Moto Clube',
     desc: 'A criação e presidência de Moto Clubes é um recurso exclusivo para pilotos MotoLegado Pro ou com Modo Bonificado liberado.'
+  },
+  membro_clube: {
+    title: 'Ingresso em Moto Clube Oficial (Exclusivo Pro)',
+    desc: 'Para preservar o padrão e os benefícios da irmandade, todos os integrantes e candidatos a Moto Clubes Oficiais precisam ser assinantes Pro ou Bonificados.'
   },
   criar_evento: {
     title: 'Criação e Agendamento de Eventos Coletivos',
@@ -290,6 +295,7 @@ export function UpgradeModal({ isOpen, onClose, feature = 'geral', onSuccess }: 
                   <ul className="space-y-1 text-[11px] text-slate-200 font-medium">
                     <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Diário de Bordo ILIMITADO</strong></li>
                     <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Fundar e Gerenciar Moto Clube</strong></li>
+                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Ingresso & Candidatura a Moto Clubes</strong></li>
                     <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Criar & Agendar Eventos Oficiais</strong></li>
                     <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Criar & Publicar Roteiros</strong></li>
                     <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Exportação de Relatórios de Viagem</strong></li>
@@ -546,7 +552,7 @@ export function UpgradeModal({ isOpen, onClose, feature = 'geral', onSuccess }: 
                     type="button"
                     disabled={isProcessing || !cardNumber}
                     onClick={() => handleConfirmPayment('pago')}
-                    className="w-full py-3.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-slate-950 font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-lg shadow-orange-600/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="w-full btn-primary py-3.5 disabled:opacity-50"
                   >
                     {isProcessing ? (
                       <>

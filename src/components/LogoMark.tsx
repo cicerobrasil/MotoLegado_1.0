@@ -7,12 +7,12 @@ interface LogoMarkProps {
   showGlow?: boolean;
 }
 
-const sizeMap = {
-  xs: 'w-7 h-7 rounded-lg',
-  sm: 'w-8 h-8 rounded-xl',
-  md: 'w-10 h-10 rounded-xl',
-  lg: 'w-12 h-12 rounded-2xl',
-  xl: 'w-16 h-16 rounded-2xl',
+const sizeConfig = {
+  xs: 'h-6',
+  sm: 'h-7 sm:h-8',
+  md: 'h-8 sm:h-9 md:h-10',
+  lg: 'h-8 sm:h-10 md:h-12',
+  xl: 'h-12 sm:h-16 md:h-20',
 };
 
 export const LogoMark: React.FC<LogoMarkProps> = ({
@@ -20,19 +20,57 @@ export const LogoMark: React.FC<LogoMarkProps> = ({
   className,
   showGlow = true,
 }) => {
+  const heightClass = sizeConfig[size];
+
   return (
-    <div className={cn('relative flex items-center justify-center shrink-0 group', className)}>
+    <div className={cn('relative inline-flex items-center shrink-0 select-none group', className)}>
       {showGlow && (
-        <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl blur-sm opacity-60 group-hover:opacity-100 group-hover:blur-md transition-all duration-300 pointer-events-none" />
+        <div className="absolute -inset-1 bg-[#ff751f]/20 rounded-2xl blur-sm opacity-50 group-hover:opacity-80 transition-opacity duration-300 pointer-events-none" />
       )}
-      <img
-        src="/icon.svg"
-        alt="MotoLegado"
+      <svg
+        viewBox="0 0 504 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
         className={cn(
-          sizeMap[size],
-          'relative z-10 object-contain shadow-[0_4px_22px_rgba(234,88,12,0.5)] group-hover:scale-105 transition-all duration-300'
+          'relative z-10 w-auto block select-none drop-shadow-sm group-hover:drop-shadow-md group-hover:scale-[1.01] transition-all duration-300',
+          heightClass
         )}
-      />
+        aria-label="MotoLegado"
+      >
+        {/* Fundo Azul Escuro Oficial (#001b3d) */}
+        <rect width="504" height="100" rx="12" fill="#001b3d" />
+
+        {/* Caixa Salmão Oficial (#ff751f) */}
+        <rect x="12" y="12" width="76" height="76" rx="11" fill="#ff751f" />
+
+        {/* Letra M em Azul (#001b3d) */}
+        <text
+          x="50"
+          y="70"
+          fontFamily="Outfit, Montserrat, system-ui, -apple-system, sans-serif"
+          fontWeight="900"
+          fontSize="62"
+          fill="#001b3d"
+          textAnchor="middle"
+        >
+          M
+        </text>
+
+        {/* OTO em Branco (#ffffff) + LEGADO em Salmão (#ff751f) */}
+        <text
+          x="100"
+          y="70"
+          fontFamily="Outfit, Montserrat, system-ui, -apple-system, sans-serif"
+          fontWeight="900"
+          fontSize="62"
+          letterSpacing="-0.5px"
+        >
+          <tspan fill="#ffffff">OTO</tspan>
+          <tspan fill="#ff751f">LEGADO</tspan>
+        </text>
+      </svg>
     </div>
   );
 };
+
+

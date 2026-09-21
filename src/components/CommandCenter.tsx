@@ -1175,16 +1175,16 @@ export function CommandCenter() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
               onClick={() => navigate('/dashboard')}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-black italic uppercase text-xs tracking-widest transition-all shadow-[0_0_20px_rgba(234,88,12,0.3)] cursor-pointer"
+              className="btn-primary"
             >
               <ArrowLeft size={16} />
-              VOLTAR AO DASHBOARD
+              <span>VOLTAR AO DASHBOARD</span>
             </button>
             <button
               onClick={() => navigate('/profile')}
-              className="w-full sm:w-auto px-8 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl font-bold uppercase text-xs tracking-widest transition-all cursor-pointer border border-slate-700"
+              className="btn-secondary"
             >
-              VER MEU PERFIL
+              <span>VER MEU PERFIL</span>
             </button>
           </div>
         </motion.div>
@@ -1226,7 +1226,7 @@ export function CommandCenter() {
             </div>
 
             <h1 className="text-3xl md:text-5xl font-black italic uppercase tracking-tight text-white drop-shadow-md">
-              CENTRO DE <span className="text-amber-500">COMANDO</span>
+              CENTRO DE <span className="text-[#ff751f]">COMANDO</span>
             </h1>
 
             <p className="text-xs md:text-sm text-slate-300 max-w-3xl font-medium leading-relaxed">
@@ -1275,12 +1275,12 @@ export function CommandCenter() {
           onClick={() => setActiveTab('eventos')}
           className={cn(
             "bento-card p-5 text-left transition-all border group relative overflow-hidden",
-            activeTab === 'eventos' ? "border-amber-500 bg-amber-950/20 shadow-lg shadow-amber-950/30" : "border-slate-800/80 hover:border-slate-700 bg-slate-900/40"
+            activeTab === 'eventos' ? "border-[#ff751f] bg-[#00273d] shadow-lg shadow-[#ff751f]/20" : "border-slate-800/80 hover:border-[#ff751f]/50 bg-[#00273d]"
           )}
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">MODERAÇÃO DE EVENTOS</span>
-            <Calendar size={18} className="text-amber-400" />
+            <Calendar size={18} className="text-[#ff751f]" />
           </div>
           <div className="text-3xl font-black italic text-white mb-1">
             {pendingEventsCount} <span className="text-xs font-normal text-slate-400 uppercase italic">Pendentes</span>
@@ -1450,10 +1450,10 @@ export function CommandCenter() {
                 </span>
                 <Link
                   to="/events"
-                  className="px-3.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-[10px] font-black uppercase rounded-full flex items-center gap-1.5 transition-all"
+                  className="btn-primary"
                 >
-                  <Plus size={12} />
-                  Cadastrar Evento em /events
+                  <Plus size={14} />
+                  <span>AGENDAR EVENTO</span>
                 </Link>
               </div>
             </div>
@@ -1467,7 +1467,7 @@ export function CommandCenter() {
                   placeholder="Buscar evento por título, local ou autor..."
                   value={eventSearch}
                   onChange={(e) => setEventSearch(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-600"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-[#ff751f] transition-all placeholder:text-slate-600"
                 />
               </div>
 
@@ -1482,14 +1482,11 @@ export function CommandCenter() {
                     key={f.id}
                     onClick={() => setEventFilter(f.id as any)}
                     className={cn(
-                      "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border",
-                      eventFilter === f.id
-                        ? "bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-600/20"
-                        : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                      eventFilter === f.id ? "btn-filter-active" : "btn-filter-inactive"
                     )}
                   >
                     {f.label}
-                    <span className="px-1.5 py-0.5 rounded-md bg-slate-950 text-[8px] border border-slate-800 font-mono">
+                    <span className="px-1.5 py-0.5 rounded-md bg-black/20 text-[8px] font-mono">
                       {f.count}
                     </span>
                   </button>
@@ -2959,7 +2956,7 @@ export function CommandCenter() {
                   <button
                     type="button"
                     onClick={() => handleBatchUpdatePlan('bonificado')}
-                    className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+                    className="btn-primary text-xs py-1.5 px-3.5"
                   >
                     <Gift size={13} />
                     <span>Bonificar Selecionados</span>
@@ -5085,7 +5082,7 @@ export function CommandCenter() {
                       handleUpdatePlan(viewingPilotModal.id, 'bonificado');
                       setViewingPilotModal({ ...viewingPilotModal, plan_type: 'bonificado', is_pro: true });
                     }}
-                    className="flex-1 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black uppercase rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+                    className="flex-1 btn-primary py-2.5"
                   >
                     <Gift size={15} /> Ativar Modo Bonificado
                   </button>

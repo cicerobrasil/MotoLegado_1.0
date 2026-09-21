@@ -582,10 +582,10 @@ export function Logbook() {
 
           <button 
             onClick={handleOpenForm}
-            className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-white text-black rounded-xl text-[10px] sm:text-[11px] font-black tracking-[0.2em] uppercase italic transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)] flex items-center justify-center gap-2"
+            className="w-full sm:w-auto btn-primary"
           >
             <Plus size={16} />
-            + NOVO REGISTRO
+            <span>NOVO REGISTRO</span>
           </button>
         </div>
       </header>

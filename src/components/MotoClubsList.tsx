@@ -21,7 +21,8 @@ import {
   Tablet as Motorcycle,
   Settings,
   Loader2,
-  Lock
+  Lock,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -176,7 +177,7 @@ export function MotoClubsList() {
         </div>
         
         {activeMainTab === 'explorar' && (
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" size={18} />
               <input 
@@ -184,9 +185,16 @@ export function MotoClubsList() {
                 placeholder="Buscar clubes..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-slate-950 border border-slate-800/50 rounded-xl py-3 pl-12 pr-6 text-sm font-bold focus:border-orange-500 outline-none transition-all w-64 backdrop-blur-sm"
+                className="bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-11 pr-4 text-xs font-bold text-white focus:border-orange-500 outline-none transition-all w-48 sm:w-60"
               />
             </div>
+            <button
+              onClick={handleOpenGestaoTab}
+              className="btn-primary"
+            >
+              {isVip ? <Plus size={16} /> : <Lock size={14} />}
+              <span>{isVip ? "CADASTRAR MEU MOTOCLUBE" : "CADASTRAR MOTOCLUBE (VIP PRO)"}</span>
+            </button>
           </div>
         )}
       </header>
@@ -328,10 +336,10 @@ export function MotoClubsList() {
                 </div>
                 <button
                   onClick={handleOpenGestaoTab}
-                  className="px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-600/20 cursor-pointer flex items-center gap-2 mx-auto"
+                  className="btn-primary mx-auto"
                 >
-                  {isVip ? <Plus size={14} /> : <Lock size={13} className="text-amber-300" />}
-                  <span>{isVip ? "Cadastrar Meu Moto Clube" : "Cadastrar Moto Clube (VIP Pro)"}</span>
+                  {isVip ? <Plus size={16} /> : <Lock size={14} />}
+                  <span>{isVip ? "CADASTRAR MEU MOTOCLUBE" : "CADASTRAR MOTOCLUBE (VIP PRO)"}</span>
                 </button>
               </div>
             )}
@@ -349,14 +357,14 @@ export function MotoClubsList() {
             <div className="space-y-2">
               <h3 className="text-2xl font-black italic uppercase text-white">FUNDAÇÃO E GESTÃO DE MOTO CLUBE</h3>
               <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
-                No Plano Gratuito você tem permissão para explorar todos os Moto Clubes públicos e enviar sua candidatura como membro. Para fundar seu próprio clube, nomear diretoria, definir estatutos e ter mural restrito, ative o MotoLegado Pro ou solicite o Modo Bonificado.
+                No Plano Gratuito você pode explorar todos os Moto Clubes públicos e consultar sua liderança. Para fundar seu próprio clube ou ingressar como membro oficial de qualquer moto clube parceiro, ative o MotoLegado Pro ou solicite o Modo Bonificado.
               </p>
             </div>
             <button
               onClick={() => setIsUpgradeModalOpen(true)}
-              className="px-8 py-3.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-slate-950 font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-lg shadow-orange-600/20 cursor-pointer"
+              className="btn-primary"
             >
-              Liberar Fundação de Moto Clube
+              Liberar Acesso Completo aos Moto Clubes
             </button>
           </motion.div>
         ) : (
@@ -407,10 +415,10 @@ export function MotoClubsList() {
 
               <button 
                 onClick={() => navigate('/motoclub/1')} 
-                className="w-full md:w-auto px-8 py-3 bg-slate-950 border border-orange-500/30 text-orange-500 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] hover:bg-orange-600 hover:text-white transition-all flex items-center justify-center gap-2 group shadow-lg shadow-orange-600/5"
+                className="btn-secondary"
               >
-                <Search size={14} className="group-hover:scale-110 transition-transform" />
-                Ver Página Pública
+                <ExternalLink size={15} className="text-[#ff751f]" />
+                <span>Ver Página Pública</span>
               </button>
             </div>
 
@@ -821,7 +829,20 @@ export function MotoClubsList() {
             >
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-600 to-orange-400" />
               
-              <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-8">Novo Recruta</h3>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">Novo Recruta</h3>
+                  <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mt-1 flex items-center gap-1">
+                    <Sparkles size={12} /> Membros precisam ter conta Pro ativa
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-orange-600/10 border border-orange-500/20 mb-6">
+                <p className="text-[11px] text-slate-300 font-medium leading-relaxed">
+                  Para que os recrutas recebam os escudos oficiais e acessem o mural restrito, certifique-se de que o piloto possua a assinatura MotoLegado Pro.
+                </p>
+              </div>
               
               <form onSubmit={handleAddMember} className="space-y-6">
                 <div className="space-y-3">

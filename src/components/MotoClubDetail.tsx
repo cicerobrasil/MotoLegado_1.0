@@ -1,11 +1,18 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Shield, MapPin, Users, Calendar, ExternalLink, Trophy, ArrowLeft } from 'lucide-react';
+import { Shield, MapPin, Users, Calendar, ExternalLink, Trophy, ArrowLeft, Lock, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
+import { isUserProOrBonificado } from '../lib/permissions';
+import { UpgradeModal } from './UpgradeModal';
 
 export function MotoClubDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const isVip = isUserProOrBonificado(profile);
 
   // Load real club data from storage or fallback
   const savedClubsStr = typeof window !== 'undefined' ? localStorage.getItem('motolegado_clubs') : null;
@@ -257,17 +264,44 @@ export function MotoClubDetail() {
                  </div>
                </div>
 
-               <button 
-                  onClick={() => navigate(`/motoclub/${id}/apply`)}
-                  className="w-full py-5 bg-slate-800/50 hover:bg-white hover:text-slate-950 border border-slate-700/50 rounded-[1.5rem] text-[10px] font-black italic uppercase tracking-[0.25em] transition-all transform hover:scale-[1.02] active:scale-95 z-10 relative"
-               >
-                  CANDIDATAR-SE À VAGA
-               </button>
+               {isVip ? (
+                 <button 
+                   onClick={() => navigate(`/motoclub/${id}/apply`)}
+                   className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-[1.5rem] text-[11px] font-black italic uppercase tracking-[0.25em] transition-all transform hover:scale-[1.02] active:scale-95 z-10 relative flex items-center justify-center gap-2 shadow-lg shadow-orange-600/30"
+                 >
+                   <span>CANDIDATAR-SE À VAGA</span>
+                 </button>
+               ) : (
+                 <div className="space-y-3 z-10 relative">
+                   <button 
+                     onClick={() => setIsUpgradeModalOpen(true)}
+                     className="w-full btn-primary py-4 text-[10px]"
+                   >
+                     <Lock size={14} />
+                     <span>CANDIDATAR-SE (EXCLUSIVO PRO)</span>
+                   </button>
+                   <div className="p-3.5 rounded-2xl bg-orange-600/10 border border-orange-500/20 text-center space-y-1">
+                     <div className="flex items-center justify-center gap-1.5 text-orange-400 text-[9px] font-black uppercase tracking-wider">
+                       <Sparkles size={12} />
+                       <span>REQUISITO DE FILIAÇÃO</span>
+                     </div>
+                     <p className="text-[10px] text-slate-300 font-medium leading-relaxed">
+                       Para integrar um Moto Clube Oficial e manter o padrão de irmandade da rede, é necessário possuir assinatura Pro ativa.
+                     </p>
+                   </div>
+                 </div>
+               )}
             </div>
           </div>
 
         </div>
       </div>
+
+      <UpgradeModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+        feature="membro_clube" 
+      />
     </div>
   );
 }

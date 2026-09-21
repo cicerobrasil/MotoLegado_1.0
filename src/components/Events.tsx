@@ -510,14 +510,14 @@ export function Events() {
         <div className="flex flex-wrap items-center gap-3 self-start md:self-end">
           <button
             onClick={handleOpenCreateTab}
-            className="px-6 py-3 bg-slate-900 border border-orange-500/30 text-orange-500 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-orange-600 hover:text-white hover:border-orange-500 transition-all flex items-center justify-center gap-2 group shadow-xl shadow-orange-600/5"
+            className="btn-primary"
           >
             {isVip ? (
-              <Plus size={14} className="group-hover:rotate-90 transition-transform duration-300" />
+              <Plus size={16} className="group-hover:rotate-90 transition-transform duration-300" />
             ) : (
-              <Lock size={14} className="text-amber-400" />
+              <Lock size={14} />
             )}
-            {activeTab === 'criar' ? "Ver Eventos" : isVip ? "Agendar Evento" : "Agendar Evento (VIP Pro)"}
+            <span>{activeTab === 'criar' ? "VER EVENTOS" : isVip ? "AGENDAR EVENTO" : "AGENDAR EVENTO (VIP PRO)"}</span>
           </button>
         </div>
       </header>
@@ -924,10 +924,7 @@ export function Events() {
                 key={tag}
                 onClick={() => setSelectedCategory(tag)}
                 className={cn(
-                  "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
-                  selectedCategory === tag 
-                    ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20 border border-orange-500/20" 
-                    : "bg-slate-900/60 border border-slate-800/40 text-slate-500 hover:text-white hover:border-slate-700"
+                  selectedCategory === tag ? "btn-filter-active" : "btn-filter-inactive"
                 )}
               >
                 {tag}
@@ -1229,7 +1226,7 @@ export function Events() {
             </div>
             <button
               onClick={() => setIsUpgradeModalOpen(true)}
-              className="px-8 py-3.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-slate-950 font-black uppercase text-xs tracking-widest rounded-xl transition-all shadow-lg shadow-orange-600/20 cursor-pointer"
+              className="btn-primary"
             >
               Desbloquear Agendamento de Eventos
             </button>

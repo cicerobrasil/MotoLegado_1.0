@@ -11,17 +11,23 @@ import {
   QrCode,
   Calendar,
   Award,
-  Clock
+  Clock,
+  Lock,
+  Sparkles
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
+import { isUserProOrBonificado } from '../lib/permissions';
+import { UpgradeModal } from './UpgradeModal';
 
 export function MotoClubApplication() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const isVip = isUserProOrBonificado(profile);
 
   const pilotName = profile?.name || 'Piloto MotoLegado';
   const pilotEmail = profile?.email || '';
@@ -44,6 +50,11 @@ export function MotoClubApplication() {
   };
 
   const handleSendApplication = () => {
+    if (!isVip) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+
     setStatus('sending');
 
     // Persist real application request
@@ -153,7 +164,11 @@ export function MotoClubApplication() {
               {/* Badges Footer */}
               <div className="pt-6 border-t border-slate-800 flex items-center gap-3">
                  <div className="px-3 py-1 bg-slate-900 rounded-lg border border-slate-800 text-[8px] font-bold text-slate-500 uppercase tracking-widest">Documento Verificado</div>
-                 <div className="px-3 py-1 bg-orange-600/10 rounded-lg border border-orange-500/20 text-[8px] font-bold text-orange-500 uppercase tracking-widest">Elite member</div>
+                 {isVip ? (
+                   <div className="px-3 py-1 bg-orange-600/10 rounded-lg border border-orange-500/20 text-[8px] font-bold text-orange-500 uppercase tracking-widest">Piloto Pro Verificado</div>
+                 ) : (
+                   <div className="px-3 py-1 bg-slate-800 rounded-lg border border-slate-700 text-[8px] font-bold text-slate-400 uppercase tracking-widest">Plano Gratuito (Requer Pro)</div>
+                 )}
               </div>
             </div>
           </motion.div>
@@ -196,26 +211,60 @@ export function MotoClubApplication() {
             </div>
           </div>
 
-          <button 
-            disabled={status !== 'idle'}
-            onClick={handleSendApplication}
-            className={cn(
-              "w-full py-6 text-white rounded-[2rem] font-black italic uppercase tracking-[0.3em] text-lg hover:scale-[1.03] active:scale-95 transition-all relative group overflow-hidden",
-              status === 'sent' 
-                ? "bg-green-600 shadow-[0_20px_50px_-10px_rgba(22,163,74,0.4)]" 
-                : "bg-gradient-to-r from-orange-700 to-orange-500 shadow-[0_20px_50px_-10px_rgba(255,85,0,0.4)]"
-            )}
-          >
-            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <span className="relative z-10 flex items-center justify-center gap-4">
-              {status === 'idle' && <>QUERO SER MEMBRO <Zap size={24} className="fill-white" /></>}
-              {status === 'sending' && <>ENVIANDO... <Clock size={24} className="animate-spin" /></>}
-              {status === 'sent' && <>SOLICITAÇÃO ENVIADA! <Check size={24} /></>}
-            </span>
-          </button>
+          {!isVip && (
+            <div className="p-5 rounded-3xl bg-slate-900/80 border border-orange-500/40 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-600/15 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0">
+                  <Lock size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-white">REQUISITO OBRIGATÓRIO: CONTA PRO</h4>
+                  <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Exclusivo para Membros VIP Pro</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                Para que o Moto Clube mantenha sua homologação oficial e o padrão de irmandade da comunidade, todos os membros devem ser assinantes Pro.
+              </p>
+            </div>
+          )}
+
+          {isVip ? (
+            <button 
+              disabled={status !== 'idle'}
+              onClick={handleSendApplication}
+              className={cn(
+                "w-full py-6 text-white rounded-[2rem] font-black italic uppercase tracking-[0.3em] text-lg hover:scale-[1.03] active:scale-95 transition-all relative group overflow-hidden cursor-pointer",
+                status === 'sent' 
+                  ? "bg-green-600 shadow-[0_20px_50px_-10px_rgba(22,163,74,0.4)]" 
+                  : "bg-gradient-to-r from-orange-700 to-orange-500 shadow-[0_20px_50px_-10px_rgba(255,85,0,0.4)]"
+              )}
+            >
+              <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <span className="relative z-10 flex items-center justify-center gap-4">
+                {status === 'idle' && <>QUERO SER MEMBRO <Zap size={24} className="fill-white" /></>}
+                {status === 'sending' && <>ENVIANDO... <Clock size={24} className="animate-spin" /></>}
+                {status === 'sent' && <>SOLICITAÇÃO ENVIADA! <Check size={24} /></>}
+              </span>
+            </button>
+          ) : (
+            <button 
+              type="button"
+              onClick={() => setIsUpgradeModalOpen(true)}
+              className="w-full btn-primary py-5 text-sm"
+            >
+              <Sparkles size={18} />
+              <span>ASSINAR PRO PARA SE CANDIDATAR</span>
+            </button>
+          )}
         </div>
 
       </div>
+
+      <UpgradeModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+        feature="membro_clube" 
+      />
     </div>
   );
 }

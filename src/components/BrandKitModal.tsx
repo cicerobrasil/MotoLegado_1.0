@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Download, Sparkles, Layers, Shield } from 'lucide-react';
+import { LogoMark } from './LogoMark';
 
 interface BrandKitModalProps {
   isOpen: boolean;
@@ -33,13 +34,13 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase rounded-full mb-2">
                 <Sparkles size={12} />
-                <span>Kit de Marca Oficial</span>
+                <span>Identidade Visual Oficial</span>
               </div>
               <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white">
-                BAIXAR EMBLEMA DO <span className="text-orange-500">MOTOLEGADO</span>
+                LOGO OFICIAL <span className="text-[#ff751f]">MOTOLEGADO</span>
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                Arquivos oficiais em altíssima resolução para camisetas, adesivos, redes sociais e gráficas.
+                Badge Azul (<code className="text-[#99c0ff]">#001b3d</code>) com caixa Salmão (<code className="text-[#ff751f]">#ff751f</code>), OTO em Branco (<code className="text-white">#ffffff</code>) e LEGADO em Salmão.
               </p>
             </div>
             <button
@@ -52,83 +53,71 @@ export const BrandKitModal: React.FC<BrandKitModalProps> = ({ isOpen, onClose })
 
           {/* Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-6">
-            {/* 1. Transparente (Camisetas, Adesivos, Canva) */}
-            <div className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col items-center text-center group hover:border-orange-500/40 transition-all">
-              <div className="w-32 h-32 rounded-2xl p-3 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:12px_12px] bg-slate-900/90 border border-slate-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                <img
-                  src="/motolegado-emblema-transparente-1024.png"
-                  alt="Emblema Fundo Transparente"
-                  className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.6)]"
-                />
+            {/* 1. Logo Horizontal Principal */}
+            <div className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col items-center text-center group hover:border-[#ff751f]/40 transition-all">
+              <div className="w-full h-32 rounded-2xl p-4 bg-slate-900/90 border border-slate-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                <LogoMark size="md" showGlow={false} />
               </div>
               <span className="text-xs font-black uppercase text-white flex items-center gap-1.5">
-                <Layers size={14} className="text-orange-400" />
-                Fundo Transparente (PNG)
+                <Layers size={14} className="text-[#ff751f]" />
+                Logo Horizontal (SVG / PNG)
               </span>
               <p className="text-[11px] text-slate-400 mt-1 mb-4 leading-relaxed">
-                Apenas o brasão puro. Perfeito para Canva, Photoshop, camisetas e adesivos.
+                Versão horizontal para websites, cabeçalhos, camisetas, adesivos de moto e banners.
               </p>
               <div className="mt-auto w-full space-y-2">
                 <button
                   type="button"
-                  onClick={() => downloadFile('/motolegado-emblema-transparente-2048.png', 'motolegado-emblema-transparente-2048.png')}
-                  className="w-full py-2.5 px-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-lg shadow-orange-600/20"
+                  onClick={() => downloadFile('/motolegado-logo.svg', 'motolegado-logo-oficial.svg')}
+                  className="w-full py-2.5 px-3 bg-[#ff751f] hover:bg-[#ff853a] text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-lg shadow-[#ff751f]/20"
                 >
                   <Download size={14} />
-                  <span>Baixar Ultra HD (2048px)</span>
+                  <span>Baixar Vetor SVG</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => downloadFile('/motolegado-emblema-transparente.svg', 'motolegado-emblema-vetor.svg')}
-                  className="w-full py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  onClick={() => downloadFile('/motolegado-logo-2048.png', 'motolegado-logo-2048.png')}
+                  className="w-full py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-colors"
                 >
-                  <Download size={13} />
-                  <span>Baixar Vetor SVG</span>
+                  <Download size={14} />
+                  <span>Baixar PNG HD (2048px)</span>
                 </button>
               </div>
             </div>
 
-            {/* 2. Com Placa / Badge Escura (Redes Sociais, Perfil) */}
-            <div className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col items-center text-center group hover:border-orange-500/40 transition-all">
-              <div className="w-32 h-32 rounded-2xl p-2 bg-slate-900 border border-slate-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+            {/* 2. Ícone Quadrado / App & Favicon */}
+            <div className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col items-center text-center group hover:border-[#ff751f]/40 transition-all">
+              <div className="w-32 h-32 rounded-2xl p-2 bg-slate-900 border border-slate-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform overflow-hidden">
                 <img
-                  src="/motolegado-emblema-1024.png"
-                  alt="Emblema Completo com Badge"
+                  src="/icon.svg"
+                  alt="Logo MotoLegado Quadrado"
                   className="w-full h-full object-contain rounded-xl shadow-lg"
                 />
               </div>
               <span className="text-xs font-black uppercase text-white flex items-center gap-1.5">
-                <Shield size={14} className="text-orange-400" />
-                Badge Completo (PNG)
+                <Shield size={14} className="text-blue-400" />
+                Ícone App / Favicon (SVG)
               </span>
               <p className="text-[11px] text-slate-400 mt-1 mb-4 leading-relaxed">
-                Com a placa escura de proteção e borda laranja. Ideal para fotos de perfil e posts.
+                Formato quadrado com cantos curvos para ícone de PWA, redes sociais e avatares.
               </p>
               <div className="mt-auto w-full space-y-2">
                 <button
                   type="button"
-                  onClick={() => downloadFile('/motolegado-emblema-2048.png', 'motolegado-emblema-badge-2048.png')}
+                  onClick={() => downloadFile('/icon.svg', 'motolegado-app-icon.svg')}
                   className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-colors"
                 >
                   <Download size={14} />
-                  <span>Baixar Ultra HD (2048px)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => downloadFile('/icon.svg', 'motolegado-badge-vetor.svg')}
-                  className="w-full py-2 px-3 bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                >
-                  <Download size={13} />
-                  <span>Baixar Vetor SVG</span>
+                  <span>Baixar SVG Quadrado</span>
                 </button>
               </div>
             </div>
           </div>
 
           {/* Footer note */}
-          <div className="p-3.5 rounded-xl bg-orange-950/20 border border-orange-500/20 text-center">
-            <p className="text-[11px] text-orange-300">
-              💡 <strong>Dica Pro:</strong> Use o arquivo <strong>SVG</strong> caso vá enviar para uma gráfica imprimir camisas, adesivos de vinil ou banners sem limite de tamanho.
+          <div className="p-3.5 rounded-xl bg-[#001b3d]/60 border border-[#ff751f]/30 text-center">
+            <p className="text-[11px] text-slate-200">
+              💡 <strong>Cores Oficiais da Marca:</strong> Salmão (<code className="text-[#ff751f] font-mono font-bold">#ff751f</code>), Azul (<code className="text-[#7bb0ff] font-mono font-bold">#001b3d</code>) e Branco (<code className="text-white font-mono font-bold">#ffffff</code>).
             </p>
           </div>
         </motion.div>

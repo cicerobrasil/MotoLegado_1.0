@@ -10,11 +10,15 @@ import {
   ShieldCheck, 
   Clock, 
   MoreVertical,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Lock,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
+import { isUserProOrBonificado } from '../lib/permissions';
+import { UpgradeModal } from './UpgradeModal';
 
 interface Post {
   id: string;
@@ -37,6 +41,8 @@ export function MotoClubMural() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const isVip = isUserProOrBonificado(profile);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [posts, setPosts] = useState<Post[]>(() => {
     const saved = localStorage.getItem('motolegado_mural_posts');
     if (saved) {
@@ -61,6 +67,11 @@ export function MotoClubMural() {
   };
 
   const handlePost = () => {
+    if (!isVip) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+
     if (!newPostContent.trim()) return;
     
     const newPost: Post = {
@@ -181,13 +192,23 @@ export function MotoClubMural() {
               <ImageIcon size={18} />
               <span className="text-[10px] font-black uppercase tracking-widest">Anexar Foto</span>
             </button>
-            <button 
-              onClick={handlePost}
-              disabled={!newPostContent.trim()}
-              className="flex items-center gap-3 px-8 py-3 bg-white text-black rounded-2xl font-black italic uppercase tracking-[0.2em] hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all shadow-xl"
-            >
-              Publicar <Send size={14} />
-            </button>
+            {isVip ? (
+              <button 
+                onClick={handlePost}
+                disabled={!newPostContent.trim()}
+                className="flex items-center gap-3 px-8 py-3 bg-white text-black rounded-2xl font-black italic uppercase tracking-[0.2em] hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all shadow-xl"
+              >
+                Publicar <Send size={14} />
+              </button>
+            ) : (
+              <button 
+                onClick={() => setIsUpgradeModalOpen(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl font-black italic uppercase tracking-[0.15em] text-xs transition-all shadow-lg shadow-orange-600/20"
+              >
+                <Lock size={14} />
+                <span>Publicar (Exclusivo Pro)</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -272,6 +293,12 @@ export function MotoClubMural() {
           }))}
         </div>
       </div>
+
+      <UpgradeModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+        feature="membro_clube" 
+      />
     </div>
   );
 }

@@ -609,7 +609,7 @@ export function ProfileDashboard() {
                   className={cn(
                     "px-2.5 sm:px-3 py-1.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
                     achievementFilter === tab.id
-                      ? "bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20"
+                      ? "bg-orange-600 text-white font-black shadow-md shadow-orange-600/20"
                       : "text-slate-400 hover:text-white"
                   )}
                 >

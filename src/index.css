@@ -1,28 +1,57 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;600;800&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* MotoLegado Official Palette */
+  --color-slate-950: #001b3d; /* Fundo principal */
+  --color-slate-900: #00273d; /* Cards e Sidebar */
+  --color-slate-850: #002235; /* Containers internos de cards */
+  --color-slate-800: #1e293b; /* Bordas e inputs */
+  --color-slate-700: #1e293b; /* Bordas e inputs */
+  --color-slate-600: #334155;
+  --color-slate-500: #64748b;
+  --color-slate-400: #94a3b8;
+  --color-slate-300: #cbd5e1;
+  --color-slate-200: #e2e8f0; /* chrome: Texto principal e detalhes metálicos */
+  --color-slate-100: #f1f5f9;
+
+  --color-orange-400: #ff8b42;
+  --color-orange-500: #ff751f; /* Cor de destaque, ícones ativos, botões primários */
+  --color-orange-600: #ff751f; /* Cor de destaque e botões primários */
+  --color-orange-700: #e65100; /* Hover e progressão */
+  --color-orange-800: #cc4800;
+
+  --color-motolegado-bg: #001b3d;
+  --color-motolegado-card: #00273d;
+  --color-motolegado-border: #1e293b;
+  --color-motolegado-accent: #ff751f;
+  --color-motolegado-hover: #e65100;
+  --color-motolegado-chrome: #e2e8f0;
 }
 
 :root {
-  --bg-primary: #020408;
-  --bg-secondary: #0a0e17;
-  --text-primary: #ffffff;
-  --text-secondary: #64748b; /* slate-500 */
-  --accent-orange: #ff5500;
-  --accent-blue: #3b82f6;
-  --border-muted: #1e293b; /* slate-800 */
+  --bg-primary: #001b3d; /* Fundo principal */
+  --bg-secondary: #00273d; /* Cards e Sidebar */
+  --bg-card: #00273d;
+  --bg-sidebar: #00273d;
+  --text-primary: #e2e8f0; /* chrome: Texto principal e detalhes metálicos */
+  --text-secondary: #94a3b8;
+  --accent-orange: #ff751f; /* Cor de destaque, ícones ativos, botões primários */
+  --accent-orange-hover: #e65100; /* Hover e progressão */
+  --accent-blue: #00273d;
+  --border-muted: #1e293b; /* Bordas e inputs */
+  --border-input: #1e293b;
 }
 
 @layer base {
   body {
     background-color: var(--bg-primary);
     background-image: 
-      radial-gradient(circle at 50% -20%, rgba(59, 130, 246, 0.05), transparent 50%),
-      radial-gradient(circle at 0% 0%, rgba(255, 85, 0, 0.02), transparent 30%);
+      radial-gradient(circle at 50% -20%, rgba(0, 39, 61, 0.4), transparent 60%),
+      radial-gradient(circle at 100% 100%, rgba(255, 117, 31, 0.04), transparent 40%);
     color: var(--text-primary);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
@@ -30,28 +59,605 @@
   }
 }
 
+/* =========================================================
+   ACCESSIBILITY: UNIVERSAL FONT SCALING & READABILITY BOOST
+   Eliminates micro-fonts (9px, 10px) that cause eye fatigue
+   ========================================================= */
+
+/* Boost micro text to at least 12px with readable line-height */
+.text-\[9px\] {
+  font-size: 0.75rem !important; /* 12px */
+  line-height: 1.1rem !important;
+}
+
+.text-\[10px\] {
+  font-size: 0.8125rem !important; /* 13px */
+  line-height: 1.15rem !important;
+}
+
+.text-\[8px\] {
+  font-size: 0.75rem !important; /* 12px */
+  line-height: 1.1rem !important;
+}
+
+/* Dark mode text contrast improvement */
+:root:not(.theme-light) .text-slate-500 {
+  color: #94a3b8 !important; /* Elevate low contrast slate-500 to slate-400 */
+}
+
+:root:not(.theme-light) .text-slate-600 {
+  color: #cbd5e1 !important; /* Elevate slate-600 to slate-300 */
+}
+
+/* Dynamic Font Scaling: Large */
+html.font-large {
+  font-size: 114%;
+}
+
+html.font-large .text-\[9px\],
+html.font-large .text-\[10px\] {
+  font-size: 0.85rem !important;
+}
+
+/* Dynamic Font Scaling: Extra Large */
+html.font-xlarge {
+  font-size: 128%;
+}
+
+html.font-xlarge .text-\[9px\],
+html.font-xlarge .text-\[10px\] {
+  font-size: 0.95rem !important;
+}
+
+/* =========================================================
+   ACCESSIBILITY: LIGHT THEME (MODO DIURNO / SOL FORTE)
+   High visibility in bright daylight or for riders outdoors
+   ========================================================= */
+
+html.theme-light {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --border-muted: #cbd5e1;
+}
+
+html.theme-light body {
+  background-color: #f8fafc !important;
+  background-image: radial-gradient(circle at 50% -20%, rgba(249, 115, 22, 0.05), transparent 50%) !important;
+  color: #0f172a !important;
+}
+
+html.theme-light .bento-card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08) !important;
+  color: #0f172a !important;
+}
+
+html.theme-light .bento-card:hover {
+  border-color: #f97316 !important;
+  box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.12) !important;
+}
+
+/* Map dark backgrounds to clean, crisp light surfaces */
+html.theme-light .bg-slate-950,
+html.theme-light .bg-slate-950\/95,
+html.theme-light .bg-slate-950\/90,
+html.theme-light .bg-slate-950\/80,
+html.theme-light .bg-slate-950\/60,
+html.theme-light .bg-slate-950\/40,
+html.theme-light .bg-slate-950\/20 {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html.theme-light .bg-slate-900,
+html.theme-light .bg-slate-900\/95,
+html.theme-light .bg-slate-900\/90,
+html.theme-light .bg-slate-900\/80,
+html.theme-light .bg-slate-900\/70,
+html.theme-light .bg-slate-900\/60,
+html.theme-light .bg-slate-900\/50,
+html.theme-light .bg-slate-900\/40,
+html.theme-light .bg-slate-900\/30,
+html.theme-light .bg-slate-900\/20,
+html.theme-light .bg-slate-900\/10 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Fix for dark badges, pills, and secondary buttons (e.g., 'Em Progresso') */
+html.theme-light .bg-slate-800,
+html.theme-light .bg-slate-800\/90,
+html.theme-light .bg-slate-800\/80,
+html.theme-light .bg-slate-800\/70,
+html.theme-light .bg-slate-800\/60,
+html.theme-light .bg-slate-800\/50,
+html.theme-light .bg-slate-800\/40,
+html.theme-light .bg-slate-850,
+html.theme-light .bg-slate-700 {
+  background-color: #e2e8f0 !important; /* light crisp slate */
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Borders */
+html.theme-light .border-slate-900,
+html.theme-light .border-slate-800,
+html.theme-light .border-slate-800\/80,
+html.theme-light .border-slate-800\/60,
+html.theme-light .border-slate-800\/50,
+html.theme-light .border-slate-800\/40,
+html.theme-light .border-slate-700,
+html.theme-light .border-slate-700\/60,
+html.theme-light .border-slate-700\/50 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Typography Contrast: Dark text on light background */
+html.theme-light .text-white {
+  color: #0f172a !important; /* Deep Slate 900 */
+}
+
+html.theme-light .text-slate-100,
+html.theme-light .text-slate-200,
+html.theme-light .text-slate-300 {
+  color: #1e293b !important; /* Slate 800 */
+}
+
+html.theme-light .text-slate-400 {
+  color: #475569 !important; /* Slate 600 - High contrast WCAG AAA */
+}
+
+html.theme-light .text-slate-500 {
+  color: #334155 !important; /* Slate 700 */
+}
+
+html.theme-light .text-slate-600 {
+  color: #1e293b !important; /* Slate 800 */
+}
+
+/* Colored typography in light mode: boost saturation and darken for readability */
+html.theme-light .text-orange-400 {
+  color: #c2410c !important; /* Orange 700 - Deep, readable on white */
+}
+
+html.theme-light .text-orange-500 {
+  color: #ea580c !important; /* Orange 600 */
+}
+
+html.theme-light .text-amber-400,
+html.theme-light .text-yellow-400 {
+  color: #b45309 !important; /* Amber 700 */
+}
+
+html.theme-light .text-amber-500,
+html.theme-light .text-yellow-500 {
+  color: #92400e !important; /* Amber 800 */
+}
+
+html.theme-light .text-emerald-400 {
+  color: #047857 !important; /* Emerald 700 */
+}
+
+html.theme-light .text-emerald-500 {
+  color: #059669 !important; /* Emerald 600 */
+}
+
+html.theme-light .text-blue-400 {
+  color: #1d4ed8 !important; /* Blue 700 */
+}
+
+html.theme-light .text-blue-500 {
+  color: #2563eb !important; /* Blue 600 */
+}
+
+html.theme-light .text-cyan-400 {
+  color: #0e7490 !important; /* Cyan 700 */
+}
+
+html.theme-light .text-purple-400 {
+  color: #6d28d9 !important; /* Purple 700 */
+}
+
+html.theme-light .text-red-400 {
+  color: #b91c1c !important; /* Red 700 */
+}
+
+/* Colored accent badges and status pills in light mode */
+html.theme-light .bg-orange-600\/20,
+html.theme-light .bg-orange-500\/10,
+html.theme-light .bg-orange-500\/15,
+html.theme-light .bg-orange-500\/20,
+html.theme-light .bg-orange-600\/10 {
+  background-color: #fff7ed !important; /* Orange 50 */
+  border-color: #fed7aa !important; /* Orange 200 */
+  color: #c2410c !important; /* Orange 700 */
+}
+
+html.theme-light .bg-emerald-500\/15,
+html.theme-light .bg-emerald-500\/10,
+html.theme-light .bg-emerald-500\/20 {
+  background-color: #ecfdf5 !important; /* Emerald 50 */
+  border-color: #a7f3d0 !important; /* Emerald 200 */
+  color: #047857 !important; /* Emerald 700 */
+}
+
+html.theme-light .bg-amber-500\/10,
+html.theme-light .bg-amber-500\/15,
+html.theme-light .bg-amber-500\/20 {
+  background-color: #fffbeb !important; /* Amber 50 */
+  border-color: #fde68a !important; /* Amber 200 */
+  color: #b45309 !important; /* Amber 700 */
+}
+
+html.theme-light .bg-blue-500\/10,
+html.theme-light .bg-blue-500\/15,
+html.theme-light .bg-blue-500\/20 {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1d4ed8 !important;
+}
+
+html.theme-light .bg-emerald-950,
+html.theme-light .bg-emerald-950\/90,
+html.theme-light .bg-emerald-950\/80 {
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+  color: #065f46 !important;
+}
+
+html.theme-light .bg-rose-950,
+html.theme-light .bg-rose-950\/90,
+html.theme-light .bg-red-950,
+html.theme-light .bg-red-950\/90 {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+  color: #9f1239 !important;
+}
+
+html.theme-light .bg-amber-950,
+html.theme-light .bg-amber-950\/90 {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #92400e !important;
+}
+
+/* Prevent excessive dimming of locked items in light mode */
+html.theme-light .opacity-60 {
+  opacity: 0.88 !important;
+}
+
+/* Form controls */
+html.theme-light input,
+html.theme-light select,
+html.theme-light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.theme-light input::placeholder,
+html.theme-light textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Sidebar and Mobile Header in light mode */
+html.theme-light aside {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.theme-light header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.theme-light nav.fixed.bottom-0 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Hover highlights in light mode */
+html.theme-light .hover\:text-white:hover {
+  color: #ea580c !important;
+}
+
+html.theme-light .hover\:bg-slate-800:hover {
+  background-color: #e2e8f0 !important;
+}
+
+html.theme-light .hover\:bg-slate-700:hover {
+  background-color: #cbd5e1 !important;
+}
+
+/* =========================================================
+   LIGHT THEME: CARDS WITH DARK GRADIENTS & PRICING
+   ========================================================= */
+
+/* Fix any container/card that has dark gradient backgrounds in light mode */
+html.theme-light div:not(.absolute)[class*="from-orange-950"],
+html.theme-light div:not(.absolute)[class*="from-amber-950"],
+html.theme-light div:not(.absolute)[class*="from-slate-900"][class*="to-slate-950"],
+html.theme-light header[class*="from-amber-950"] {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Specific styling for the PRO pricing card in light mode */
+html.theme-light .pricing-card-pro {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  border: 2px solid #ea580c !important;
+  box-shadow: 0 20px 45px -10px rgba(234, 88, 12, 0.18), 0 0 0 1px rgba(234, 88, 12, 0.15) !important;
+}
+
+html.theme-light .pricing-card-pro .pro-subtitle {
+  color: #475569 !important; /* Slate 600 - clear high contrast */
+}
+
+html.theme-light .pricing-card-pro .pro-feature-item {
+  color: #0f172a !important; /* Slate 900 - bold dark text on white */
+}
+
+html.theme-light .pricing-card-pro .border-orange-500\/30 {
+  border-color: #fed7aa !important; /* Orange 200 divider */
+}
+
+html.theme-light .comparison-table-container {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.theme-light .comparison-table-container th {
+  color: #475569 !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.theme-light .comparison-table-container td {
+  border-color: #f1f5f9 !important;
+}
+
+html.theme-light .comparison-item-name {
+  color: #0f172a !important;
+}
+
+/* =========================================================
+   MOTOLEGADO OFFICIAL LOGO BADGE (AZUL #001b3d + SALMÃO #ff751f + BRANCO #ffffff)
+   ========================================================= */
+
+.motolegado-badge,
+html.theme-light .motolegado-badge,
+html.theme-high-contrast .motolegado-badge {
+  background-color: #001b3d !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.motolegado-m-box,
+html.theme-light .motolegado-m-box,
+html.theme-high-contrast .motolegado-m-box {
+  background-color: #ff751f !important;
+  color: #001b3d !important;
+}
+
+.motolegado-oto,
+html.theme-light .motolegado-oto,
+html.theme-high-contrast .motolegado-oto {
+  color: #ffffff !important;
+}
+
+.motolegado-legado,
+html.theme-light .motolegado-legado,
+html.theme-high-contrast .motolegado-legado {
+  color: #ff751f !important;
+}
+
+/* =========================================================
+   ACCESSIBILITY: HIGH CONTRAST MODE & CONTRAST BOOST
+   ========================================================= */
+
+html.theme-high-contrast {
+  --bg-primary: #000000;
+  --bg-secondary: #000000;
+  --text-primary: #ffffff;
+  --text-secondary: #f8fafc;
+  --border-muted: #f97316;
+}
+
+html.theme-high-contrast body {
+  background-color: #000000 !important;
+  background-image: none !important;
+  color: #ffffff !important;
+}
+
+html.theme-high-contrast .bento-card,
+html.theme-high-contrast .bg-slate-900,
+html.theme-high-contrast .bg-slate-950 {
+  background-color: #000000 !important;
+  border-color: #ffffff !important;
+  border-width: 2px !important;
+  color: #ffffff !important;
+}
+
+html.theme-high-contrast .text-slate-400,
+html.theme-high-contrast .text-slate-500,
+html.theme-high-contrast .text-slate-600 {
+  color: #f1f5f9 !important;
+  font-weight: 600 !important;
+}
+
+html.contrast-boost .border-slate-800,
+html.contrast-boost .border-slate-700 {
+  border-color: #ea580c !important;
+  border-width: 1.5px !important;
+}
+
+html.contrast-boost .text-slate-400,
+html.contrast-boost .text-slate-500 {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+/* =========================================================
+   MOTOLEGADO BRAND SYSTEM (CSS RULES)
+   - Fundo principal: #001b3d
+   - Cards e Sidebar: #00273d
+   - Bordas e inputs: #1e293b
+   - Cor de destaque, ícones ativos, botões primários: #ff751f
+   - Hover e progressão: #e65100
+   - chrome: Texto principal e detalhes metálicos: #e2e8f0
+   ========================================================= */
+
+:root:not(.theme-light) {
+  /* Fundo principal = #001b3d */
+  .bg-slate-950,
+  .bg-slate-950\/95,
+  .bg-slate-950\/90,
+  .bg-slate-950\/80,
+  .bg-slate-950\/70,
+  .bg-slate-950\/60,
+  .bg-slate-950\/50,
+  .bg-slate-950\/40,
+  .bg-slate-950\/20 {
+    background-color: #001b3d !important;
+  }
+
+  /* Cards e Sidebar = #00273d */
+  aside,
+  .sidebar-container,
+  .bento-card,
+  .bg-slate-900,
+  .bg-slate-900\/95,
+  .bg-slate-900\/90,
+  .bg-slate-900\/80,
+  .bg-slate-900\/70,
+  .bg-slate-900\/60,
+  .bg-slate-900\/50,
+  .bg-slate-900\/40,
+  .bg-slate-900\/30,
+  .bg-slate-900\/20,
+  .bg-slate-850 {
+    background-color: #00273d !important;
+  }
+
+  /* Bordas e inputs = #1e293b */
+  .border-slate-950,
+  .border-slate-900,
+  .border-slate-800,
+  .border-slate-800\/80,
+  .border-slate-800\/60,
+  .border-slate-800\/50,
+  .border-slate-800\/40,
+  .border-slate-700,
+  .border-slate-700\/60,
+  .border-slate-700\/50 {
+    border-color: #1e293b !important;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    background-color: #001b3d !important;
+    border-color: #1e293b !important;
+    color: #e2e8f0 !important;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: #ff751f !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(255, 117, 31, 0.25) !important;
+  }
+
+  /* Cor de destaque, ícones ativos, botões primários = #ff751f */
+  .text-orange-500,
+  .text-orange-400 {
+    color: #ff751f !important;
+  }
+
+  .bg-orange-500,
+  .bg-orange-600 {
+    background-color: #ff751f !important;
+  }
+
+  .border-orange-500,
+  .border-orange-600 {
+    border-color: #ff751f !important;
+  }
+
+  /* Hover e progressão = #e65100 */
+  button.bg-orange-500:hover,
+  button.bg-orange-600:hover,
+  a.bg-orange-500:hover,
+  a.bg-orange-600:hover,
+  .hover\:bg-orange-500:hover,
+  .hover\:bg-orange-600:hover,
+  .hover\:bg-orange-700:hover {
+    background-color: #e65100 !important;
+  }
+
+  .hover\:border-orange-500:hover,
+  .hover\:border-orange-600:hover {
+    border-color: #e65100 !important;
+  }
+
+  .hover\:text-orange-400:hover,
+  .hover\:text-orange-500:hover {
+    color: #e65100 !important;
+  }
+
+  /* Progressão (barras de progresso e medidores) = #e65100 */
+  progress,
+  [role="progressbar"],
+  .progress-bar,
+  .bg-progress {
+    background-color: #e65100 !important;
+  }
+
+  /* chrome: Texto principal e detalhes metálicos = #e2e8f0 */
+  .text-white,
+  .text-slate-100,
+  .text-slate-200 {
+    color: #e2e8f0 !important;
+  }
+
+  .chrome-gradient {
+    background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 45%, #cbd5e1 75%, #94a3b8 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+  }
+}
+
+/* Card & Effects base */
 .bento-card {
-  background: rgba(15, 23, 42, 0.4);
+  background: #00273d;
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(30, 41, 59, 0.6);
+  border: 1px solid #1e293b;
   border-radius: 1.5rem;
   padding: 1.5rem;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 24px -4px rgba(0, 15, 35, 0.5);
+  color: #e2e8f0;
 }
 
 .bento-card:hover {
-  border-color: rgba(59, 130, 246, 0.3);
+  border-color: #ff751f;
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7), 0 0 15px rgba(59, 130, 246, 0.05);
+  box-shadow: 0 12px 30px -10px rgba(0, 15, 35, 0.7), 0 0 15px rgba(255, 117, 31, 0.12);
 }
 
 .orange-glow {
-  box-shadow: 0 0 30px rgba(255, 85, 0, 0.2);
+  box-shadow: 0 0 30px rgba(255, 117, 31, 0.25);
 }
 
 .blue-glow {
-  box-shadow: 0 0 30px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 30px rgba(0, 39, 61, 0.3);
 }
 
 .font-black-italic {
@@ -60,27 +666,161 @@
   text-transform: uppercase;
 }
 
+/* =========================================================
+   STANDARDIZED BUTTON SYSTEM - MOTOLEGADO
+   Modeled after "+ CRIAR ROTEIRO AGORA" (/routes)
+   Orange-600 background, white text, bold italic typography,
+   clean pill/rounded-xl border, rich shadow, and scale hover
+   ========================================================= */
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.5rem;
+  border-radius: 0.75rem;
+  background-color: #ea580c;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(251, 146, 60, 0.25);
+  box-shadow: 0 10px 20px -3px rgba(234, 88, 12, 0.3);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-primary:hover {
+  background-color: #f97316;
+  border-color: rgba(251, 146, 60, 0.5);
+  color: #ffffff;
+  transform: scale(1.05) translateY(-1px);
+  box-shadow: 0 14px 28px -4px rgba(249, 115, 22, 0.4);
+}
+
+.btn-primary:active {
+  transform: scale(0.95);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.5rem;
+  border-radius: 0.75rem;
+  background-color: #00273d;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid #1e293b;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-secondary:hover {
+  background-color: #001b3d;
+  color: #ffffff;
+  border-color: #ea580c;
+  transform: scale(1.03) translateY(-1px);
+}
+
+.btn-secondary:active {
+  transform: scale(0.95);
+}
+
+.btn-filter-active {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  background-color: #ea580c;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid #ea580c;
+  box-shadow: 0 6px 16px -3px rgba(234, 88, 12, 0.35);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-filter-active:hover {
+  background-color: #f97316;
+  border-color: #f97316;
+  color: #ffffff;
+  transform: scale(1.03);
+}
+
+.btn-filter-inactive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  background-color: #00273d;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid #1e293b;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-filter-inactive:hover {
+  background-color: #001b3d;
+  color: #ffffff;
+  border-color: #ea580c;
+  transform: scale(1.02);
+}
+
 .chrome-gradient {
-  background: linear-gradient(to bottom right, #e4e4e7, #71717a);
+  background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 45%, #cbd5e1 75%, #94a3b8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
+.chrome-border {
+  border-color: #e2e8f0 !important;
+}
+
+.chrome-detail {
+  color: #e2e8f0 !important;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-primary);
+  background: #001b3d;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-muted);
+  background: #1e293b;
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: #ff751f;
 }
 
 /* Autofill styling override */
@@ -88,7 +828,7 @@ input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px #020617 inset !important; /* bg-slate-950 */
-  -webkit-text-fill-color: white !important;
+  -webkit-box-shadow: 0 0 0 1000px #001b3d inset !important;
+  -webkit-text-fill-color: #e2e8f0 !important;
   transition: background-color 5000s ease-in-out 0s;
 }
