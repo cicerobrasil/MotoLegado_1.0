@@ -59,7 +59,7 @@ export function Feed() {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showImageUrlInput, setShowImageUrlInput] = useState(false);
   const [imageUrlText, setImageUrlText] = useState("");
-  const [authorName, setAuthorName] = useState(profile?.name || "");
+  const authorName = profile?.name || "Você (Piloto Motolegado)";
   
   // Modals & Feedback
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -326,7 +326,7 @@ export function Feed() {
   });
 
   return (
-    <div className="p-4 sm:p-8 max-w-4xl mx-auto space-y-8 bg-slate-950 min-h-screen pb-32">
+    <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto space-y-6 sm:space-y-8 bg-slate-950 min-h-screen pb-32">
       
       {/* Toast Notification */}
       <AnimatePresence>
@@ -346,7 +346,7 @@ export function Feed() {
       {/* HEADER */}
       <header className="border-b border-slate-800/80 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl sm:text-5xl font-black italic uppercase tracking-tighter text-white">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-white">
             COMUNIDADE <span className="text-[#ff751f]">MOTOLEGADO</span>
           </h1>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.25em] mt-2 flex items-center gap-2">
@@ -356,11 +356,12 @@ export function Feed() {
         </div>
 
         {/* Feed View Switcher */}
-        <div className="flex items-center gap-2 bg-[#001b3d] p-1.5 rounded-2xl border border-[#1e293b] self-start md:self-auto">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-[#001b3d] p-1.5 rounded-2xl border border-[#1e293b] w-full sm:w-auto">
           <button
             onClick={() => setFeedViewTab('mural')}
             className={cn(
-              feedViewTab === 'mural' ? "btn-filter-active" : "btn-filter-inactive"
+              feedViewTab === 'mural' ? "btn-filter-active" : "btn-filter-inactive",
+              "flex-1 sm:flex-initial text-center justify-center"
             )}
           >
             <Sparkles size={14} /> Mural da Comunidade ({approvedPosts.length})
@@ -370,7 +371,7 @@ export function Feed() {
             onClick={() => setFeedViewTab('meus_posts')}
             className={cn(
               feedViewTab === 'meus_posts' ? "btn-filter-active" : "btn-filter-inactive",
-              "relative"
+              "flex-1 sm:flex-initial text-center justify-center relative"
             )}
           >
             <Clock size={14} /> Em Moderação
@@ -384,16 +385,16 @@ export function Feed() {
       </header>
 
       {/* 1. CADASTRO DE POST / CRIAR PUBLICAÇÃO */}
-      <div className="bg-slate-900/60 border border-slate-800/90 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl relative overflow-hidden">
+      <div className="bg-slate-900/60 border border-slate-800/90 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6 shadow-xl relative overflow-hidden">
         
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-4">
           <div className="flex items-center gap-2">
             <Plus size={18} className="text-amber-500" />
             <h3 className="text-sm font-black italic uppercase text-white tracking-wider">
               CRIAR NOVA PUBLICAÇÃO NA COMUNIDADE
             </h3>
           </div>
-          <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[9px] font-black uppercase rounded-full flex items-center gap-1">
+          <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[9px] font-black uppercase rounded-full flex items-center gap-1 self-start sm:self-auto">
             <ShieldCheck size={12} /> Moderação Prévia Requerida
           </span>
         </div>
@@ -636,7 +637,6 @@ export function Feed() {
           displayedPosts.map((post) => {
             const isPending = post.status === 'pendente';
             const isRejected = post.status === 'rejeitado';
-            const isApproved = post.status === 'aprovado' || !post.status;
             const isLiked = !!likedPosts[post.id];
             const isCommentsExpanded = !!expandedComments[post.id];
 

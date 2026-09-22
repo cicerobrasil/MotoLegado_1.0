@@ -13,7 +13,6 @@ import {
   Calendar, 
   AlertTriangle, 
   Search, 
-  Filter, 
   Plus, 
   UserCheck, 
   UserX,
@@ -41,7 +40,6 @@ import {
   Gift,
   Crown,
   Users,
-  Zap,
   Check,
   List,
   LayoutGrid,
@@ -174,7 +172,6 @@ export function CommandCenter() {
   const [clubRequests, setClubRequests] = useState<ClubModerationRequest[]>([]);
   const [clubSearchText, setClubSearchText] = useState('');
   const [clubStatusFilter, setClubStatusFilter] = useState<'todos' | 'pendentes' | 'aprovados' | 'rejeitados'>('todos');
-  const [clubTypeFilter, setClubTypeFilter] = useState<'todos' | 'criacao' | 'filiacao'>('todos');
   const [viewingClub, setViewingClub] = useState<ClubModerationRequest | null>(null);
   const [editingClub, setEditingClub] = useState<ClubModerationRequest | null>(null);
   const [deleteConfirmClub, setDeleteConfirmClub] = useState<ClubModerationRequest | null>(null);
@@ -205,10 +202,6 @@ export function CommandCenter() {
   const [deleteConfirmPost, setDeleteConfirmPost] = useState<CommunityPost | null>(null);
   const [rejectionModalPost, setRejectionModalPost] = useState<CommunityPost | null>(null);
   const [postRejectionReason, setPostRejectionReason] = useState('');
-
-  // Telemetria State
-  const [telemetriaSearchText, setTelemetriaSearchText] = useState('');
-  const [telemetriaCategoryFilter, setTelemetriaCategoryFilter] = useState<'todos' | 'homologacoes' | 'eventos' | 'clubes' | 'feed'>('todos');
 
   // Partners Requests State
   const [partnerRequests, setPartnerRequests] = useState<PartnerRequest[]>([]);
@@ -1193,15 +1186,15 @@ export function CommandCenter() {
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 bg-slate-950 min-h-screen text-slate-100 pb-32">
+    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8 bg-slate-950 min-h-screen text-slate-100 pb-32">
       
       {/* HEADER BANNER */}
-      <header className="relative bg-gradient-to-r from-amber-950/60 via-slate-900 to-slate-950 border border-amber-500/40 rounded-3xl p-6 md:p-10 overflow-hidden shadow-2xl">
+      <header className="relative bg-gradient-to-r from-amber-950/60 via-slate-900 to-slate-950 border border-amber-500/40 rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-10 overflow-hidden shadow-2xl">
         <div className="absolute -right-10 -bottom-10 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <span className="px-3.5 py-1.5 bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[10px] font-black uppercase rounded-full tracking-widest flex items-center gap-2">
                 <ShieldCheck size={14} className="text-amber-400" />
                 SISTEMA CENTRAL DE MODERAÇÃO & CONTROLE
@@ -1225,7 +1218,7 @@ export function CommandCenter() {
               )}
             </div>
 
-            <h1 className="text-3xl md:text-5xl font-black italic uppercase tracking-tight text-white drop-shadow-md">
+            <h1 className="text-2xl sm:text-3xl md:text-5xl font-black italic uppercase tracking-tight text-white drop-shadow-md">
               CENTRO DE <span className="text-[#ff751f]">COMANDO</span>
             </h1>
 
@@ -1235,9 +1228,9 @@ export function CommandCenter() {
           </div>
 
           {/* Quick summary badge */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="bg-slate-950/80 border border-amber-500/30 p-5 rounded-2xl flex items-center gap-4 shadow-inner">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-xl">
+          <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto">
+            <div className="bg-slate-950/80 border border-amber-500/30 p-4 sm:p-5 rounded-2xl flex items-center gap-4 shadow-inner w-full sm:w-auto">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-xl shrink-0">
                 {totalPendingAll}
               </div>
               <div>
@@ -1270,7 +1263,7 @@ export function CommandCenter() {
       </AnimatePresence>
 
       {/* STATS OVERVIEW CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
         <button 
           onClick={() => setActiveTab('eventos')}
           className={cn(
@@ -3193,7 +3186,6 @@ export function CommandCenter() {
                   {displayedPilots.map(pilot => {
                     const isBonificado = pilot.plan_type === 'bonificado';
                     const isPro = pilot.plan_type === 'pago' || (pilot.is_pro && !isBonificado && pilot.role !== 'admin');
-                    const isGratuito = !isBonificado && !isPro && pilot.role !== 'admin';
                     const isSelf = pilot.id === profile?.id || pilot.email === profile?.email;
 
                     return (

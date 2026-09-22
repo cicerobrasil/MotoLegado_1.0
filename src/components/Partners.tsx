@@ -2,7 +2,6 @@ import { useState, useEffect, FormEvent, ChangeEvent, useRef } from 'react';
 import { 
   Store, 
   MapPin, 
-  Tag, 
   Search, 
   Plus, 
   X, 
@@ -30,7 +29,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
@@ -104,7 +102,6 @@ export function Partners() {
   const isVip = isUserProOrBonificado(profile);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
-  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [activeTab, setActiveTab] = useState<'browse' | 'register'>('browse');
@@ -127,10 +124,6 @@ export function Partners() {
   const [formImage, setFormImage] = useState(PRESETS_IMAGE[0]);
   const [formManagerName, setFormManagerName] = useState('');
   const [formManagerPhone, setFormManagerPhone] = useState('');
-
-  // Mural State inside Details Modal
-  const [newMuralContent, setNewMuralContent] = useState('');
-  const [newMuralType, setNewMuralType] = useState<'announcement' | 'review' | 'checkin' | 'general'>('general');
 
   // Sync with localStorage
   useEffect(() => {
@@ -182,47 +175,6 @@ export function Partners() {
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  const handleAddMuralPost = () => {
-    if (!selectedPartner || !newMuralContent.trim()) return;
-
-    const newPost: PartnerPost = {
-      id: 'post_' + Date.now(),
-      author: {
-        name: "Piloto Convidado",
-        photo: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&q=80&w=200",
-        role: "Membro da Comunidade",
-        isOwner: false
-      },
-      type: newMuralType,
-      content: newMuralContent.trim(),
-      timestamp: "Agora mesmo",
-      likes: 0
-    };
-
-    const updatedPosts = [newPost, ...(selectedPartner.posts || [])];
-    const updatedPartner = { ...selectedPartner, posts: updatedPosts };
-
-    setSelectedPartner(updatedPartner);
-    const updatedList = partners.map(p => p.id === selectedPartner.id ? updatedPartner : p);
-    savePartners(updatedList);
-    setNewMuralContent('');
-    triggerToast("Sua publicação foi adicionada ao mural!", "success");
-  };
-
-  const handleLikeMuralPost = (postId: string) => {
-    if (!selectedPartner) return;
-    const updatedPosts = (selectedPartner.posts || []).map(p => {
-      if (p.id === postId) {
-        return { ...p, likes: p.likes + 1 };
-      }
-      return p;
-    });
-    const updatedPartner = { ...selectedPartner, posts: updatedPosts };
-    setSelectedPartner(updatedPartner);
-    const updatedList = partners.map(p => p.id === selectedPartner.id ? updatedPartner : p);
-    savePartners(updatedList);
   };
 
   const handleRegisterPartner = (e: FormEvent) => {
@@ -296,18 +248,6 @@ export function Partners() {
     
     // Switch back to view list
     setActiveTab('browse');
-  };
-
-  const handleToggleHighlight = (id: string) => {
-    const updated = partners.map(p => {
-      if (p.id === id) {
-        const nextState = !p.highlight;
-        triggerToast(`Status do parceiro atualizado! Destaque: ${nextState ? "ATIVADO" : "DESATIVADO"}`, "success");
-        return { ...p, highlight: nextState };
-      }
-      return p;
-    });
-    savePartners(updated);
   };
 
   // Filter strategy - Only show approved/homologated partners to the public
@@ -423,11 +363,12 @@ export function Partners() {
             className="space-y-6"
           >
             {/* Search and Category filters */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-900/10 p-4 border border-slate-800/40 rounded-3xl backdrop-blur-sm">
-              <div className="flex flex-wrap gap-2 overflow-x-auto w-full md:w-auto">
+            <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-slate-900/10 p-3 sm:p-4 border border-slate-800/40 rounded-2xl sm:rounded-3xl backdrop-blur-sm">
+              <div className="flex flex-nowrap sm:flex-wrap gap-2 overflow-x-auto w-full md:w-auto pb-1 sm:pb-0 scrollbar-none">
                 <button
                   onClick={() => setSelectedCategory('Todos')}
                   className={cn(
+                    "whitespace-nowrap shrink-0",
                     selectedCategory === 'Todos' ? "btn-filter-active" : "btn-filter-inactive"
                   )}
                 >
@@ -438,6 +379,7 @@ export function Partners() {
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
                     className={cn(
+                      "whitespace-nowrap shrink-0",
                       selectedCategory === cat ? "btn-filter-active" : "btn-filter-inactive"
                     )}
                   >
@@ -446,7 +388,7 @@ export function Partners() {
                 ))}
               </div>
 
-              <div className="relative group w-full md:w-80">
+              <div className="relative group w-full md:w-80 shrink-0">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" size={16} />
                 <input 
                   type="text" 
@@ -459,7 +401,7 @@ export function Partners() {
             </div>
 
             {/* List GRID */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
               {filtered.map((pt) => (
                 <motion.div
                   key={pt.id}
@@ -654,7 +596,7 @@ export function Partners() {
             className="grid grid-cols-1 lg:grid-cols-12 gap-8"
           >
             {/* Form Column */}
-            <form onSubmit={handleRegisterPartner} className="lg:col-span-8 bg-slate-900/40 border border-slate-800/60 rounded-[2.5rem] p-8 md:p-10 space-y-6">
+            <form onSubmit={handleRegisterPartner} className="lg:col-span-8 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-3xl lg:rounded-[2.5rem] p-4 sm:p-6 md:p-10 space-y-6">
               <div className="flex items-center gap-3 mb-2">
                 <Store size={20} className="text-orange-500" />
                 <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">Credenciar Estabelecimento Comercial</h3>

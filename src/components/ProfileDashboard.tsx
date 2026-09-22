@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, FileText, Lock, CheckCircle2, ShieldCheck, BookOpen, Sparkles, Crown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -11,7 +11,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export function ProfileDashboard() {
   const navigate = useNavigate();
-  const { profile, user, refreshProfile } = useAuth();
+  const { profile, user } = useAuth();
   const [achievementFilter, setAchievementFilter] = useState<'todas' | 'desbloqueadas' | 'bloqueadas'>('todas');
   const [showRankHierarchyModal, setShowRankHierarchyModal] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);

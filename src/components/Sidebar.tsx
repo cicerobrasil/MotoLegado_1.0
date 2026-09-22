@@ -55,7 +55,7 @@ const BOTTOM_NAV_ITEMS = [
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, isSupabaseConfigured, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const isVip = isUserProOrBonificado(profile);
@@ -92,31 +92,31 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile Top Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#00273d]/95 backdrop-blur-md border-b border-[#1e293b] flex items-center justify-between px-4 z-40">
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#00273d]/95 backdrop-blur-md border-b border-[#1e293b] flex items-center justify-between px-3 sm:px-4 z-40">
         <Link 
           to="/dashboard" 
           onClick={() => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
             document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
           }} 
-          className="flex items-center"
+          className="flex items-center shrink-0"
           aria-label="MotoLegado Início"
         >
           <LogoMark size="sm" />
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <AccessibilityButton variant="compact" />
           <PWAInstallButton variant="header" />
-          <Link to="/profile" className="w-8 h-8 rounded-lg bg-[#001b3d] border border-[#1e293b] overflow-hidden">
+          <Link to="/profile" className="w-8 h-8 rounded-lg bg-[#001b3d] border border-[#1e293b] overflow-hidden shrink-0">
             <img src={pilotAvatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
           </Link>
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="w-10 h-10 rounded-xl bg-[#001b3d] border border-[#1e293b] flex items-center justify-center text-slate-300 hover:text-white hover:border-[#ff751f] transition-colors cursor-pointer"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#001b3d] border border-[#1e293b] flex items-center justify-center text-slate-300 hover:text-white hover:border-[#ff751f] transition-colors cursor-pointer shrink-0"
             aria-label="Abrir Menu"
           >
-            {isOpen ? <X size={20} /> : <Menu size={20} />}
+            {isOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
       </header>

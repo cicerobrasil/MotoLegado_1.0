@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Shield, MapPin, Users, Calendar, ExternalLink, Trophy, ArrowLeft, Lock, Sparkles } from 'lucide-react';
-import { motion } from 'motion/react';
-import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';

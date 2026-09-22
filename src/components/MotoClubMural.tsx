@@ -11,10 +11,9 @@ import {
   Clock, 
   MoreVertical,
   Image as ImageIcon,
-  Lock,
-  Sparkles
+  Lock
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
@@ -34,8 +33,6 @@ interface Post {
   comments: number;
   image?: string;
 }
-
-const MOCK_MURAL_POSTS: Post[] = [];
 
 export function MotoClubMural() {
   const { id } = useParams();

@@ -321,8 +321,6 @@ export function Routes() {
     showToast("Avaliação e notas de pilotagem registradas com sucesso!", "success");
   };
 
-  const pendingCount = routes.filter(r => r.status === 'pendente').length;
-
   // Filtered List
   const filteredRoutes = routes.filter(r => {
     const matchesSearch = 
@@ -342,7 +340,7 @@ export function Routes() {
   });
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8">
       
       {/* Toast Notification Banner */}
       <AnimatePresence>
@@ -372,17 +370,17 @@ export function Routes() {
       </AnimatePresence>
 
       {/* HEADER & TOP ACTION BAR */}
-      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-slate-800/80 pb-8 gap-6">
+      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-slate-800/80 pb-6 sm:pb-8 gap-4 sm:gap-6">
         <div>
           <div className="flex items-center gap-3">
-            <span className="p-2.5 bg-orange-500/10 border border-orange-500/30 text-orange-500 rounded-2xl">
-              <Navigation size={28} />
+            <span className="p-2 sm:p-2.5 bg-orange-500/10 border border-orange-500/30 text-orange-500 rounded-2xl shrink-0">
+              <Navigation size={24} className="sm:w-7 sm:h-7" />
             </span>
             <div>
-              <h1 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-white">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-white">
                 ROTEIROS <span className="text-orange-500">LEGADOS</span>
               </h1>
-              <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.25em] mt-1 flex items-center gap-2">
+              <p className="text-slate-400 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] sm:tracking-[0.25em] mt-1 flex items-center gap-2">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                 EXPEDIÇÕES COM MODERAÇÃO E DICAS TURÍSTICAS VIA IA
               </p>
@@ -400,7 +398,7 @@ export function Routes() {
       </header>
 
       {/* FILTER & MODERATION NAVIGATION BAR */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-3xl border border-slate-800">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-slate-900/60 p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-slate-800">
         
         {/* Search */}
         <div className="relative flex-1 max-w-md">
@@ -415,7 +413,7 @@ export function Routes() {
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none shrink-0">
           {[
             { id: 'todos', label: 'Todos os Roteiros' },
             { id: 'populares', label: '⭐ Mais Avaliados' },
@@ -426,6 +424,7 @@ export function Routes() {
               key={f.id}
               onClick={() => setActiveFilter(f.id as any)}
               className={cn(
+                "whitespace-nowrap shrink-0",
                 activeFilter === f.id ? "btn-filter-active" : "btn-filter-inactive"
               )}
             >
@@ -437,7 +436,7 @@ export function Routes() {
       </div>
 
       {/* ROUTES GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {filteredRoutes.map((route, i) => {
           const isPending = route.status === 'pendente';
           const isRejected = route.status === 'rejeitado';
@@ -624,16 +623,16 @@ export function Routes() {
               initial={{ scale: 0.95, y: 20 }} 
               animate={{ scale: 1, y: 0 }} 
               exit={{ scale: 0.95, y: 20 }} 
-              className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full my-8 shadow-2xl overflow-hidden"
+              className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl max-w-3xl w-full my-4 sm:my-8 shadow-2xl overflow-hidden"
             >
               {/* Modal Header */}
-              <div className="p-6 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+              <div className="p-4 sm:p-6 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="p-2 bg-orange-500/20 text-orange-400 rounded-xl border border-orange-500/30">
                     <Plus size={20} />
                   </span>
                   <div>
-                    <h2 className="text-xl font-black italic uppercase tracking-tight text-white">
+                    <h2 className="text-lg sm:text-xl font-black italic uppercase tracking-tight text-white">
                       CRIAR NOVO ROTEIRO LEGADO
                     </h2>
                     <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
@@ -651,7 +650,7 @@ export function Routes() {
               </div>
 
               {/* Modal Form */}
-              <form onSubmit={handleCreateRoute} className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+              <form onSubmit={handleCreateRoute} className="p-4 sm:p-6 space-y-6 max-h-[75vh] overflow-y-auto">
                 
                 {/* Basic Info */}
                 <div className="space-y-4">
@@ -874,11 +873,11 @@ export function Routes() {
               initial={{ scale: 0.95, y: 20 }} 
               animate={{ scale: 1, y: 0 }} 
               exit={{ scale: 0.95, y: 20 }} 
-              className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full my-8 shadow-2xl overflow-hidden"
+              className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl max-w-4xl w-full my-4 sm:my-8 shadow-2xl overflow-hidden"
             >
               
               {/* Detail Header Banner */}
-              <div className="relative h-64 md:h-80 overflow-hidden">
+              <div className="relative h-52 sm:h-64 md:h-80 overflow-hidden">
                 <img 
                   src={selectedRouteDetail.image || "https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=1200"} 
                   className="w-full h-full object-cover"
@@ -889,12 +888,12 @@ export function Routes() {
 
                 <button 
                   onClick={() => setSelectedRouteDetail(null)}
-                  className="absolute top-4 right-4 p-2.5 bg-slate-950/80 hover:bg-slate-900 text-white rounded-full border border-slate-700 backdrop-blur-md transition-all z-10"
+                  className="absolute top-4 right-4 p-2 sm:p-2.5 bg-slate-950/80 hover:bg-slate-900 text-white rounded-full border border-slate-700 backdrop-blur-md transition-all z-10"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
 
-                <div className="absolute bottom-6 left-6 right-6 space-y-2">
+                <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 right-4 sm:right-6 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="px-3.5 py-1 bg-orange-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-md">
                       {selectedRouteDetail.difficulty}

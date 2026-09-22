@@ -9,7 +9,7 @@ import {
   Tooltip, 
   ResponsiveContainer 
 } from 'recharts';
-import { Calendar, Store, Percent, Route, BookOpen, CheckCircle, ArrowUpRight, Plus, MapPin } from 'lucide-react';
+import { Calendar, Store, Percent, Route, BookOpen, CheckCircle, Plus, MapPin } from 'lucide-react';
 import { MotoEvent } from './Events';
 import { Partner } from './Partners';
 import { LogEntry } from './Logbook';
@@ -140,13 +140,13 @@ export function Dashboard() {
 
       <main className="grid grid-cols-12 gap-4 sm:gap-6">
         {/* Active Route Main Box */}
-        <div className="col-span-12 lg:col-span-8 bg-slate-900/40 border border-slate-800/60 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8 md:p-10 flex flex-col relative overflow-hidden group">
-          <div className="flex justify-between items-start mb-6">
+        <div className="col-span-12 lg:col-span-8 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-3xl lg:rounded-[2.5rem] p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col relative overflow-hidden group">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
               <span className="px-3.5 py-1 bg-orange-600/20 text-orange-400 text-[9px] sm:text-[10px] font-black uppercase italic rounded-full border border-orange-500/30">
                 ÚLTIMA ROTA REGISTRADA
               </span>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black italic uppercase mt-2 sm:mt-3 tracking-tighter text-white">
+              <h2 className="text-xl sm:text-3xl md:text-4xl font-black italic uppercase mt-2 sm:mt-3 tracking-tighter text-white">
                 {latestLog ? latestLog.title : 'Nenhuma Viagem Registrada'}
               </h2>
               <p className="text-slate-400 mt-1 flex items-center gap-2 sm:gap-3 font-black text-[9px] sm:text-[10px] uppercase tracking-[0.15em] sm:tracking-[0.2em]">
@@ -157,7 +157,7 @@ export function Dashboard() {
 
             <button
               onClick={() => navigate('/logbook')}
-              className="btn-primary self-start"
+              className="btn-primary w-full sm:w-auto self-start sm:self-center"
             >
               <Plus size={15} />
               <span>NOVO REGISTRO</span>
@@ -248,7 +248,7 @@ export function Dashboard() {
         </div>
 
         {/* Checked In Events Section */}
-        <div className="col-span-12 lg:col-span-6 bg-slate-900/40 border border-slate-800/60 rounded-[2.5rem] p-8 flex flex-col justify-between">
+        <div className="col-span-12 lg:col-span-6 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-3xl lg:rounded-[2.5rem] p-4 sm:p-6 lg:p-8 flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center mb-6 border-b border-slate-800/60 pb-3">
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
@@ -303,7 +303,7 @@ export function Dashboard() {
         {/* Benefícios e Parceiros */}
         <div 
           onClick={() => navigate('/partners')}
-          className="col-span-12 lg:col-span-6 bg-slate-900/40 border border-slate-800/60 rounded-[2.5rem] p-8 flex flex-col justify-between cursor-pointer group hover:border-orange-500/30 transition-all"
+          className="col-span-12 lg:col-span-6 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-3xl lg:rounded-[2.5rem] p-4 sm:p-6 lg:p-8 flex flex-col justify-between cursor-pointer group hover:border-orange-500/30 transition-all"
         >
           <div>
             <div className="flex justify-between items-center mb-6 border-b border-slate-800/60 pb-3">
@@ -351,7 +351,7 @@ export function Dashboard() {
         </div>
 
         {/* Bottom Metrics Bar */}
-        <div className="col-span-12 sm:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-[2rem] p-6 flex items-center gap-4">
+        <div className="col-span-12 sm:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 shrink-0">
             <Route size={22} />
           </div>
@@ -363,7 +363,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="col-span-12 sm:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-[2rem] p-6 flex items-center gap-4">
+        <div className="col-span-12 sm:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
             <Calendar size={22} />
           </div>
@@ -375,7 +375,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="col-span-12 sm:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-[2rem] p-6 flex items-center gap-4">
+        <div className="col-span-12 sm:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
             <BookOpen size={22} />
           </div>
@@ -388,8 +388,8 @@ export function Dashboard() {
         </div>
       </main>
 
-      <footer className="flex justify-between items-center text-[9px] text-zinc-600 font-black uppercase tracking-[0.3em] pb-4 border-t border-slate-900 pt-4">
-        <div className="flex gap-8">
+      <footer className="flex flex-col sm:flex-row gap-3 justify-between items-center text-[9px] text-zinc-600 font-black uppercase tracking-[0.3em] pb-4 border-t border-slate-900 pt-4 text-center sm:text-left">
+        <div className="flex flex-wrap justify-center sm:justify-start gap-4 sm:gap-8">
           <span className="flex items-center gap-2"><span className="w-1 h-1 bg-green-500 rounded-full"></span>GPS: ATIVO (L1/L5)</span>
           <span>LAT: -26.3045 LON: -48.8456</span>
         </div>

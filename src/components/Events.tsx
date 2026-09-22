@@ -1,5 +1,4 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
-import { Link } from 'react-router-dom';
 import { 
   Calendar, 
   MapPin, 
@@ -9,7 +8,6 @@ import {
   CheckCircle, 
   Clock, 
   Compass, 
-  Tag, 
   AlertTriangle, 
   Bookmark, 
   X, 
@@ -24,10 +22,7 @@ import {
   Eye,
   Info,
   Edit3,
-  Trash2,
-  XCircle,
-  Lock,
-  Crown
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -149,8 +144,6 @@ export const generateCategorySvgCover = (category: string) => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
-const DEFAULT_EVENTS: MotoEvent[] = [];
-
 const DEFAULT_FALLBACK_IMAGE = generateCategorySvgCover("Geral");
 
 const CATEGORY_TAGS = ["Todos", "Geral", "Festas & Encontros", "On-Road", "Off-Road", "Misto"];
@@ -209,12 +202,8 @@ export function Events() {
   const [showToast, setShowToast] = useState<{message: string, type: 'success' | 'info'} | null>(null);
   const [selectedEventDetails, setSelectedEventDetails] = useState<MotoEvent | null>(null);
 
-  // Moderation & Admin State
-  const [moderationFilter, setModerationFilter] = useState<'pendente' | 'aprovado' | 'rejeitado' | 'todos'>('pendente');
+  // Edit State
   const [editingEvent, setEditingEvent] = useState<MotoEvent | null>(null);
-  const [rejectionModalEvent, setRejectionModalEvent] = useState<MotoEvent | null>(null);
-  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
-  const [deleteConfirmEvent, setDeleteConfirmEvent] = useState<MotoEvent | null>(null);
 
   // Cover image mode & custom upload state
   const [coverSource, setCoverSource] = useState<'sugestoes' | 'upload'>('sugestoes');
@@ -340,53 +329,6 @@ export function Events() {
     }
   };
 
-  // Moderation Handler Actions
-  const handleApproveEvent = (id: string) => {
-    const updated = events.map(evt => {
-      if (evt.id === id) {
-        return {
-          ...evt,
-          status: 'aprovado' as const,
-          checkedIn: false,
-          memberCount: Math.max(1, evt.memberCount || 1)
-        };
-      }
-      return evt;
-    });
-    saveEvents(updated);
-    triggerToast("Evento APROVADO e publicado com sucesso no mapa!", "success");
-  };
-
-  const handleOpenRejectModal = (evt: MotoEvent) => {
-    setRejectionModalEvent(evt);
-    setRejectionReasonInput('');
-  };
-
-  const handleConfirmRejectEvent = () => {
-    if (!rejectionModalEvent) return;
-    const updated = events.map(evt => {
-      if (evt.id === rejectionModalEvent.id) {
-        return {
-          ...evt,
-          status: 'rejeitado' as const,
-          rejectionReason: rejectionReasonInput.trim() || 'Não atendeu às diretrizes da comunidade.'
-        };
-      }
-      return evt;
-    });
-    saveEvents(updated);
-    triggerToast("Evento REJEITADO pelo moderador.", "info");
-    setRejectionModalEvent(null);
-  };
-
-  const handleConfirmDeleteEvent = () => {
-    if (!deleteConfirmEvent) return;
-    const updated = events.filter(evt => evt.id !== deleteConfirmEvent.id);
-    saveEvents(updated);
-    triggerToast("Evento EXCLUÍDO permanentemente do sistema.", "info");
-    setDeleteConfirmEvent(null);
-  };
-
   const handleSaveEditedEvent = (e: FormEvent) => {
     e.preventDefault();
     if (!editingEvent) return;
@@ -469,8 +411,6 @@ export function Events() {
 
   // Helper filters
   const approvedEvents = events.filter(evt => evt.status === 'aprovado' || !evt.status);
-  const pendingEvents = events.filter(evt => evt.status === 'pendente');
-  const rejectedEvents = events.filter(evt => evt.status === 'rejeitado');
 
   const filteredExploreEvents = approvedEvents.filter(evt => {
     const matchesSearch = 
@@ -479,13 +419,6 @@ export function Events() {
       evt.desc.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'Todos' || evt.category === selectedCategory;
     return matchesSearch && matchesCategory;
-  });
-
-  const displayedModerationEvents = events.filter(evt => {
-    if (moderationFilter === 'pendente') return evt.status === 'pendente';
-    if (moderationFilter === 'aprovado') return evt.status === 'aprovado' || !evt.status;
-    if (moderationFilter === 'rejeitado') return evt.status === 'rejeitado';
-    return true; // 'todos'
   });
 
   const checkedInEvents = events.filter(evt => evt.checkedIn);
@@ -706,157 +639,60 @@ export function Events() {
         )}
       </AnimatePresence>
 
-      {/* REJECTION REASON MODAL */}
-      <AnimatePresence>
-        {rejectionModalEvent && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-slate-900 border border-amber-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4"
-            >
-              <div className="flex items-center gap-3">
-                <XCircle size={24} className="text-amber-500 shrink-0" />
-                <div>
-                  <h3 className="text-lg font-black italic uppercase text-white">REJEITAR SOLICITAÇÃO DE EVENTO</h3>
-                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">{rejectionModalEvent.title}</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Motivo da Rejeição (Opcional):</label>
-                <textarea
-                  rows={3}
-                  placeholder="Ex: Informações incompletas, local em área privada sem autorização, duplicidade..."
-                  value={rejectionReasonInput}
-                  onChange={(e) => setRejectionReasonInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:border-amber-500 outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  onClick={() => setRejectionModalEvent(null)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-black uppercase"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleConfirmRejectEvent}
-                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black uppercase"
-                >
-                  Confirmar Rejeição
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* DELETE CONFIRMATION MODAL */}
-      <AnimatePresence>
-        {deleteConfirmEvent && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-slate-900 border border-rose-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 text-center"
-            >
-              <div className="w-12 h-12 bg-rose-950 border border-rose-500/40 rounded-full flex items-center justify-center mx-auto text-rose-400">
-                <Trash2 size={24} />
-              </div>
-              <div>
-                <h3 className="text-lg font-black italic uppercase text-white">CONFIRMAR EXCLUSÃO</h3>
-                <p className="text-xs text-slate-300 mt-2">
-                  Tem certeza que deseja excluir o evento <span className="font-bold text-white">"{deleteConfirmEvent.title}"</span>? Esta ação não pode ser desfeita.
-                </p>
-              </div>
-
-              <div className="flex justify-center gap-3 pt-2">
-                <button
-                  onClick={() => setDeleteConfirmEvent(null)}
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-black uppercase"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleConfirmDeleteEvent}
-                  className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black uppercase shadow-lg shadow-rose-600/20"
-                >
-                  Excluir Permanentemente
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* TELEMETRIA DE EVENTOS OVERVIEW CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bento-card border-slate-800/50 bg-slate-900/40 p-6 flex items-center justify-between group">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="bento-card border-slate-800/50 bg-slate-900/40 p-4 sm:p-6 flex items-center justify-between group rounded-2xl sm:rounded-3xl">
           <div className="space-y-1">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">EVENTOS APROVADOS</span>
-            <div className="text-3xl font-black text-white italic tracking-tighter group-hover:text-orange-500 transition-colors">
+            <div className="text-2xl sm:text-3xl font-black text-white italic tracking-tighter group-hover:text-orange-500 transition-colors">
               {approvedEvents.length}
             </div>
             <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">DISPONÍVEIS NA COMUNIDADE</p>
           </div>
-          <div className="w-12 h-12 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center text-slate-600 group-hover:border-orange-500 transition-all">
+          <div className="w-12 h-12 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center text-slate-600 group-hover:border-orange-500 transition-all shrink-0">
             <Compass size={20} className="text-orange-500" />
           </div>
         </div>
 
-        <div className="bento-card border-slate-800/50 bg-slate-900/40 p-6 flex items-center justify-between group">
+        <div className="bento-card border-slate-800/50 bg-slate-900/40 p-4 sm:p-6 flex items-center justify-between group rounded-2xl sm:rounded-3xl">
           <div className="space-y-1">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">MINHAS ADESÕES</span>
-            <div className="text-3xl font-black text-white italic tracking-tighter group-hover:text-emerald-500 transition-colors">
+            <div className="text-2xl sm:text-3xl font-black text-white italic tracking-tighter group-hover:text-emerald-500 transition-colors">
               {checkedInEvents.length}
             </div>
             <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">PRONTO PARA ENVELOCER</p>
           </div>
-          <div className="w-12 h-12 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center text-slate-600 group-hover:border-emerald-500 transition-all">
+          <div className="w-12 h-12 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center text-slate-600 group-hover:border-emerald-500 transition-all shrink-0">
             <CheckCircle size={20} className="text-emerald-500" />
           </div>
         </div>
 
-        <div className="bento-card border-slate-800/50 bg-slate-900/40 p-6 flex items-center justify-between group">
+        <div className="bento-card border-slate-800/50 bg-slate-900/40 p-4 sm:p-6 flex items-center justify-between group rounded-2xl sm:rounded-3xl sm:col-span-2 lg:col-span-1">
           <div className="space-y-1">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">KM TOTAL AGENDADO</span>
-            <div className="text-3xl font-black text-white italic tracking-tighter group-hover:text-blue-500 transition-colors">
+            <div className="text-2xl sm:text-3xl font-black text-white italic tracking-tighter group-hover:text-blue-500 transition-colors">
               {totalKmsChecked} <span className="text-xs text-slate-500 not-italic">KM</span>
             </div>
             <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">ESTRADA PREVISTA NA SESSÃO</p>
           </div>
-          <div className="w-12 h-12 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center text-slate-600 group-hover:border-blue-500 transition-all">
+          <div className="w-12 h-12 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center text-slate-600 group-hover:border-blue-500 transition-all shrink-0">
             <Navigation size={20} className="text-blue-400" />
           </div>
         </div>
       </div>
 
       {/* CORE TAB NAVIGATION */}
-      <div className="flex border-b border-slate-800/60 max-w-2xl">
+      <div className="flex border-b border-slate-800/60 max-w-2xl overflow-x-auto scrollbar-none w-full">
         <button
           onClick={() => setActiveTab('explorar')}
           className={cn(
-            "flex-1 flex flex-col items-center justify-center gap-2 py-4 px-2 transition-all relative group",
+            "flex-1 flex flex-col items-center justify-center gap-2 py-3 sm:py-4 px-2 sm:px-4 transition-all relative group shrink-0",
             activeTab === 'explorar' ? "text-orange-500" : "text-slate-500 hover:text-white"
           )}
         >
           <div className={cn(
-            "flex items-center gap-2 font-black italic uppercase tracking-[0.2em] text-[10px] transition-all",
-            activeTab === 'explorar' ? "scale-110" : "scale-100 opacity-70 group-hover:opacity-100"
+            "flex items-center gap-2 font-black italic uppercase tracking-[0.15em] sm:tracking-[0.2em] text-[9px] sm:text-[10px] transition-all whitespace-nowrap",
+            activeTab === 'explorar' ? "scale-105 sm:scale-110" : "opacity-70 group-hover:opacity-100"
           )}>
             <Compass size={13} className={activeTab === 'explorar' ? 'text-orange-500 animate-[pulse_2s_infinite]' : 'text-slate-400'} />
             EXPLORAR EVENTOS
@@ -872,13 +708,13 @@ export function Events() {
         <button
           onClick={() => setActiveTab('meus')}
           className={cn(
-            "flex-1 flex flex-col items-center justify-center gap-2 py-4 px-2 transition-all relative group",
+            "flex-1 flex flex-col items-center justify-center gap-2 py-3 sm:py-4 px-2 sm:px-4 transition-all relative group shrink-0",
             activeTab === 'meus' ? "text-orange-500" : "text-slate-500 hover:text-white"
           )}
         >
           <div className={cn(
-            "flex items-center gap-2 font-black italic uppercase tracking-[0.2em] text-[10px] transition-all",
-            activeTab === 'meus' ? "scale-110" : "scale-100 opacity-70 group-hover:opacity-100"
+            "flex items-center gap-2 font-black italic uppercase tracking-[0.15em] sm:tracking-[0.2em] text-[9px] sm:text-[10px] transition-all whitespace-nowrap",
+            activeTab === 'meus' ? "scale-105 sm:scale-110" : "opacity-70 group-hover:opacity-100"
           )}>
             <Bookmark size={13} />
             MEUS CHECK-INS
@@ -894,13 +730,13 @@ export function Events() {
         <button
           onClick={handleOpenCreateTab}
           className={cn(
-            "flex-1 flex flex-col items-center justify-center gap-2 py-4 px-2 transition-all relative group",
+            "flex-1 flex flex-col items-center justify-center gap-2 py-3 sm:py-4 px-2 sm:px-4 transition-all relative group shrink-0",
             activeTab === 'criar' ? "text-orange-500" : "text-slate-500 hover:text-white"
           )}
         >
           <div className={cn(
-            "flex items-center gap-2 font-black italic uppercase tracking-[0.2em] text-[10px] transition-all",
-            activeTab === 'criar' ? "scale-110" : "scale-100 opacity-70 group-hover:opacity-100"
+            "flex items-center gap-2 font-black italic uppercase tracking-[0.15em] sm:tracking-[0.2em] text-[9px] sm:text-[10px] transition-all whitespace-nowrap",
+            activeTab === 'criar' ? "scale-105 sm:scale-110" : "opacity-70 group-hover:opacity-100"
           )}>
             {isVip ? <Plus size={13} /> : <Lock size={12} className="text-amber-400" />}
             <span>AGENDAR {isVip ? '' : '(PRO)'}</span>
@@ -916,9 +752,9 @@ export function Events() {
 
       {/* FILTER AND SEARCH CONTROLS */}
       {activeTab !== 'criar' && (
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-900/10 p-4 border border-slate-800/40 rounded-3xl backdrop-blur-sm">
+        <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-slate-900/10 p-3 sm:p-4 border border-slate-800/40 rounded-2xl sm:rounded-3xl backdrop-blur-sm">
           {/* Categories Selector */}
-          <div className="flex flex-wrap gap-2 overflow-x-auto w-full md:w-auto">
+          <div className="flex flex-nowrap sm:flex-wrap gap-2 overflow-x-auto w-full md:w-auto pb-1 sm:pb-0 scrollbar-none">
             {CATEGORY_TAGS.map((tag) => (
               <button
                 key={tag}
@@ -1795,256 +1631,6 @@ export function Events() {
         )}
       </AnimatePresence>
 
-      {/* EDIT EVENT MODAL */}
-      <AnimatePresence>
-        {editingEvent && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl space-y-6 my-8 max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                <div className="flex items-center gap-2">
-                  <Edit3 size={18} className="text-amber-500" />
-                  <h3 className="text-xl font-black italic uppercase text-white tracking-tight">EDITAR DETALHES DO EVENTO</h3>
-                </div>
-                <button onClick={() => setEditingEvent(null)} className="text-slate-500 hover:text-white p-1">
-                  <X size={20} />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveEditedEvent} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Título do Evento</label>
-                  <input
-                    type="text"
-                    value={editingEvent.title}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Categoria</label>
-                    <select
-                      value={editingEvent.category}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, category: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
-                    >
-                      {CATEGORY_TAGS.filter(t => t !== 'Todos').map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status de Moderação</label>
-                    <select
-                      value={editingEvent.status || 'aprovado'}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, status: e.target.value as any })}
-                      className="w-full bg-slate-950 border border-amber-500/50 rounded-xl p-3 text-sm font-bold text-amber-300 focus:border-amber-500 outline-none"
-                    >
-                      <option value="aprovado">Aprovado & Publicado</option>
-                      <option value="pendente">Pendente de Aprovação</option>
-                      <option value="rejeitado">Rejeitado</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Localização</label>
-                    <input
-                      type="text"
-                      value={editingEvent.location}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Distância Percurso (KM)</label>
-                    <input
-                      type="number"
-                      value={editingEvent.distance}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, distance: Number(e.target.value) })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data do Evento</label>
-                    <input
-                      type="date"
-                      value={editingEvent.date}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Horário</label>
-                    <input
-                      type="text"
-                      value={editingEvent.time}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, time: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">URL da Imagem de Capa</label>
-                  <input
-                    type="text"
-                    value={editingEvent.image}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, image: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-300 focus:border-amber-500 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Descrição Detalhada</label>
-                  <textarea
-                    rows={4}
-                    value={editingEvent.desc}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, desc: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-medium text-white focus:border-amber-500 outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setEditingEvent(null)}
-                    className="px-5 py-3 rounded-xl bg-slate-800 text-slate-300 text-xs font-black uppercase tracking-wider hover:bg-slate-700"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-amber-600/20"
-                  >
-                    Salvar Alterações
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* REJECTION REASON MODAL */}
-      <AnimatePresence>
-        {rejectionModalEvent && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-slate-900 border border-amber-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4"
-            >
-              <div className="flex items-center gap-3">
-                <XCircle size={24} className="text-amber-500 shrink-0" />
-                <div>
-                  <h3 className="text-lg font-black italic uppercase text-white">REJEITAR SOLICITAÇÃO DE EVENTO</h3>
-                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">{rejectionModalEvent.title}</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Motivo da Rejeição (Opcional):</label>
-                <textarea
-                  rows={3}
-                  placeholder="Ex: Informações incompletas, local em área privada sem autorização, duplicidade..."
-                  value={rejectionReasonInput}
-                  onChange={(e) => setRejectionReasonInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:border-amber-500 outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  onClick={() => setRejectionModalEvent(null)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-black uppercase"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleConfirmRejectEvent}
-                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black uppercase"
-                >
-                  Confirmar Rejeição
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* DELETE CONFIRMATION MODAL */}
-      <AnimatePresence>
-        {deleteConfirmEvent && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-slate-900 border border-rose-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 text-center"
-            >
-              <div className="w-12 h-12 bg-rose-950 border border-rose-500/40 rounded-full flex items-center justify-center mx-auto text-rose-400">
-                <Trash2 size={24} />
-              </div>
-              <div>
-                <h3 className="text-lg font-black italic uppercase text-white">CONFIRMAR EXCLUSÃO</h3>
-                <p className="text-xs text-slate-300 mt-2">
-                  Tem certeza que deseja excluir o evento <span className="font-bold text-white">"{deleteConfirmEvent.title}"</span>? Esta ação não pode ser desfeita.
-                </p>
-              </div>
-
-              <div className="flex justify-center gap-3 pt-2">
-                <button
-                  onClick={() => setDeleteConfirmEvent(null)}
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-black uppercase"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleConfirmDeleteEvent}
-                  className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black uppercase shadow-lg shadow-rose-600/20"
-                >
-                  Excluir Permanentemente
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <UpgradeModal 
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
@@ -2052,9 +1638,4 @@ export function Events() {
       />
     </div>
   );
-}
-
-// Simple helper to render beautiful inline conditions
-function cnpj(active: boolean) {
-  return active ? 'text-orange-500 animate-[pulse_2s_infinite]' : 'text-slate-400';
 }

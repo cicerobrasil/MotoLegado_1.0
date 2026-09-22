@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, UploadCloud } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
@@ -46,8 +46,6 @@ export function Logbook() {
   const [image, setImage] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const tripPhotoInputRef = useRef<HTMLInputElement>(null);
-
-  const pilotMotorcycle = profile?.motorcycle || '';
 
   const isProOrBonificado = Boolean(
     profile?.is_pro ||
@@ -207,7 +205,7 @@ export function Logbook() {
     const d = destination || 'Serra Catarinense';
     const km = distance || '220';
     
-    setContent(`Partida ao amanhecer em ${o} com destino a ${d}. O trecho de ${km}km surpreendeu pela excelente fluidez do tráfego e trechos de curvas envolventes. Parada estratégica no mirante para fotos e um café quente. A moto manteve desempenho exemplar durante toda a travessia, consolidando mais um registro memorável no diário de bordo do MotoLegado.`);
+    setContent(`Diário de bordo: "${t}". Partida ao amanhecer em ${o} com destino a ${d}. O trecho de ${km}km surpreendeu pela excelente fluidez do tráfego e trechos de curvas envolventes. Parada estratégica no mirante para fotos e um café quente. A moto manteve desempenho exemplar durante toda a travessia, consolidando mais um registro memorável no diário de bordo do MotoLegado.`);
   };
 
   if (isFormOpen) {
@@ -504,24 +502,24 @@ export function Logbook() {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Conte os detalhes da aventura, os obstáculos e a emoção de cada curva..."
-                  className="w-full aspect-[2/1] bg-slate-950/30 border border-slate-800 rounded-[2rem] p-8 text-sm font-medium text-slate-300 placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50 resize-none leading-relaxed"
+                  className="w-full min-h-[160px] sm:min-h-[200px] bg-slate-950/30 border border-slate-800 rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 lg:p-8 text-sm font-medium text-slate-300 placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50 resize-y leading-relaxed"
                 />
               </div>
             </div>
 
             {/* Footer Actions */}
-            <div className="flex justify-end items-center gap-8 pt-10 border-t border-slate-800">
+            <div className="flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-4 sm:gap-8 pt-6 sm:pt-10 border-t border-slate-800">
                <button 
                  type="button"
                  onClick={() => setIsFormOpen(false)}
-                 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] hover:text-white transition-colors"
+                 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] hover:text-white transition-colors py-2 text-center"
                 >
                  DESCARTAR
                </button>
                <button 
                  type="button"
                  onClick={handleFinish}
-                 className="px-12 py-4 bg-orange-600 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-orange-600/20 group hover:bg-orange-500 transition-all active:scale-95"
+                 className="w-full sm:w-auto px-8 sm:px-12 py-3.5 sm:py-4 bg-orange-600 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-orange-600/20 group hover:bg-orange-500 transition-all active:scale-95"
                >
                  <Send size={18} className="text-white group-hover:translate-x-1 transition-transform" />
                  <span className="text-[11px] font-black text-white uppercase tracking-widest">FINALIZAR REGISTRO</span>
@@ -632,7 +630,7 @@ export function Logbook() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.1 }}
               key={log.id}
-              className="bg-slate-900/40 border border-slate-800/60 rounded-3xl sm:rounded-[2.5rem] overflow-hidden group hover:border-orange-500/20 transition-all"
+              className="bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-3xl lg:rounded-[2.5rem] overflow-hidden group hover:border-orange-500/20 transition-all"
             >
               <div className="grid grid-cols-1 lg:grid-cols-12">
                 {/* Image Side */}
@@ -642,7 +640,7 @@ export function Logbook() {
                 </div>
                 
                 {/* Content Side */}
-                <div className="lg:col-span-8 p-5 sm:p-8 md:p-10 flex flex-col justify-between space-y-6 sm:space-y-8">
+                <div className="lg:col-span-8 p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col justify-between space-y-4 sm:space-y-6 lg:space-y-8">
                    <div className="space-y-4">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                         <div className="space-y-1">

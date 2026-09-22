@@ -20,8 +20,6 @@ import { Achievements } from "./components/Achievements";
 import { PWAInstallBanner } from "./components/PWAInstallBanner";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { AccessibilityModal } from "./components/AccessibilityModal";
-import { AccessibilityButton } from "./components/AccessibilityButton";
-import { AnimatePresence } from "motion/react";
 import { cn } from "./lib/utils";
 import "./utils/systemReset";
 
@@ -58,9 +56,6 @@ function AppLayout() {
           <Route path="/logbook" element={<Logbook />} />
         </Routes>
       </main>
-
-      {/* Floating Quick Accessibility Button (discreet & high utility) */}
-      <AccessibilityButton variant="floating" />
 
       {/* Modal for Visual & Typography Settings */}
       <AccessibilityModal />

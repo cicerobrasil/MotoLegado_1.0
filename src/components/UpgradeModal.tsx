@@ -11,8 +11,6 @@ import {
   Lock, 
   Zap, 
   ShieldCheck, 
-  ArrowRight,
-  FileText,
   Clock,
   Loader2,
   ExternalLink
@@ -20,7 +18,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '../lib/utils';
-import { FREE_PLAN_FEATURES } from '../types';
 
 export type UpgradeFeatureTrigger = 
   | 'diario_ilimitado'

@@ -1,7 +1,7 @@
 import { useAuth } from '../context/AuthContext';
 import { calculatePilotRank, PILOT_RANKS } from '../lib/gamification';
 import { motion } from 'motion/react';
-import { Award, Zap, Star, ShieldCheck, ChevronRight, Sparkles } from 'lucide-react';
+import { Award, Star, ShieldCheck, ChevronRight, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export interface AchievementItem {

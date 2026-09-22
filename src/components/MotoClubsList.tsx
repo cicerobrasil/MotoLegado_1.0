@@ -60,7 +60,7 @@ export function MotoClubsList() {
     setActiveMainTab('gestao');
   };
   const [searchTerm, setSearchTerm] = useState('');
-  const [clubs, setClubs] = useState<ClubItem[]>(() => {
+  const [clubs] = useState<ClubItem[]>(() => {
     try {
       const saved = localStorage.getItem('motolegado_clubs');
       return saved ? JSON.parse(saved) : [];
@@ -164,28 +164,28 @@ export function MotoClubsList() {
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-800/60 pb-8">
+    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 border-b border-slate-800/60 pb-6 sm:pb-8">
         <div>
-          <h1 className="text-5xl font-black italic uppercase tracking-tighter text-white">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-white">
             MOTO <span className="text-orange-500">CLUBES</span>
           </h1>
-          <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-3 flex items-center gap-2">
+          <p className="text-slate-500 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] mt-2 sm:mt-3 flex items-center gap-2">
             <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>
             EXPLORE A IRMANDADE OU GERENCIE SEU CLUBE
           </p>
         </div>
         
         {activeMainTab === 'explorar' && (
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative group">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div className="relative group w-full sm:w-auto">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" size={18} />
               <input 
                 type="text" 
                 placeholder="Buscar clubes..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-11 pr-4 text-xs font-bold text-white focus:border-orange-500 outline-none transition-all w-48 sm:w-60"
+                className="bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-11 pr-4 text-xs font-bold text-white focus:border-orange-500 outline-none transition-all w-full sm:w-60"
               />
             </div>
             <button
@@ -200,17 +200,17 @@ export function MotoClubsList() {
       </header>
 
       {/* Tabs para navegar entre Explorar e Gestão */}
-      <div className="flex border-b border-slate-800/60 max-w-2xl">
+      <div className="flex border-b border-slate-800/60 max-w-2xl overflow-x-auto scrollbar-none w-full">
         <button
           onClick={() => setActiveMainTab('explorar')}
           className={cn(
-            "flex-1 flex flex-col items-center justify-center gap-2 py-4 px-2 transition-all relative group",
+            "flex-1 flex flex-col items-center justify-center gap-2 py-3 sm:py-4 px-3 sm:px-4 transition-all relative group shrink-0",
             activeMainTab === 'explorar' ? "text-orange-500" : "text-slate-500 hover:text-white"
           )}
         >
           <div className={cn(
-            "flex items-center gap-2 font-black italic uppercase tracking-[0.2em] text-[10px] transition-all",
-            activeMainTab === 'explorar' ? "scale-110" : "scale-100 opacity-70 group-hover:opacity-100"
+            "flex items-center gap-2 font-black italic uppercase tracking-[0.15em] sm:tracking-[0.2em] text-[9px] sm:text-[10px] transition-all whitespace-nowrap",
+            activeMainTab === 'explorar' ? "scale-105 sm:scale-110" : "opacity-70 group-hover:opacity-100"
           )}>
             <Shield size={14} className={cn(activeMainTab === 'explorar' ? "text-orange-500" : "text-slate-400")} />
             EXPLORAR CLUBES
@@ -226,13 +226,13 @@ export function MotoClubsList() {
         <button
           onClick={handleOpenGestaoTab}
           className={cn(
-            "flex-1 flex flex-col items-center justify-center gap-2 py-4 px-2 transition-all relative group",
+            "flex-1 flex flex-col items-center justify-center gap-2 py-3 sm:py-4 px-3 sm:px-4 transition-all relative group shrink-0",
             activeMainTab === 'gestao' ? "text-orange-500" : "text-slate-500 hover:text-white"
           )}
         >
           <div className={cn(
-            "flex items-center gap-2 font-black italic uppercase tracking-[0.2em] text-[10px] transition-all",
-            activeMainTab === 'gestao' ? "scale-110" : "scale-100 opacity-70 group-hover:opacity-100"
+            "flex items-center gap-2 font-black italic uppercase tracking-[0.15em] sm:tracking-[0.2em] text-[9px] sm:text-[10px] transition-all whitespace-nowrap",
+            activeMainTab === 'gestao' ? "scale-105 sm:scale-110" : "opacity-70 group-hover:opacity-100"
           )}>
             {isVip ? (
               <Settings size={14} className={cn(activeMainTab === 'gestao' ? "text-orange-500" : "text-slate-400")} />
