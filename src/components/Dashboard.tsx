@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   AreaChart, 
@@ -9,12 +9,13 @@ import {
   Tooltip, 
   ResponsiveContainer 
 } from 'recharts';
-import { Calendar, Store, Percent, Route, BookOpen, CheckCircle, Plus, MapPin } from 'lucide-react';
+import { Calendar, Store, Percent, Route, BookOpen, CheckCircle, Plus, MapPin, Trophy } from 'lucide-react';
 import { MotoEvent } from './Events';
 import { Partner } from './Partners';
 import { LogEntry } from './Logbook';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getPilotLiveGamification } from '../lib/gamification';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -110,6 +111,14 @@ export function Dashboard() {
     { name: 'Mai', km: logs.length > 0 ? Math.round(loggedKm * 0.10) : 0 },
   ];
 
+  // Live Gamification Engine (KM + Eventos + Diário + Badges)
+  const gamification = useMemo(() => {
+    return getPilotLiveGamification(logs, events);
+  }, [logs, events]);
+
+  const { pointsBreakdown, rankInfo, badges } = gamification;
+  const unlockedBadgesCount = badges.filter(b => b.unlocked).length;
+
   return (
     <div className="p-4 sm:p-6 h-full flex flex-col gap-6 overflow-y-auto bg-slate-950">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800/60 pb-6 md:pb-8 gap-4 sm:gap-6">
@@ -122,25 +131,26 @@ export function Dashboard() {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
+            data-tour="dashboard-ranking"
+            onClick={() => navigate('/achievements')}
+            className="btn-secondary flex items-center gap-1.5 border-amber-500/40 text-amber-400 hover:text-white"
+          >
+            <Trophy size={15} className="text-amber-400" />
+            <span className="font-mono">{rankInfo.currentTier.icon} {pointsBreakdown.totalPoints.toLocaleString()} PTS</span>
+          </button>
+          <button
             onClick={() => navigate('/logbook')}
             className="btn-secondary"
           >
             <BookOpen size={15} className="text-[#ff751f]" />
             <span>Diário ({logs.length})</span>
           </button>
-          <button
-            onClick={() => navigate('/events')}
-            className="btn-primary"
-          >
-            <Calendar size={15} />
-            <span>Eventos ({checkedInEvents.length})</span>
-          </button>
         </div>
       </header>
 
       <main className="grid grid-cols-12 gap-4 sm:gap-6">
         {/* Active Route Main Box */}
-        <div className="col-span-12 lg:col-span-8 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-3xl lg:rounded-[2.5rem] p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col relative overflow-hidden group">
+        <div data-tour="dashboard-telemetry" className="col-span-12 lg:col-span-8 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-3xl lg:rounded-[2.5rem] p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col relative overflow-hidden group">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
               <span className="px-3.5 py-1 bg-orange-600/20 text-orange-400 text-[9px] sm:text-[10px] font-black uppercase italic rounded-full border border-orange-500/30">
@@ -156,6 +166,7 @@ export function Dashboard() {
             </div>
 
             <button
+              data-tour="dashboard-logbook"
               onClick={() => navigate('/logbook')}
               className="btn-primary w-full sm:w-auto self-start sm:self-center"
             >
@@ -351,39 +362,63 @@ export function Dashboard() {
         </div>
 
         {/* Bottom Metrics Bar */}
-        <div className="col-span-12 sm:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 flex items-center gap-4">
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-[2rem] p-4 sm:p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 shrink-0">
             <Route size={22} />
           </div>
-          <div>
-            <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.2em]">DISTÂNCIA TOTAL COMBINADA</p>
-            <div className="text-2xl font-black italic text-white tracking-tighter">
+          <div className="overflow-hidden">
+            <p className="text-slate-500 text-[8px] font-black uppercase tracking-[0.2em] truncate">DISTÂNCIA TOTAL</p>
+            <div className="text-xl font-black italic text-white tracking-tighter">
               {totalKmCombined.toLocaleString()} <span className="text-xs not-italic text-orange-500 uppercase font-black">KM</span>
             </div>
+            <p className="text-[9px] text-slate-500 font-medium">+{pointsBreakdown.kmPoints} pts no asfalto</p>
           </div>
         </div>
 
-        <div className="col-span-12 sm:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-[2rem] p-4 sm:p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
             <Calendar size={22} />
           </div>
-          <div>
-            <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.2em]">EVENTOS CONFIRMADOS</p>
-            <div className="text-2xl font-black italic text-white tracking-tighter">
-              {checkedInEvents.length.toString().padStart(2, '0')} <span className="text-xs not-italic text-amber-400 uppercase font-black">CHECK-INS</span>
+          <div className="overflow-hidden">
+            <p className="text-slate-500 text-[8px] font-black uppercase tracking-[0.2em] truncate">EVENTOS PARTICIPADOS</p>
+            <div className="text-xl font-black italic text-white tracking-tighter">
+              {checkedInEvents.length.toString().padStart(2, '0')} <span className="text-xs not-italic text-sky-400 uppercase font-black">CHECK-INS</span>
             </div>
+            <p className="text-[9px] text-slate-500 font-medium">+{pointsBreakdown.eventPoints} pts de eventos</p>
           </div>
         </div>
 
-        <div className="col-span-12 sm:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 flex items-center gap-4">
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-[2rem] p-4 sm:p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
             <BookOpen size={22} />
           </div>
-          <div>
-            <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.2em]">REGISTROS NO DIÁRIO</p>
-            <div className="text-2xl font-black italic text-white tracking-tighter">
+          <div className="overflow-hidden">
+            <p className="text-slate-500 text-[8px] font-black uppercase tracking-[0.2em] truncate">DIÁRIO DE BORDO</p>
+            <div className="text-xl font-black italic text-white tracking-tighter">
               {logs.length.toString().padStart(2, '0')} <span className="text-xs not-italic text-purple-400 uppercase font-black">EXPEDIÇÕES</span>
             </div>
+            <p className="text-[9px] text-slate-500 font-medium">+{pointsBreakdown.tripPoints} pts de relatos</p>
+          </div>
+        </div>
+
+        <div 
+          onClick={() => navigate('/achievements')}
+          className="col-span-12 sm:col-span-6 lg:col-span-3 bg-gradient-to-br from-amber-500/10 via-slate-900/80 to-slate-900 border border-amber-500/40 rounded-2xl sm:rounded-[2rem] p-4 sm:p-5 flex items-center gap-4 cursor-pointer hover:border-amber-400 transition-all group"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl shrink-0 group-hover:scale-105 transition-transform">
+            {rankInfo.currentTier.icon}
+          </div>
+          <div className="overflow-hidden flex-1">
+            <div className="flex items-center justify-between">
+              <p className="text-amber-500 text-[8px] font-black uppercase tracking-[0.2em] truncate">PATENTE & BADGES</p>
+              <span className="text-[8px] font-black text-amber-400 uppercase tracking-widest group-hover:underline">VER HUB ➔</span>
+            </div>
+            <div className="text-xl font-black italic text-white tracking-tighter truncate">
+              {rankInfo.currentTier.title}
+            </div>
+            <p className="text-[9px] text-slate-400 font-medium font-mono">
+              <strong className="text-amber-400">{pointsBreakdown.totalPoints.toLocaleString()} PTS</strong> • {unlockedBadgesCount}/{badges.length} Badges
+            </p>
           </div>
         </div>
       </main>

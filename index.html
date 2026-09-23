@@ -8,20 +8,126 @@
     <meta property="og:title" content="MotoLegado" />
     <meta property="og:description" content="Plataforma completa para motociclistas, motoclubes e rotas estradeiras com gamificação e painel de comando." />
 
+    <!-- React Fast Refresh Preamble Safety (guarantees $RefreshReg$ is defined before any modules load) -->
+    <script>
+      window.$RefreshReg$ = window.$RefreshReg$ || function() {};
+      window.$RefreshSig$ = window.$RefreshSig$ || function() { return function(type) { return type; }; };
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
+
     <!-- Intercept harmless Vite WebSocket closures in container preview -->
     <script>
       (function() {
+        var isViteNoise = function(args) {
+          if (!args) return false;
+          for (var i = 0; i < args.length; i++) {
+            var val = args[i];
+            if (!val) continue;
+            var str = typeof val === 'object' ? (val.message || val.stack || val.type || '') : String(val);
+            if (
+              str.indexOf('WebSocket') !== -1 || 
+              str.indexOf('websocket') !== -1 || 
+              str.indexOf('[vite]') !== -1 || 
+              str.indexOf('vite-hmr') !== -1 ||
+              str.indexOf('vite-ping') !== -1
+            ) {
+              return true;
+            }
+          }
+          return false;
+        };
+
+        var origConsoleError = console.error;
+        console.error = function() {
+          if (isViteNoise(arguments)) return;
+          return origConsoleError.apply(console, arguments);
+        };
+
+        var origConsoleWarn = console.warn;
+        console.warn = function() {
+          if (isViteNoise(arguments)) return;
+          return origConsoleWarn.apply(console, arguments);
+        };
+
+        var origConsoleLog = console.log;
+        console.log = function() {
+          if (isViteNoise(arguments)) return;
+          return origConsoleLog.apply(console, arguments);
+        };
+
+        var origConsoleDebug = console.debug;
+        console.debug = function() {
+          if (isViteNoise(arguments)) return;
+          return origConsoleDebug.apply(console, arguments);
+        };
+
+        var origConsoleInfo = console.info;
+        console.info = function() {
+          if (isViteNoise(arguments)) return;
+          return origConsoleInfo.apply(console, arguments);
+        };
+
+        // Mock WebSocket for Vite HMR in preview environment where HMR is disabled
+        if (typeof window !== 'undefined' && window.WebSocket) {
+          var OrigWebSocket = window.WebSocket;
+          window.WebSocket = function(url, protocols) {
+            var urlStr = String(url || '');
+            if (
+              protocols === 'vite-hmr' || 
+              protocols === 'vite-ping' || 
+              urlStr.indexOf('vite-hmr') !== -1 || 
+              urlStr.indexOf('token=') !== -1
+            ) {
+              var dummy = {
+                readyState: 1, // WebSocket.OPEN
+                CONNECTING: 0,
+                OPEN: 1,
+                CLOSING: 2,
+                CLOSED: 3,
+                url: urlStr,
+                protocol: protocols || '',
+                send: function() {},
+                close: function() {},
+                addEventListener: function(type, listener) {
+                  if (type === 'open') {
+                    setTimeout(function() {
+                      try { listener({ type: 'open', target: dummy }); } catch(e) {}
+                    }, 0);
+                  }
+                },
+                removeEventListener: function() {},
+                dispatchEvent: function() { return true; },
+                onopen: null,
+                onclose: null,
+                onerror: null,
+                onmessage: null
+              };
+              setTimeout(function() {
+                if (typeof dummy.onopen === 'function') {
+                  try { dummy.onopen({ type: 'open', target: dummy }); } catch(e) {}
+                }
+              }, 0);
+              return dummy;
+            }
+            return new OrigWebSocket(url, protocols);
+          };
+          window.WebSocket.prototype = OrigWebSocket.prototype;
+          window.WebSocket.CONNECTING = 0;
+          window.WebSocket.OPEN = 1;
+          window.WebSocket.CLOSING = 2;
+          window.WebSocket.CLOSED = 3;
+        }
+
         window.addEventListener('unhandledrejection', function(event) {
           var r = event && (event.reason || event.message);
-          var msg = typeof r === 'object' ? (r && (r.message || r.stack) || '') : String(r || '');
-          if (msg.indexOf('WebSocket') !== -1 || msg.indexOf('websocket') !== -1 || msg.indexOf('[vite]') !== -1) {
+          if (isViteNoise([r])) {
             event.preventDefault();
             event.stopImmediatePropagation();
           }
         });
         window.addEventListener('error', function(event) {
           var msg = (event && event.message) || '';
-          if (msg.indexOf('WebSocket') !== -1 || msg.indexOf('websocket') !== -1 || msg.indexOf('[vite]') !== -1) {
+          if (isViteNoise([msg, event.error])) {
             event.preventDefault();
             event.stopImmediatePropagation();
           }

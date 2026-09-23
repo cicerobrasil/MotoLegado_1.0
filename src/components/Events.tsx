@@ -323,9 +323,11 @@ export function Events() {
     
     const target = updated.find(e => e.id === id);
     if (target?.checkedIn) {
-      triggerToast(`Check-in confirmado para: ${target.title}!`, 'success');
+      triggerToast(`Check-in confirmado em ${target.title}! +150 PTS adicionados! 🎟️`, 'success');
+      window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
     } else if (target) {
       triggerToast(`Presença cancelada em: ${target.title}.`, 'info');
+      window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
     }
   };
 
@@ -754,12 +756,13 @@ export function Events() {
       {activeTab !== 'criar' && (
         <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-slate-900/10 p-3 sm:p-4 border border-slate-800/40 rounded-2xl sm:rounded-3xl backdrop-blur-sm">
           {/* Categories Selector */}
-          <div className="flex flex-nowrap sm:flex-wrap gap-2 overflow-x-auto w-full md:w-auto pb-1 sm:pb-0 scrollbar-none">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full md:w-auto">
             {CATEGORY_TAGS.map((tag) => (
               <button
                 key={tag}
                 onClick={() => setSelectedCategory(tag)}
                 className={cn(
+                  "text-[11px] sm:text-xs py-1.5 sm:py-2 px-3 sm:px-4 shrink-0",
                   selectedCategory === tag ? "btn-filter-active" : "btn-filter-inactive"
                 )}
               >

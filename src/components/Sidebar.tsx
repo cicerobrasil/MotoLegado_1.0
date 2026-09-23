@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Trophy, 
   Map as MapIcon, 
@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   Calendar,
   Store,
-  Menu,
   X,
   BookOpen,
   Crown
@@ -24,7 +23,8 @@ import { isUserProOrBonificado } from "../lib/permissions";
 import { UpgradeModal } from "./UpgradeModal";
 import { PWAInstallButton } from "./PWAInstallButton";
 import { LogoMark } from "./LogoMark";
-import { AccessibilityButton } from "./AccessibilityButton";
+import { TourButton } from "./TourButton";
+import { getPilotLiveGamification } from "../lib/gamification";
 
 interface MenuItem {
   icon: any;
@@ -37,9 +37,11 @@ const MENU_ITEMS: MenuItem[] = [
   { icon: Layers, label: "Dashboard", path: "/dashboard" },
   { icon: Calendar, label: "Eventos", path: "/events" },
   { icon: Store, label: "Parceiros", path: "/partners" },
+  { icon: BookOpen, label: "Diário & Checklist", path: "/logbook" },
   { icon: Newspaper, label: "COMUNIDADE", path: "/community" },
   { icon: MapIcon, label: "Roteiros", path: "/routes" },
   { icon: Trophy, label: "Conquistas", path: "/achievements" },
+  { icon: Crown, label: "Ranking Global", path: "/ranking" },
   { icon: Shield, label: "Moto Clubes", path: "/motoclubes" },
   { icon: ShieldCheck, label: "CENTRO DE COMANDO", path: "/command-center", adminOnly: true },
 ];
@@ -52,17 +54,42 @@ const BOTTOM_NAV_ITEMS = [
   { icon: User, label: "Perfil", path: "/profile" },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  setIsOpen?: (open: boolean) => void;
+}
+
+export function Sidebar({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }: SidebarProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+  const setIsOpen = externalSetIsOpen || setInternalIsOpen;
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const isVip = isUserProOrBonificado(profile);
 
   const pilotName = profile?.name || 'Piloto MotoLegado';
-  const pilotTier = profile?.tier || 'Bronze';
-  const pilotPoints = profile?.points ?? 0;
+  
+  const [livePoints, setLivePoints] = useState(() => getPilotLiveGamification().pointsBreakdown.totalPoints);
+  const [liveTier, setLiveTier] = useState(() => getPilotLiveGamification().rankInfo.currentTier.title);
+
+  useEffect(() => {
+    const update = () => {
+      const g = getPilotLiveGamification();
+      setLivePoints(g.pointsBreakdown.totalPoints);
+      setLiveTier(g.rankInfo.currentTier.title);
+    };
+    window.addEventListener('storage', update);
+    window.addEventListener('motolegado_gamification_updated', update);
+    return () => {
+      window.removeEventListener('storage', update);
+      window.removeEventListener('motolegado_gamification_updated', update);
+    };
+  }, []);
+
+  const pilotTier = liveTier || profile?.tier || 'Bronze';
+  const pilotPoints = livePoints ?? profile?.points ?? 0;
   const pilotAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
     ? profile.avatar_url
     : `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotName)}&background=ea580c&color=ffffff&bold=true`;
@@ -91,36 +118,6 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile Top Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#00273d]/95 backdrop-blur-md border-b border-[#1e293b] flex items-center justify-between px-3 sm:px-4 z-40">
-        <Link 
-          to="/dashboard" 
-          onClick={() => {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
-          }} 
-          className="flex items-center shrink-0"
-          aria-label="MotoLegado Início"
-        >
-          <LogoMark size="sm" />
-        </Link>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <AccessibilityButton variant="compact" />
-          <PWAInstallButton variant="header" />
-          <Link to="/profile" className="w-8 h-8 rounded-lg bg-[#001b3d] border border-[#1e293b] overflow-hidden shrink-0">
-            <img src={pilotAvatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-          </Link>
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#001b3d] border border-[#1e293b] flex items-center justify-center text-slate-300 hover:text-white hover:border-[#ff751f] transition-colors cursor-pointer shrink-0"
-            aria-label="Abrir Menu"
-          >
-            {isOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-        </div>
-      </header>
-
       {/* Mobile Backdrop Overlay */}
       <AnimatePresence>
         {isOpen && (
@@ -162,10 +159,21 @@ export function Sidebar() {
         <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
           {visibleMenuItems.map((item) => {
             const isActive = location.pathname === item.path;
+            const tourAttr = item.path === '/routes' 
+              ? 'nav-routes' 
+              : item.path === '/motoclubes' 
+              ? 'nav-motoclubes' 
+              : item.path === '/partners' 
+              ? 'nav-partners' 
+              : item.path === '/ranking' 
+              ? 'nav-ranking'
+              : undefined;
+
             return (
               <Link
                 key={item.path}
                 to={item.path}
+                data-tour={tourAttr}
                 onClick={() => setIsOpen(false)}
                 className={cn(
                   "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 group relative",
@@ -187,12 +195,8 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* PWA Mobile & Desktop Install Action */}
-        <div className="px-4 pb-2">
-          <PWAInstallButton variant="sidebar" />
-        </div>
-
-        <div className="p-6 border-t border-[#1e293b] bg-[#001b3d]/60 backdrop-blur-md space-y-4">
+        <div className="p-4 sm:p-5 border-t border-[#1e293b] bg-[#001b3d]/60 backdrop-blur-md space-y-3">
+          {/* User Pilot Profile Card */}
           <Link to="/profile" onClick={() => setIsOpen(false)} className="flex items-center gap-3 group cursor-pointer decoration-none">
             <div className="w-10 h-10 rounded-lg bg-[#001b3d] border border-[#1e293b] overflow-hidden group-hover:border-[#ff751f] transition-all shadow-lg shrink-0">
               <img src={pilotAvatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
@@ -218,6 +222,12 @@ export function Sidebar() {
               )}
             </div>
           </Link>
+
+          {/* Action: PWA Install & Guided Tour */}
+          <div className="space-y-2 pt-1">
+            <TourButton variant="sidebar" />
+            <PWAInstallButton variant="sidebar" />
+          </div>
 
           {(!isVip || isAdmin) && (
             <button

@@ -35,7 +35,7 @@ export async function compressImage(
   maxDimension = 1600, 
   quality = 0.85
 ): Promise<Blob> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     // Se for svg, não comprimir via canvas
     if ('type' in file && file.type === 'image/svg+xml') {
       resolve(file);

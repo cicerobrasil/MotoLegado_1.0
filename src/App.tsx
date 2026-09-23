@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { AccessibilityProvider } from "./context/AccessibilityContext";
+import { TourProvider } from "./context/TourContext";
 import { Sidebar } from "./components/Sidebar";
+import { TopNavbar } from "./components/TopNavbar";
 import { LandingPage } from "./components/LandingPage";
 import { Dashboard } from "./components/Dashboard";
 import { Feed } from "./components/Feed";
@@ -17,25 +20,35 @@ import { Events } from "./components/Events";
 import { Partners } from "./components/Partners";
 import { CommandCenter } from "./components/CommandCenter";
 import { Achievements } from "./components/Achievements";
+import { GlobalRanking } from "./components/GlobalRanking";
 import { PWAInstallBanner } from "./components/PWAInstallBanner";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { AccessibilityModal } from "./components/AccessibilityModal";
+import { OnboardingTour } from "./components/OnboardingTour";
 import { cn } from "./lib/utils";
 import "./utils/systemReset";
 
 function AppLayout() {
   const location = useLocation();
   const isLandingPage = location.pathname === "/";
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen bg-[#001b3d] text-[#e2e8f0] font-sans selection:bg-[#ff751f] selection:text-white">
-      {!isLandingPage && <Sidebar />}
+      {!isLandingPage && (
+        <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      )}
       
-      <main className={cn(
-        "flex-1 min-h-screen overflow-y-auto",
-        isLandingPage ? "w-full" : "lg:ml-64 pt-16 lg:pt-0 pb-20 lg:pb-0"
+      <div className={cn(
+        "flex-1 min-h-screen flex flex-col min-w-0",
+        isLandingPage ? "w-full" : "lg:ml-64"
       )}>
-        <Routes>
+        {!isLandingPage && (
+          <TopNavbar onOpenSidebar={() => setIsSidebarOpen(true)} />
+        )}
+
+        <main className="flex-1 overflow-y-auto pb-16 lg:pb-8">
+          <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/events" element={<Events />} />
@@ -44,6 +57,8 @@ function AppLayout() {
           <Route path="/community" element={<Feed />} />
           <Route path="/routes" element={<RoutesList />} />
           <Route path="/achievements" element={<Achievements />} />
+          <Route path="/ranking" element={<GlobalRanking />} />
+          <Route path="/leaderboard" element={<GlobalRanking />} />
           <Route path="/motoclub" element={<MotoClubsList />} />
           <Route path="/motoclubes" element={<MotoClubsList />} />
           <Route path="/motoclub/:id" element={<MotoClubDetail />} />
@@ -56,9 +71,13 @@ function AppLayout() {
           <Route path="/logbook" element={<Logbook />} />
         </Routes>
       </main>
+    </div>
 
       {/* Modal for Visual & Typography Settings */}
       <AccessibilityModal />
+
+      {/* Interactive First Access Onboarding Tour & Tooltips */}
+      <OnboardingTour />
 
       {/* PWA In-App Mobile Install Banner & Offline Connectivity Indicator */}
       <PWAInstallBanner />
@@ -72,7 +91,9 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AccessibilityProvider>
-          <AppLayout />
+          <TourProvider>
+            <AppLayout />
+          </TourProvider>
         </AccessibilityProvider>
       </AuthProvider>
     </BrowserRouter>

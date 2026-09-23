@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, FileText, Lock, CheckCircle2, ShieldCheck, BookOpen, Sparkles, Crown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
-import { calculatePilotRank, PILOT_RANKS } from '../lib/gamification';
+import { getPilotLiveGamification, PILOT_RANKS } from '../lib/gamification';
 import { LogEntry } from './Logbook';
 import { MotoEvent } from './Events';
 import { useAuth } from '../context/AuthContext';
@@ -83,35 +83,19 @@ export function ProfileDashboard() {
     }
   }, [user, isSupabaseConfigured]);
 
-  const loggedKm = logs.reduce((acc, curr) => {
-    const val = parseInt(curr.distance, 10);
-    return acc + (isNaN(val) ? 0 : val);
-  }, 0);
+  // Centralized Live Gamification Engine
+  const gamificationData = useMemo(() => {
+    return getPilotLiveGamification(logs, events);
+  }, [logs, events]);
 
-  const totalKm = loggedKm;
+  const { stats, badges, pointsBreakdown, rankInfo } = gamificationData;
+  const totalKm = stats.totalKm;
   const checkedInEvents = events.filter(e => e.checkedIn);
-
-  const achievements = [
-    { id: '1', icon: "🌎", title: "Viagem Internacional", desc: "Expedição cruzando fronteiras internacionais", points: 500, unlocked: (totalKm >= 5000 && logs.length > 0), date: (totalKm >= 5000 && logs.length > 0) ? "Desbloqueado" : undefined, requirement: "Registrar 5.000km em viagens", category: "Expedição" },
-    { id: '2', icon: "🛣️", title: "Viagem Interestadual", desc: "Pilotagem cruzando divisas estaduais", points: 250, unlocked: logs.length >= 2, date: logs.length >= 2 ? "Desbloqueado" : undefined, requirement: "Registrar pelo menos 2 viagens no diário", category: "Navegação" },
-    { id: '3', icon: "🏔️", title: "Alfa da Montanha", desc: "1.000km em trechos de altitude acumulada", points: 250, unlocked: (totalKm >= 1000 && logs.length > 0), date: (totalKm >= 1000 && logs.length > 0) ? "Desbloqueado" : undefined, requirement: "Acumular 1.000km rodados", category: "Desafio" },
-    { id: '4', icon: "🏎️", title: "Primeiro Roteiro", desc: "Primeira viagem de moto gravada no diário de bordo", points: 100, unlocked: logs.length >= 1, date: logs.length >= 1 ? "Desbloqueado" : undefined, requirement: "Registrar 1ª viagem no diário", category: "Iniciação" },
-    { id: '5', icon: "🤝", title: "Irmão de Estrada", desc: "Prestou suporte e ajudou motociclistas", points: 500, unlocked: false, requirement: "Ajudar motociclistas em emergências", category: "Comunidade" },
-    { id: '6', icon: "🌃", title: "Coruja Noturna", desc: "500km rodados em pilotagem noturna contínua", points: 200, unlocked: false, requirement: "Registrar viagens noturnas", category: "Especial" },
-    { id: '7', icon: "⛽", title: "Econômico", desc: "Média superior a 30km/L em viagem oficial", points: 150, unlocked: false, requirement: "Registrar média de consumo", category: "Eficiência" },
-    { id: '8', icon: "🏕️", title: "Acampamento Motociclista", desc: "Pernoite em evento ou área de camping oficial", points: 300, unlocked: false, requirement: "Registrar 1 pernoite em evento oficial", category: "Estilo de Vida" }
-  ];
-
-  const earnedAchievementPoints = achievements.filter(a => a.unlocked).reduce((acc, curr) => acc + curr.points, 0);
-  const checkInPoints = checkedInEvents.length * 50;
-  const calculatedRealPoints = earnedAchievementPoints + checkInPoints;
-
-  // Pontuação real calculada do piloto
-  const totalPointsEarned = calculatedRealPoints;
-
-  // Pilot Rank & Gamification Calculation
-  const rankInfo = calculatePilotRank(totalPointsEarned);
+  const achievements = badges;
+  const totalPointsEarned = pointsBreakdown.totalPoints;
   const { currentTier, nextTier, progressPercent, pointsRemaining } = rankInfo;
+  const unlockedCount = badges.filter(a => a.unlocked).length;
+  const totalPossiblePoints = badges.reduce((acc, curr) => acc + curr.points, 0);
 
   const mainStats = [
     { label: 'DISTÂNCIA TOTAL', value: totalKm.toLocaleString(), unit: 'KM', icon: Route, color: 'text-orange-500' },
@@ -128,9 +112,6 @@ export function ProfileDashboard() {
       image: 'https://images.unsplash.com/photo-1558981403-c5f91cbba527?auto=format&fit=crop&q=80&w=400' 
     }
   ];
-
-  const unlockedCount = achievements.filter(a => a.unlocked).length;
-  const totalPossiblePoints = achievements.reduce((acc, curr) => acc + curr.points, 0);
 
   // Histórico mensal de consumo de asfalto (baseado nos registros reais de viagens)
   const chartData = [
@@ -581,15 +562,23 @@ export function ProfileDashboard() {
               </h3>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Troféus e marcas acumuladas em viagens, eventos e navegações na estrada.
+              Troféus e insígnias acumuladas em quilometragem percorrida no asfalto e presença em encontros motociclísticos.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+            <button
+              onClick={() => navigate('/achievements')}
+              className="btn-secondary py-2 px-3 text-[10px] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1.5"
+            >
+              <Sparkles size={13} className="text-orange-400" />
+              <span>Ver Hub Completo</span>
+            </button>
+
             <div className="bg-slate-950 p-2.5 sm:p-3 px-4 sm:px-5 rounded-2xl border border-slate-800 flex items-center gap-3 sm:gap-4 w-full sm:w-auto justify-between sm:justify-start">
               <div>
                 <p className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest">PONTUAÇÃO</p>
-                <p className="text-lg sm:text-xl font-black text-amber-400 italic">{totalPointsEarned} <span className="text-xs text-slate-500 font-normal">/ {totalPossiblePoints} PTS</span></p>
+                <p className="text-lg sm:text-xl font-black text-amber-400 italic">{totalPointsEarned.toLocaleString()} <span className="text-xs text-slate-500 font-normal">/ {totalPossiblePoints.toLocaleString()} PTS</span></p>
               </div>
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-black text-xs">
                 {Math.round((unlockedCount / achievements.length) * 100)}%
@@ -632,8 +621,9 @@ export function ProfileDashboard() {
               <motion.div
                 key={badge.id}
                 whileHover={{ y: -4 }}
+                onClick={() => navigate('/achievements')}
                 className={cn(
-                  "p-5 sm:p-6 rounded-2xl sm:rounded-3xl border transition-all flex flex-col justify-between relative overflow-hidden group",
+                  "p-5 sm:p-6 rounded-2xl sm:rounded-3xl border transition-all flex flex-col justify-between relative overflow-hidden group cursor-pointer",
                   badge.unlocked
                     ? "bg-slate-900/80 border-amber-500/40 hover:border-amber-400 shadow-lg shadow-amber-500/5"
                     : "bg-slate-950/40 border-slate-800/80 opacity-70 hover:opacity-100"
@@ -647,7 +637,7 @@ export function ProfileDashboard() {
                       ? "bg-amber-500/10 text-amber-400 border-amber-500/30" 
                       : "bg-slate-800/50 text-slate-500 border-slate-800"
                   )}>
-                    {badge.category}
+                    {badge.categoryLabel || badge.category}
                   </span>
 
                   <span className={cn(
@@ -684,17 +674,27 @@ export function ProfileDashboard() {
                     )}>
                       {badge.title}
                     </h4>
-                    <p className="text-[10px] sm:text-[11px] text-slate-400 leading-relaxed mt-1">
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 leading-relaxed mt-1 line-clamp-2">
                       {badge.desc}
                     </p>
                   </div>
                 </div>
 
+                {/* Mini Progress Bar */}
+                <div className="mt-3 space-y-1">
+                  <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                    <div 
+                      className={cn("h-full rounded-full", badge.unlocked ? "bg-emerald-400" : "bg-orange-500")}
+                      style={{ width: `${badge.progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+
                 {/* Footer Status */}
-                <div className="mt-4 sm:mt-5 pt-3 border-t border-slate-800/60 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
+                <div className="mt-3 pt-3 border-t border-slate-800/60 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
                   {badge.unlocked ? (
                     <span className="text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 size={12} /> Desbloqueado em {badge.date}
+                      <CheckCircle2 size={12} /> Conquistado
                     </span>
                   ) : (
                     <span className="text-amber-500/80 flex items-center gap-1 line-clamp-1" title={badge.requirement}>

@@ -1285,17 +1285,12 @@ export function LandingPage() {
                 <X size={16} />
               </button>
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-4">
-                  <LogoMark size="md" />
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[9px] font-black uppercase rounded-full">
-                    <User size={11} />
-                    <span>Acesso do Piloto</span>
-                  </div>
+              <div className="flex items-center justify-between gap-4 pt-1">
+                <LogoMark size="md" />
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase rounded-full">
+                  <User size={12} />
+                  <span>Acesso do Piloto</span>
                 </div>
-                <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white">
-                  INICIAR SESSÃO
-                </h3>
               </div>
 
               {/* Status & Error Alerts */}

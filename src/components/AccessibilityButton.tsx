@@ -2,11 +2,28 @@ import { useAccessibility } from '../context/AccessibilityContext';
 import { Eye, Type, Sun, Moon } from 'lucide-react';
 
 interface AccessibilityButtonProps {
-  variant?: 'header' | 'sidebar' | 'floating' | 'compact';
+  variant?: 'header' | 'sidebar' | 'floating' | 'compact' | 'top-menu';
 }
 
 export function AccessibilityButton({ variant = 'header' }: AccessibilityButtonProps) {
   const { openModal, theme, fontSize } = useAccessibility();
+
+  if (variant === 'top-menu') {
+    return (
+      <button
+        data-tour="top-theme"
+        onClick={openModal}
+        title="Legibilidade & Tema: Ajustar tamanho de letra e contraste"
+        aria-label="Legibilidade & Tema"
+        className="h-10 px-2.5 md:px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-[#ff751f]/50 text-slate-200 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm group shrink-0"
+      >
+        <Eye size={17} className="text-[#ff751f] group-hover:scale-110 transition-transform shrink-0" />
+        <span className="hidden md:inline-block text-[11px] font-black uppercase tracking-wider text-slate-300 group-hover:text-white whitespace-nowrap">
+          Legibilidade & Tema
+        </span>
+      </button>
+    );
+  }
 
   if (variant === 'floating') {
     return (
@@ -28,17 +45,10 @@ export function AccessibilityButton({ variant = 'header' }: AccessibilityButtonP
     return (
       <button
         onClick={openModal}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-white transition-all text-xs font-black uppercase tracking-wider cursor-pointer group"
+        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-white transition-all text-xs font-black uppercase tracking-wider cursor-pointer group"
       >
-        <div className="flex items-center gap-2">
-          <Eye size={15} className="text-orange-400 group-hover:scale-110 transition-transform" />
-          <span>Legibilidade & Tema</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-[10px] font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-md border border-orange-500/20">
-          <span>{theme === 'light' ? '☀️ Claro' : '🌙 Escuro'}</span>
-          <span>•</span>
-          <span>{fontSize === 'normal' ? 'Aa' : fontSize === 'large' ? 'Aa+' : 'AA+'}</span>
-        </div>
+        <Eye size={16} className="text-orange-400 group-hover:scale-110 transition-transform shrink-0" />
+        <span>Legibilidade & Tema</span>
       </button>
     );
   }

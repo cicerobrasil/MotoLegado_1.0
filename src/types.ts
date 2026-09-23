@@ -52,14 +52,42 @@ export interface Route {
   rejectionReason?: string;
 }
 
-export interface Achievement {
+export type BadgeCategory = 'all' | 'mileage' | 'events' | 'combo' | 'special';
+
+export interface MotorcyclistBadge {
   id: string;
+  category: 'mileage' | 'events' | 'combo' | 'special';
+  categoryLabel: string;
   title: string;
-  description: string;
+  subtitle: string;
+  desc: string;
   icon: string;
   points: number;
   unlocked: boolean;
-  unlockedAt?: string;
+  unlockedDate?: string;
+  targetKm?: number;
+  targetEvents?: number;
+  targetTrips?: number;
+  currentValue: number;
+  targetValue: number;
+  progressPercent: number;
+  requirement: string;
+  unit?: string;
+  accentColor?: string;
+}
+
+export interface PointsBreakdown {
+  kmPoints: number;
+  eventPoints: number;
+  tripPoints: number;
+  badgePoints: number;
+  bonusPoints: number;
+  totalPoints: number;
+  totalKm: number;
+  eventsCount: number;
+  tripsCount: number;
+  unlockedBadgesCount: number;
+  totalBadgesCount: number;
 }
 
 export interface CommunityPost {
@@ -96,3 +124,47 @@ export const FREE_PLAN_FEATURES = [
   "Perfil de Piloto com Gamificação Básica",
   "Suporte Comunitário na Plataforma"
 ] as const;
+
+export type ChecklistCategory = 'documents' | 'parts' | 'tools' | 'safety' | 'logistics';
+
+export interface TripChecklistItem {
+  id: string;
+  category: ChecklistCategory;
+  label: string;
+  description?: string;
+  isRequired: boolean;
+  completed: boolean;
+  isCustom?: boolean;
+}
+
+export type RankingSortBy = 'points' | 'km' | 'events' | 'trips' | 'badges';
+export type RankingPeriod = 'all' | 'season2026' | 'month';
+
+export interface LeaderboardPilot {
+  id: string;
+  rank: number;
+  name: string;
+  handle: string;
+  avatar: string;
+  motoClub?: string;
+  clubRole?: string;
+  motorcycle: string;
+  city: string;
+  state: string;
+  totalPoints: number;
+  totalKm: number;
+  eventsCount: number;
+  tripsCount: number;
+  badgesCount: number;
+  tierTitle: string;
+  tierIcon: string;
+  tierAccent: string;
+  isCurrentUser?: boolean;
+  highlightBadge?: string;
+  isVerified?: boolean;
+  isPro?: boolean;
+  bio?: string;
+  joinedYear?: number;
+  pointsTrend?: 'up' | 'down' | 'same';
+  rankChange?: number; // e.g. +2, -1, 0
+}

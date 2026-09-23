@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2 } from 'lucide-react';
+import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { uploadImageToStorage } from '../lib/storage';
 import { UpgradeModal } from './UpgradeModal';
+import { TripChecklist } from './TripChecklist';
 
 export interface LogEntry {
   id: string;
@@ -27,6 +28,7 @@ export interface LogEntry {
 export function Logbook() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const [activeTab, setActiveTab] = useState<'trips' | 'checklist'>('trips');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -162,6 +164,7 @@ export function Logbook() {
     const updated = [newEntry, ...logs];
     setLogs(updated);
     localStorage.setItem('motolegado_logs', JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
   };
 
   const handleFinish = async () => {
@@ -251,6 +254,29 @@ export function Logbook() {
           </div>
 
           <div className="p-5 sm:p-8 md:p-10 space-y-6 sm:space-y-10">
+            {/* Quick Checklist Notice inside Form */}
+            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-orange-600/20 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0">
+                  <ClipboardCheck size={16} />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase text-white">Inspeção Pré-Estrada (Checklist)</p>
+                  <p className="text-[11px] text-slate-400">Verifique ferramentas da moto, documentos e peças sobressalentes antes de partir.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFormOpen(false);
+                  setActiveTab('checklist');
+                }}
+                className="btn-secondary py-2 px-3 text-[10px] font-black uppercase tracking-wider shrink-0 self-start sm:self-auto cursor-pointer"
+              >
+                Abrir Checklist
+              </button>
+            </div>
+
             {/* Title Input */}
             <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">TÍTULO DO ROTEIRO / NOME DA VIAGEM</label>
@@ -588,130 +614,182 @@ export function Logbook() {
         </div>
       </header>
 
-      {logs.length === 0 ? (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative w-full aspect-[21/9] min-h-[350px] sm:min-h-[500px] border-2 border-dashed border-slate-800/40 rounded-3xl sm:rounded-[3rem] flex flex-col items-center justify-center bg-slate-900/5 overflow-hidden p-6"
+      {/* Sub-navigation Tabs: Diário de Bordo vs Checklist Pré-Viagem */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 border-b border-slate-800/80 pb-4">
+        <button
+          onClick={() => setActiveTab('trips')}
+          className={cn(
+            "flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
+            activeTab === 'trips'
+              ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30"
+              : "bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800"
+          )}
         >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,85,0,0.03)_0%,transparent_70%)]" />
-          
-          <div className="relative flex flex-col items-center text-center px-4 max-w-2xl">
-            <div 
-              onClick={handleOpenForm}
-              className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-white mb-6 sm:mb-10 shadow-2xl group cursor-pointer hover:border-orange-500/50 transition-all"
-            >
-              <Send size={24} className="sm:w-8 sm:h-8 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-            </div>
+          <BookOpen size={15} />
+          <span>Histórico de Viagens</span>
+          <span className="text-[10px] bg-black/30 px-2 py-0.5 rounded-full font-mono">{logs.length}</span>
+        </button>
 
-            <h2 className="text-2xl sm:text-4xl font-black text-white italic uppercase tracking-tighter mb-4 sm:mb-6">
-              O ASFALTO ESTÁ CHAMANDO
-            </h2>
-            
-            <p className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] sm:tracking-[0.25em] leading-relaxed">
-              SUA LENDA AINDA NÃO FOI ESCRITA. CLIQUE NO BOTÃO DE NOVO <br className="hidden md:block" />
-              REGISTRO PARA COMEÇAR SUA HISTÓRIA.
-            </p>
+        <button
+          onClick={() => setActiveTab('checklist')}
+          className={cn(
+            "flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
+            activeTab === 'checklist'
+              ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30"
+              : "bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800"
+          )}
+        >
+          <ClipboardCheck size={15} />
+          <span>Checklist Pré-Viagem</span>
+          <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">Essencial</span>
+        </button>
+      </div>
 
-            <button 
-              onClick={handleOpenForm}
-              className="mt-8 sm:mt-12 flex items-center gap-2 text-[10px] font-black text-slate-700 uppercase tracking-widest hover:text-orange-500 transition-colors"
-            >
-              <Map size={14} />
-              Criar meu primeiro registro
-            </button>
-          </div>
-        </motion.div>
+      {activeTab === 'checklist' ? (
+        <TripChecklist 
+          onClose={() => setActiveTab('trips')}
+          onTripStartReady={() => {
+            setActiveTab('trips');
+            handleOpenForm();
+          }}
+        />
       ) : (
-        <div className="space-y-6 sm:space-y-8">
-          {logs.map((log, i) => (
+        <>
+          {logs.length === 0 ? (
             <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.1 }}
-              key={log.id}
-              className="bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-3xl lg:rounded-[2.5rem] overflow-hidden group hover:border-orange-500/20 transition-all"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="relative w-full aspect-[21/9] min-h-[350px] sm:min-h-[500px] border-2 border-dashed border-slate-800/40 rounded-3xl sm:rounded-[3rem] flex flex-col items-center justify-center bg-slate-900/5 overflow-hidden p-6"
             >
-              <div className="grid grid-cols-1 lg:grid-cols-12">
-                {/* Image Side */}
-                <div className="lg:col-span-4 aspect-video lg:aspect-auto relative overflow-hidden">
-                   <img src={log.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" alt={log.title} />
-                   <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 to-transparent lg:hidden" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,85,0,0.03)_0%,transparent_70%)]" />
+              
+              <div className="relative flex flex-col items-center text-center px-4 max-w-2xl">
+                <div 
+                  onClick={handleOpenForm}
+                  className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-white mb-6 sm:mb-10 shadow-2xl group cursor-pointer hover:border-orange-500/50 transition-all"
+                >
+                  <Send size={24} className="sm:w-8 sm:h-8 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                 </div>
+
+                <h2 className="text-2xl sm:text-4xl font-black text-white italic uppercase tracking-tighter mb-4 sm:mb-6">
+                  O ASFALTO ESTÁ CHAMANDO
+                </h2>
                 
-                {/* Content Side */}
-                <div className="lg:col-span-8 p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col justify-between space-y-4 sm:space-y-6 lg:space-y-8">
-                   <div className="space-y-4">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest leading-none">{log.date}</p>
-                          <h3 className="text-xl sm:text-2xl font-black text-white italic uppercase tracking-tighter">{log.title}</h3>
-                        </div>
-                        <div className="flex gap-1">
-                          {[...Array(5)].map((_, idx) => (
-                            <Star key={idx} size={14} className={cn("fill-current", idx < log.rating ? "text-orange-500" : "text-slate-800")} />
-                          ))}
-                        </div>
-                      </div>
+                <p className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] sm:tracking-[0.25em] leading-relaxed">
+                  SUA LENDA AINDA NÃO FOI ESCRITA. CLIQUE NO BOTÃO DE NOVO <br className="hidden md:block" />
+                  REGISTRO PARA COMEÇAR SUA HISTÓRIA.
+                </p>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 py-4 sm:py-6 border-y border-slate-800/30">
-                        <div>
-                          <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">DE / PARA</p>
-                          <p className="text-[10px] font-black text-white uppercase italic truncate">{log.origin.split('/')[0]} ➔ {log.destination.split('/')[0]}</p>
-                        </div>
-                        <div>
-                          <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">DISTÂNCIA</p>
-                          <p className="text-[10px] font-black text-white uppercase italic">{log.distance} KM</p>
-                        </div>
-                        <div>
-                          <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">TEMPO</p>
-                          <p className="text-[10px] font-black text-white uppercase italic">{log.duration}</p>
-                        </div>
-                        <div>
-                          <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">RODOVIA</p>
-                          <p className="text-[10px] font-black text-orange-500 uppercase italic truncate">{log.road.split(' ')[0]}</p>
-                        </div>
-                      </div>
-
-                      <p className="text-xs sm:text-sm font-medium text-slate-400 leading-relaxed italic">
-                        "{log.content}"
-                      </p>
-                   </div>
-
-                   <div className="flex flex-wrap items-center justify-between gap-3 pt-2 sm:pt-4">
-                      <div className="flex items-center gap-3">
-                         <div className="w-8 h-8 rounded-lg bg-orange-600/10 border border-orange-500/20 flex items-center justify-center text-orange-500 shrink-0">
-                           <Bike size={16} />
-                         </div>
-                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{log.bike}</p>
-                      </div>
-                      <div className={cn(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-widest",
-                        log.climate === 'sun' ? "bg-orange-500/10 border-orange-500/20 text-orange-500" : "bg-slate-800 border-slate-700 text-slate-400"
-                      )}>
-                        <Sun size={12} /> CÉU LIMPO
-                      </div>
-                   </div>
+                <div className="flex flex-wrap items-center justify-center gap-3 mt-8 sm:mt-12">
+                  <button 
+                    onClick={handleOpenForm}
+                    className="flex items-center gap-2 text-[10px] font-black text-white bg-orange-600 hover:bg-orange-500 px-4 py-2.5 rounded-xl uppercase tracking-widest transition-colors cursor-pointer"
+                  >
+                    <Map size={14} />
+                    Criar meu primeiro registro
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('checklist')}
+                    className="flex items-center gap-2 text-[10px] font-black text-slate-400 hover:text-white bg-slate-900 border border-slate-800 px-4 py-2.5 rounded-xl uppercase tracking-widest transition-colors cursor-pointer"
+                  >
+                    <ClipboardCheck size={14} />
+                    Ver Checklist Pré-Viagem
+                  </button>
                 </div>
               </div>
             </motion.div>
-          ))}
-        </div>
-      )}
+          ) : (
+            <div className="space-y-6 sm:space-y-8">
+              {logs.map((log, i) => (
+                <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  key={log.id}
+                  className="bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-3xl lg:rounded-[2.5rem] overflow-hidden group hover:border-orange-500/20 transition-all"
+                >
+                  <div className="grid grid-cols-1 lg:grid-cols-12">
+                    {/* Image Side */}
+                    <div className="lg:col-span-4 aspect-video lg:aspect-auto relative overflow-hidden">
+                       <img src={log.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" alt={log.title} />
+                       <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 to-transparent lg:hidden" />
+                    </div>
+                    
+                    {/* Content Side */}
+                    <div className="lg:col-span-8 p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col justify-between space-y-4 sm:space-y-6 lg:space-y-8">
+                       <div className="space-y-4">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest leading-none">{log.date}</p>
+                              <h3 className="text-xl sm:text-2xl font-black text-white italic uppercase tracking-tighter">{log.title}</h3>
+                            </div>
+                            <div className="flex gap-1">
+                              {[...Array(5)].map((_, idx) => (
+                                <Star key={idx} size={14} className={cn("fill-current", idx < log.rating ? "text-orange-500" : "text-slate-800")} />
+                              ))}
+                            </div>
+                          </div>
 
-      {/* Quick Stats Overlay */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8">
-        {[
-          { label: 'Total de Registros', value: logs.length.toString().padStart(2, '0') },
-          { label: 'Km Rodados Acumulados', value: `${totalKmCalculated} KM` },
-          { label: 'Fotos Publicadas', value: (logs.length * 4).toString().padStart(2, '0') },
-        ].map((stat, i) => (
-          <div key={i} className="p-5 sm:p-8 rounded-2xl sm:rounded-[2rem] bg-slate-900/40 border border-slate-800/60 text-center">
-            <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1 sm:mb-2">{stat.label}</p>
-            <p className="text-2xl sm:text-3xl font-black text-orange-500 tracking-tighter italic">{stat.value}</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 py-4 sm:py-6 border-y border-slate-800/30">
+                            <div>
+                              <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">DE / PARA</p>
+                              <p className="text-[10px] font-black text-white uppercase italic truncate">{log.origin.split('/')[0]} ➔ {log.destination.split('/')[0]}</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">DISTÂNCIA</p>
+                              <p className="text-[10px] font-black text-white uppercase italic">{log.distance} KM</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">TEMPO</p>
+                              <p className="text-[10px] font-black text-white uppercase italic">{log.duration}</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">RODOVIA</p>
+                              <p className="text-[10px] font-black text-orange-500 uppercase italic truncate">{log.road.split(' ')[0]}</p>
+                            </div>
+                          </div>
+
+                          <p className="text-xs sm:text-sm font-medium text-slate-400 leading-relaxed italic">
+                            "{log.content}"
+                          </p>
+                       </div>
+
+                       <div className="flex flex-wrap items-center justify-between gap-3 pt-2 sm:pt-4">
+                          <div className="flex items-center gap-3">
+                             <div className="w-8 h-8 rounded-lg bg-orange-600/10 border border-orange-500/20 flex items-center justify-center text-orange-500 shrink-0">
+                               <Bike size={16} />
+                             </div>
+                             <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{log.bike}</p>
+                          </div>
+                          <div className={cn(
+                            "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-widest",
+                            log.climate === 'sun' ? "bg-orange-500/10 border-orange-500/20 text-orange-500" : "bg-slate-800 border-slate-700 text-slate-400"
+                          )}>
+                            <Sun size={12} /> CÉU LIMPO
+                          </div>
+                       </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {/* Quick Stats Overlay */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8">
+            {[
+              { label: 'Total de Registros', value: logs.length.toString().padStart(2, '0') },
+              { label: 'Km Rodados Acumulados', value: `${totalKmCalculated} KM` },
+              { label: 'Fotos Publicadas', value: (logs.length * 4).toString().padStart(2, '0') },
+            ].map((stat, i) => (
+              <div key={i} className="p-5 sm:p-8 rounded-2xl sm:rounded-[2rem] bg-slate-900/40 border border-slate-800/60 text-center">
+                <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1 sm:mb-2">{stat.label}</p>
+                <p className="text-2xl sm:text-3xl font-black text-orange-500 tracking-tighter italic">{stat.value}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       <UpgradeModal 
         isOpen={isUpgradeModalOpen} 
