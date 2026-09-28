@@ -1194,30 +1194,6 @@ export function CommandCenter() {
         
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <span className="px-3.5 py-1.5 bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[10px] font-black uppercase rounded-full tracking-widest flex items-center gap-2">
-                <ShieldCheck size={14} className="text-amber-400" />
-                SISTEMA CENTRAL DE MODERAÇÃO & CONTROLE
-              </span>
-              <span className="px-3.5 py-1.5 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[10px] font-black uppercase rounded-full tracking-widest flex items-center gap-1.5">
-                <Lock size={12} />
-                ADMIN SUPREMO ATIVO
-              </span>
-              {isSupabaseConfigured ? (
-                <span className="px-3.5 py-1.5 bg-emerald-950/80 border border-emerald-500/50 text-emerald-400 text-[10px] font-black uppercase rounded-full tracking-widest flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <Database size={12} />
-                  SUPABASE CONECTADO
-                </span>
-              ) : (
-                <span className="px-3.5 py-1.5 bg-amber-950/80 border border-amber-500/50 text-amber-400 text-[10px] font-black uppercase rounded-full tracking-widest flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-400" />
-                  <Database size={12} />
-                  MODO LOCAL / DEMO
-                </span>
-              )}
-            </div>
-
             <h1 className="text-2xl sm:text-3xl md:text-5xl font-black italic uppercase tracking-tight text-white drop-shadow-md">
               CENTRO DE <span className="text-[#ff751f]">COMANDO</span>
             </h1>
