@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { testDbConnection, dbConfig } from './server/db';
 
 async function startServer() {
   const app = express();
@@ -190,6 +191,24 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
       console.error('Erro no webhook:', err);
       res.status(200).send('OK');
     }
+  });
+
+  // Hostinger MySQL Database Status & Diagnostics
+  app.get('/api/db/status', async (req, res) => {
+    const host = (req.query.host as string) || dbConfig.host;
+    const result = await testDbConnection(host !== dbConfig.host ? host : undefined);
+    res.json({
+      configuredHost: dbConfig.host,
+      database: dbConfig.database,
+      user: dbConfig.user,
+      ...result
+    });
+  });
+
+  app.post('/api/db/test-connection', async (req, res) => {
+    const { host } = req.body;
+    const result = await testDbConnection(host);
+    res.json(result);
   });
 
   // Vite middleware for development or static serving for production
