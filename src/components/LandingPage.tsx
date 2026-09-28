@@ -171,17 +171,17 @@ export function LandingPage() {
   const formatErrorMessage = (message?: string) => {
     if (!message) return 'Ocorreu um erro na autenticação.';
     const lower = message.toLowerCase();
-    if (lower.includes('invalid login credentials') || lower.includes('invalid_grant')) {
-      return 'E-mail ou senha incorretos, ou a conta ainda não foi criada no banco de dados.';
+    if (lower.includes('invalid login credentials') || lower.includes('invalid_grant') || lower.includes('incorretos')) {
+      return 'E-mail ou senha incorretos.';
     }
-    if (lower.includes('user already registered') || lower.includes('already registered')) {
-      return 'Este e-mail já possui cadastro no Supabase Auth.';
+    if (lower.includes('user already registered') || lower.includes('already registered') || lower.includes('já está cadastrado')) {
+      return 'Este e-mail já possui cadastro no MotoLegado. Acesse a aba de login para entrar.';
     }
-    if (lower.includes('password should be at least 6 characters') || lower.includes('at least 6 characters')) {
+    if (lower.includes('password should be at least 6 characters') || lower.includes('at least 6 characters') || lower.includes('mínimo 6')) {
       return 'A senha de acesso deve ter no mínimo 6 caracteres.';
     }
     if (lower.includes('email not confirmed')) {
-      return 'E-mail não confirmado. Verifique sua caixa de entrada ou confirme no painel do Supabase.';
+      return 'E-mail ainda não confirmado. Verifique sua caixa de entrada.';
     }
     if (lower.includes('rate limit')) {
       return 'Muitas tentativas consecutivas. Aguarde alguns segundos e tente novamente.';

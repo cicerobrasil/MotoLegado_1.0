@@ -59,6 +59,22 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
+    // Garantir colunas essenciais caso a tabela 'pilots' já existisse previamente
+    const columnsToEnsure = [
+      "ALTER TABLE pilots ADD COLUMN password_hash VARCHAR(255) NULL AFTER email",
+      "ALTER TABLE pilots ADD COLUMN points INT DEFAULT 0",
+      "ALTER TABLE pilots ADD COLUMN tier VARCHAR(50) DEFAULT 'Bronze'",
+      "ALTER TABLE pilots ADD COLUMN role ENUM('admin', 'pilot', 'partner', 'organizer') DEFAULT 'pilot'",
+      "ALTER TABLE pilots ADD COLUMN plan ENUM('gratuito', 'pago', 'bonificado') DEFAULT 'gratuito'"
+    ];
+    for (const sql of columnsToEnsure) {
+      try {
+        await connection.query(sql);
+      } catch (err: any) {
+        // Ignora se coluna já existir (#1060)
+      }
+    }
+
     // 2. Tabela de Viagens
     await connection.query(`
       CREATE TABLE IF NOT EXISTS trips (
@@ -144,6 +160,13 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
         status ENUM('published', 'flagged', 'archived') DEFAULT 'published',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // Inserir / Garantir Administrador Principal no Banco de Dados
+    await connection.query(`
+      INSERT INTO pilots (id, email, name, role, plan, tier)
+      VALUES ('admin_ciceroranieri', 'ciceroranieri@gmail.com', 'Cícero Ranieri', 'admin', 'pago', 'Diamante')
+      ON DUPLICATE KEY UPDATE role = 'admin', plan = 'pago';
     `);
 
     await connection.end();

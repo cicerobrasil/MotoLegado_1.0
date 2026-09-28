@@ -5,6 +5,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { testDbConnection, initDatabaseTables, getDbPool, dbConfig } from './server/db';
+import { handleRegister, handleLogin, handleGetMe } from './server/auth';
 
 async function startServer() {
   const app = express();
@@ -217,6 +218,11 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
     const result = await initDatabaseTables();
     res.json(result);
   });
+
+  // Hostinger MySQL Real Authentication Endpoints
+  app.post('/api/auth/register', handleRegister);
+  app.post('/api/auth/login', handleLogin);
+  app.get('/api/auth/me/:id', handleGetMe);
 
   // Pilots API
   app.get('/api/pilots/:id', async (req, res) => {

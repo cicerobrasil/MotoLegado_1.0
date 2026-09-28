@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { apiLogin, apiRegister, apiGetMe, syncPilotToHostinger } from '../lib/api';
 
 export interface PilotProfile {
   id: string;
@@ -145,16 +146,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Limpeza de qualquer chave de modo demo legada no armazenamento local
     localStorage.removeItem('motolegado_demo_mode');
 
-    if (!isSupabaseConfigured) {
-      // Se Supabase não estiver configurado, checa se há sessão autenticada localmente salva
-      const storedName = localStorage.getItem('motolegado_pilot_name');
+    const restoreSession = async () => {
+      const storedSession = localStorage.getItem('motolegado_pilot_session');
+      const storedId = localStorage.getItem('motolegado_pilot_id');
       const storedEmail = localStorage.getItem('motolegado_pilot_email');
-      
-      if (storedEmail && storedName) {
+      const storedName = localStorage.getItem('motolegado_pilot_name');
+
+      if (storedSession) {
+        try {
+          const parsed = JSON.parse(storedSession);
+          setProfile(parsed);
+          setUser({
+            id: parsed.id,
+            email: parsed.email,
+            user_metadata: { name: parsed.name },
+            app_metadata: {},
+            aud: 'authenticated',
+            created_at: new Date().toISOString(),
+          } as any);
+
+          // Atualiza dados frescos do MySQL na Hostinger em segundo plano
+          if (parsed.id) {
+            apiGetMe(parsed.id).then((res) => {
+              if (res.data?.success && res.data.pilot) {
+                const updated: PilotProfile = {
+                  ...res.data.pilot,
+                  plan_type: res.data.pilot.plan || 'gratuito',
+                  is_pro: res.data.pilot.role === 'admin' || res.data.pilot.plan === 'pago' || res.data.pilot.plan === 'bonificado',
+                  avatar_url: res.data.pilot.avatar_url || getCleanAvatar(res.data.pilot.name || res.data.pilot.email),
+                };
+                setProfile(updated);
+                localStorage.setItem('motolegado_pilot_session', JSON.stringify(updated));
+              }
+            }).catch(() => {});
+          }
+          setLoading(false);
+          return;
+        } catch (e) {
+          console.warn('Erro ao restaurar sessão salva:', e);
+        }
+      } else if (storedEmail && storedName) {
         const assignedRole = checkIfAdmin(storedEmail, storedName);
         const storedPlan = (localStorage.getItem('motolegado_pilot_plan') as 'gratuito' | 'pago' | 'bonificado') || (assignedRole === 'admin' ? 'pago' : 'gratuito');
-        setProfile({
-          id: 'local-pilot-' + storedEmail,
+        const fallbackProfile: PilotProfile = {
+          id: storedId || ('pilot_' + storedEmail.replace(/[^a-zA-Z0-9]/g, '_')),
           name: storedName,
           email: storedEmail,
           motorcycle: localStorage.getItem('motolegado_pilot_bike') || '',
@@ -164,171 +199,176 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           plan_type: storedPlan,
           role: assignedRole,
           avatar_url: getCleanAvatar(storedName),
-        });
+        };
+        setProfile(fallbackProfile);
+        setUser({
+          id: fallbackProfile.id,
+          email: fallbackProfile.email,
+          user_metadata: { name: fallbackProfile.name },
+          app_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+        } as any);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-      return;
-    }
 
-    // Inicializar sessão ativa no Supabase
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        setUser(session.user);
-        fetchProfile(session.user.id, session.user.email);
-      } else {
-        // Checar se há piloto Google/local salvo no localStorage
-        const storedEmail = localStorage.getItem('motolegado_pilot_email');
-        const storedName = localStorage.getItem('motolegado_pilot_name');
-        if (storedEmail && storedName) {
-          const assignedRole = checkIfAdmin(storedEmail, storedName);
-          const storedPlan = (localStorage.getItem('motolegado_pilot_plan') as 'gratuito' | 'pago' | 'bonificado') || (assignedRole === 'admin' ? 'pago' : 'gratuito');
-          const isPro = assignedRole === 'admin' || storedPlan === 'pago' || storedPlan === 'bonificado';
-          const restoredProfile: PilotProfile = {
-            id: 'google-pilot-' + storedEmail.replace(/[^a-zA-Z0-9]/g, '_'),
-            name: storedName,
-            email: storedEmail,
-            motorcycle: localStorage.getItem('motolegado_pilot_bike') || '',
-            points: 0,
-            tier: 'Bronze',
-            is_pro: isPro,
-            plan_type: storedPlan,
-            role: assignedRole,
-            avatar_url: getCleanAvatar(storedName),
-          };
-          setProfile(restoredProfile);
-          setUser({
-            id: restoredProfile.id,
-            email: restoredProfile.email,
-            user_metadata: { name: restoredProfile.name },
-            app_metadata: {},
-            aud: 'authenticated',
-            created_at: new Date().toISOString(),
-          } as any);
-        } else {
-          setUser(null);
+      if (!isSupabaseConfigured) {
+        setLoading(false);
+        return;
+      }
+
+      // Se Supabase ainda estiver configurado
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        if (session?.user) {
+          setUser(session.user);
+          fetchProfile(session.user.id, session.user.email);
         }
-      }
-      setLoading(false);
-    });
-
-    // Escutar alterações de autenticação (login, logout, refresh de token, OAuth redirect)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (session?.user) {
-        setUser(session.user);
-        fetchProfile(session.user.id, session.user.email);
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setProfile(null);
-        localStorage.removeItem('motolegado_pilot_name');
-        localStorage.removeItem('motolegado_pilot_email');
-        localStorage.removeItem('motolegado_pilot_plan');
-      }
-      setLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
+        setLoading(false);
+      });
     };
-  }, []);
 
-  // Entrar com E-mail e Senha
-  const signInWithEmail = async (email: string, password: string) => {
-    if (!isSupabaseConfigured) {
-      // Fallback de autenticação local limpa
-      const name = email.split('@')[0];
-      const assignedRole = checkIfAdmin(email, name);
-      const storedPlan = (localStorage.getItem('motolegado_pilot_plan') as 'gratuito' | 'pago' | 'bonificado') || (assignedRole === 'admin' ? 'pago' : 'gratuito');
-      const customProfile: PilotProfile = { 
-        id: 'local-pilot-' + email,
-        email, 
-        name,
-        motorcycle: '',
-        points: 0,
-        tier: 'Bronze',
-        is_pro: assignedRole === 'admin' || storedPlan === 'pago' || storedPlan === 'bonificado',
-        plan_type: storedPlan,
-        role: assignedRole,
-        avatar_url: getCleanAvatar(name),
-      };
-      setProfile(customProfile);
-      localStorage.setItem('motolegado_pilot_name', customProfile.name);
-      localStorage.setItem('motolegado_pilot_email', email);
-      return { error: null };
-    }
+    restoreSession();
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+    if (isSupabaseConfigured) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        setSession(session);
+        if (session?.user) {
+          setUser(session.user);
+          fetchProfile(session.user.id, session.user.email);
+        } else if (event === 'SIGNED_OUT') {
+          signOut();
+        }
+        setLoading(false);
       });
 
-      if (error) throw error;
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, []);
 
-      if (data.user) {
-        await fetchProfile(data.user.id, data.user.email);
+  // Entrar com E-mail e Senha (Autenticação Real com Senha no MySQL da Hostinger)
+  const signInWithEmail = async (email: string, password: string) => {
+    // 1. Tentar Login Real na API MySQL do MotoLegado (Hostinger)
+    const res = await apiLogin(email, password);
+
+    if (res.data?.success && res.data.pilot) {
+      const pilot = res.data.pilot;
+      const normalizedProfile: PilotProfile = {
+        ...pilot,
+        plan_type: pilot.plan || 'gratuito',
+        is_pro: pilot.role === 'admin' || pilot.plan === 'pago' || pilot.plan === 'bonificado',
+        avatar_url: pilot.avatar_url || getCleanAvatar(pilot.name || email),
+      };
+
+      setProfile(normalizedProfile);
+      setUser({
+        id: normalizedProfile.id,
+        email: normalizedProfile.email,
+        user_metadata: { name: normalizedProfile.name },
+        app_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date().toISOString(),
+      } as any);
+
+      localStorage.setItem('motolegado_pilot_session', JSON.stringify(normalizedProfile));
+      localStorage.setItem('motolegado_pilot_id', normalizedProfile.id);
+      localStorage.setItem('motolegado_pilot_name', normalizedProfile.name);
+      localStorage.setItem('motolegado_pilot_email', normalizedProfile.email);
+      localStorage.setItem('motolegado_pilot_plan', normalizedProfile.plan_type);
+      if (normalizedProfile.motorcycle) {
+        localStorage.setItem('motolegado_pilot_bike', normalizedProfile.motorcycle);
       }
 
       return { error: null };
-    } catch (err: any) {
-      return { error: err };
     }
+
+    // Se o backend retornou erro (ex: credenciais incorretas)
+    if (res.error) {
+      // Se Supabase ainda estiver configurado como contingência
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+          if (data.user) await fetchProfile(data.user.id, data.user.email);
+          return { error: null };
+        } catch (err: any) {
+          return { error: err };
+        }
+      }
+
+      return { error: new Error(res.error) };
+    }
+
+    return { error: new Error('Não foi possível autenticar. Verifique suas credenciais.') };
   };
 
-  // Cadastrar com E-mail e Senha
+  // Cadastrar com E-mail e Senha (Autenticação Real no MySQL da Hostinger)
   const signUpWithEmail = async (
     email: string,
     password: string,
     metadata: { name: string; motorcycle?: string }
   ) => {
-    if (!isSupabaseConfigured) {
-      const name = metadata.name || email.split('@')[0];
-      const assignedRole = checkIfAdmin(email, name);
-      const customProfile: PilotProfile = {
-        id: 'local-pilot-' + email,
-        name,
-        email,
-        motorcycle: metadata.motorcycle || '',
-        points: 0,
-        tier: 'Bronze',
-        is_pro: assignedRole === 'admin',
-        plan_type: assignedRole === 'admin' ? 'pago' : 'gratuito',
-        role: assignedRole,
-        avatar_url: getCleanAvatar(name),
+    // 1. Cadastro Direto no MySQL da Hostinger
+    const res = await apiRegister({
+      email,
+      password,
+      name: metadata.name,
+      motorcycle: metadata.motorcycle,
+    });
+
+    if (res.data?.success && res.data.pilot) {
+      const pilot = res.data.pilot;
+      const normalizedProfile: PilotProfile = {
+        ...pilot,
+        plan_type: pilot.plan || 'gratuito',
+        is_pro: pilot.role === 'admin' || pilot.plan === 'pago' || pilot.plan === 'bonificado',
+        avatar_url: pilot.avatar_url || getCleanAvatar(pilot.name || email),
       };
-      setProfile(customProfile);
-      localStorage.setItem('motolegado_pilot_name', customProfile.name);
-      localStorage.setItem('motolegado_pilot_email', email);
+
+      setProfile(normalizedProfile);
+      setUser({
+        id: normalizedProfile.id,
+        email: normalizedProfile.email,
+        user_metadata: { name: normalizedProfile.name },
+        app_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date().toISOString(),
+      } as any);
+
+      localStorage.setItem('motolegado_pilot_session', JSON.stringify(normalizedProfile));
+      localStorage.setItem('motolegado_pilot_id', normalizedProfile.id);
+      localStorage.setItem('motolegado_pilot_name', normalizedProfile.name);
+      localStorage.setItem('motolegado_pilot_email', normalizedProfile.email);
+      localStorage.setItem('motolegado_pilot_plan', normalizedProfile.plan_type);
       if (metadata.motorcycle) {
         localStorage.setItem('motolegado_pilot_bike', metadata.motorcycle);
       }
+
       return { error: null };
     }
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: metadata.name,
-            name: metadata.name,
-            motorcycle: metadata.motorcycle,
-          },
-        },
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        await fetchProfile(data.user.id, data.user.email);
+    if (res.error) {
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { data: { name: metadata.name, motorcycle: metadata.motorcycle } }
+          });
+          if (error) throw error;
+          if (data.user) await fetchProfile(data.user.id, data.user.email);
+          return { error: null };
+        } catch (err: any) {
+          return { error: err };
+        }
       }
-
-      return { error: null };
-    } catch (err: any) {
-      return { error: err };
+      return { error: new Error(res.error) };
     }
+
+    return { error: new Error('Não foi possível concluir o cadastro.') };
   };
 
   // Login Social com o Google via Supabase OAuth (com suporte a Popup para iFrames)
@@ -488,7 +528,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Encerrar Sessão
   const signOut = async () => {
+    localStorage.removeItem('motolegado_pilot_session');
+    localStorage.removeItem('motolegado_pilot_id');
     localStorage.removeItem('motolegado_pilot_email');
+    localStorage.removeItem('motolegado_pilot_name');
+    localStorage.removeItem('motolegado_pilot_plan');
     localStorage.removeItem('motolegado_pilot_bike');
     localStorage.removeItem('motolegado_demo_mode');
     setUser(null);
@@ -510,9 +554,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const updated = { ...profile, ...updates };
     setProfile(updated);
+    localStorage.setItem('motolegado_pilot_session', JSON.stringify(updated));
     if (updates.name) {
       localStorage.setItem('motolegado_pilot_name', updates.name);
     }
+
+    // Sincroniza atualização no MySQL da Hostinger
+    syncPilotToHostinger(updated).catch(() => {});
 
     if (isSupabaseConfigured && user) {
       try {
