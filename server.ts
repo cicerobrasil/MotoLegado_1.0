@@ -1,14 +1,15 @@
+import 'dotenv/config';
 import http from 'http';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { testDbConnection, dbConfig } from './server/db';
+import { testDbConnection, initDatabaseTables, getDbPool, dbConfig } from './server/db';
 
 async function startServer() {
   const app = express();
   const httpServer = http.createServer(app);
-  const PORT = 3000;
+  const PORT = parseInt(process.env.PORT || '3000', 10);
 
   app.use(express.json());
 
@@ -210,6 +211,89 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
     const result = await testDbConnection(host);
     res.json(result);
   });
+
+  // Hostinger MySQL Auto-Initialize Tables
+  app.post('/api/db/init', async (req, res) => {
+    const result = await initDatabaseTables();
+    res.json(result);
+  });
+
+  // Pilots API
+  app.get('/api/pilots/:id', async (req, res) => {
+    try {
+      const pool = getDbPool();
+      const [rows]: any = await pool.query('SELECT * FROM pilots WHERE id = ?', [req.params.id]);
+      if (rows && rows.length > 0) {
+        return res.json({ success: true, pilot: rows[0] });
+      }
+      return res.status(404).json({ success: false, error: 'Piloto não encontrado' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/pilots', async (req, res) => {
+    try {
+      const pool = getDbPool();
+      const { id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone, role, plan } = req.body;
+      await pool.query(`
+        INSERT INTO pilots (id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone, role, plan)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          name = VALUES(name),
+          motorcycle = VALUES(motorcycle),
+          phone = VALUES(phone),
+          blood_type = VALUES(blood_type),
+          emergency_contact = VALUES(emergency_contact),
+          emergency_phone = VALUES(emergency_phone),
+          role = VALUES(role),
+          plan = VALUES(plan)
+      `, [id, email, name, motorcycle || null, phone || null, blood_type || null, emergency_contact || null, emergency_phone || null, role || 'pilot', plan || 'gratuito']);
+      res.json({ success: true, message: 'Perfil do piloto salvo no MySQL com sucesso!' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Trips API
+  app.get('/api/trips', async (req, res) => {
+    try {
+      const pool = getDbPool();
+      const pilotId = req.query.pilot_id;
+      const query = pilotId ? 'SELECT * FROM trips WHERE pilot_id = ? ORDER BY created_at DESC' : 'SELECT * FROM trips ORDER BY created_at DESC';
+      const params = pilotId ? [pilotId] : [];
+      const [rows] = await pool.query(query, params);
+      res.json({ success: true, trips: rows });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/trips', async (req, res) => {
+    try {
+      const pool = getDbPool();
+      const { id, pilot_id, title, destination, distance_km, start_date, motorcycle_used, checklist_data, photos } = req.body;
+      await pool.query(`
+        INSERT INTO trips (id, pilot_id, title, destination, distance_km, start_date, motorcycle_used, checklist_data, photos)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [id, pilot_id, title, destination, distance_km || 0, start_date, motorcycle_used || null, JSON.stringify(checklist_data || {}), JSON.stringify(photos || [])]);
+      res.json({ success: true, message: 'Viagem registrada com sucesso no MySQL!' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Tentativa silenciosa de inicialização das tabelas na Hostinger em segundo plano
+  setTimeout(async () => {
+    try {
+      const initResult = await initDatabaseTables();
+      if (initResult.success) {
+        console.log('[Hostinger MySQL] Tabelas verificadas e prontas!');
+      }
+    } catch {
+      // Silencioso se estiver offline ou em ambiente sem acesso direto
+    }
+  }, 2000);
 
   // Vite middleware for development or static serving for production
   if (process.env.NODE_ENV !== 'production') {

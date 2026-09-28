@@ -1,11 +1,11 @@
 import mysql from 'mysql2/promise';
 
-// Configuração da conexão MySQL na Hostinger
+// Configuração da conexão MySQL na Hostinger via Variáveis de Ambiente (.env)
 export const dbConfig = {
-  host: process.env.MYSQL_HOST || '127.0.0.1',
+  host: process.env.MYSQL_HOST || 'localhost',
   port: parseInt(process.env.MYSQL_PORT || '3306', 10),
   user: process.env.MYSQL_USER || 'u342198764_admsql',
-  password: process.env.MYSQL_PASSWORD || 'D4?2EOEwy',
+  password: process.env.MYSQL_PASSWORD || '',
   database: process.env.MYSQL_DATABASE || 'u342198764_motolegado',
   waitForConnections: true,
   connectionLimit: 10,
@@ -20,6 +20,137 @@ export function getDbPool(): mysql.Pool {
     pool = mysql.createPool(dbConfig);
   }
   return pool;
+}
+
+// Criação automática de tabelas na inicialização do servidor
+export async function initDatabaseTables(): Promise<{ success: boolean; message: string }> {
+  try {
+    const connection = await mysql.createConnection({
+      host: dbConfig.host,
+      port: dbConfig.port,
+      user: dbConfig.user,
+      password: dbConfig.password,
+      database: dbConfig.database,
+      connectTimeout: 7000,
+    });
+
+    // 1. Tabela de Pilotos
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS pilots (
+        id VARCHAR(64) PRIMARY KEY,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NULL,
+        name VARCHAR(150) NOT NULL,
+        phone VARCHAR(30) NULL,
+        blood_type VARCHAR(10) NULL,
+        emergency_contact VARCHAR(150) NULL,
+        emergency_phone VARCHAR(30) NULL,
+        motorcycle VARCHAR(150) NULL,
+        motorcycle_year VARCHAR(10) NULL,
+        motorcycle_plate VARCHAR(20) NULL,
+        bio TEXT NULL,
+        avatar_url TEXT NULL,
+        role ENUM('admin', 'pilot', 'partner', 'organizer') DEFAULT 'pilot',
+        plan ENUM('gratuito', 'pago', 'bonificado') DEFAULT 'gratuito',
+        points INT DEFAULT 0,
+        tier VARCHAR(50) DEFAULT 'Bronze',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 2. Tabela de Viagens
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS trips (
+        id VARCHAR(64) PRIMARY KEY,
+        pilot_id VARCHAR(64) NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        description TEXT NULL,
+        start_location VARCHAR(200) NULL,
+        destination VARCHAR(200) NOT NULL,
+        distance_km DECIMAL(10,2) DEFAULT 0,
+        start_date DATE NOT NULL,
+        end_date DATE NULL,
+        status ENUM('planned', 'in_progress', 'completed') DEFAULT 'completed',
+        motorcycle_used VARCHAR(150) NULL,
+        checklist_data JSON NULL,
+        photos JSON NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 3. Tabela de Rotas
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS routes (
+        id VARCHAR(64) PRIMARY KEY,
+        author_id VARCHAR(64) NULL,
+        title VARCHAR(200) NOT NULL,
+        description TEXT NULL,
+        state VARCHAR(10) NULL,
+        city VARCHAR(100) NULL,
+        distance_km DECIMAL(10,2) DEFAULT 0,
+        difficulty ENUM('facil', 'moderada', 'dificil', 'extrema') DEFAULT 'moderada',
+        road_type VARCHAR(100) NULL,
+        cover_image TEXT NULL,
+        waypoints JSON NULL,
+        status ENUM('approved', 'pending', 'rejected') DEFAULT 'approved',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 4. Tabela de Eventos
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS events (
+        id VARCHAR(64) PRIMARY KEY,
+        organizer_id VARCHAR(64) NULL,
+        title VARCHAR(200) NOT NULL,
+        description TEXT NULL,
+        event_date DATE NOT NULL,
+        location VARCHAR(255) NOT NULL,
+        city VARCHAR(100) NULL,
+        state VARCHAR(10) NULL,
+        banner_url TEXT NULL,
+        status ENUM('active', 'pending', 'cancelled') DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 5. Tabela de Parceiros
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS partners (
+        id VARCHAR(64) PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        description TEXT NULL,
+        address VARCHAR(255) NULL,
+        city VARCHAR(100) NULL,
+        state VARCHAR(10) NULL,
+        phone VARCHAR(30) NULL,
+        discount_info VARCHAR(200) NULL,
+        logo_url TEXT NULL,
+        status ENUM('approved', 'pending', 'inactive') DEFAULT 'approved',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 6. Tabela da Comunidade
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS community_posts (
+        id VARCHAR(64) PRIMARY KEY,
+        pilot_id VARCHAR(64) NOT NULL,
+        content TEXT NOT NULL,
+        image_url TEXT NULL,
+        likes_count INT DEFAULT 0,
+        status ENUM('published', 'flagged', 'archived') DEFAULT 'published',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    await connection.end();
+    return { success: true, message: 'Tabelas MySQL inicializadas com sucesso na Hostinger!' };
+  } catch (err: any) {
+    return { success: false, message: err?.message || 'Erro ao inicializar tabelas' };
+  }
 }
 
 export async function testDbConnection(overrideHost?: string): Promise<{ success: boolean; message: string; tables?: string[] }> {
