@@ -23,7 +23,6 @@ import { isUserProOrBonificado } from "../lib/permissions";
 import { UpgradeModal } from "./UpgradeModal";
 import { PWAInstallButton } from "./PWAInstallButton";
 import { LogoMark } from "./LogoMark";
-import { TourButton } from "./TourButton";
 import { getPilotLiveGamification } from "../lib/gamification";
 
 interface MenuItem {
@@ -176,13 +175,13 @@ export function Sidebar({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }
                 data-tour={tourAttr}
                 onClick={() => setIsOpen(false)}
                 className={cn(
-                  "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 group relative",
+                  "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 group relative font-bold uppercase text-xs tracking-wider",
                   isActive 
-                    ? "bg-[#ff751f]/15 text-[#ff751f] font-black italic uppercase text-xs tracking-widest shadow-sm" 
-                    : "text-slate-300 hover:text-white hover:bg-white/5 font-bold uppercase text-[10px] tracking-widest"
+                    ? "bg-[#ff751f]/15 text-[#ff751f] shadow-sm" 
+                    : "text-slate-300 hover:text-white hover:bg-white/5"
                 )}
               >
-                <item.icon size={18} className={cn(isActive ? "text-[#ff751f]" : "group-hover:text-[#ff751f] group-hover:scale-110 transition-all")} />
+                <item.icon size={18} className={cn(isActive ? "text-[#ff751f]" : "text-slate-400 group-hover:text-[#ff751f] transition-colors")} />
                 <span>{item.label}</span>
                 {isActive && (
                   <motion.div 
@@ -223,9 +222,8 @@ export function Sidebar({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }
             </div>
           </Link>
 
-          {/* Action: PWA Install & Guided Tour */}
+          {/* Action: PWA Install */}
           <div className="space-y-2 pt-1">
-            <TourButton variant="sidebar" />
             <PWAInstallButton variant="sidebar" />
           </div>
 

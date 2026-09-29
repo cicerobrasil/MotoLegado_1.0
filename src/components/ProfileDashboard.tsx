@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, FileText, Lock, CheckCircle2, ShieldCheck, BookOpen, Sparkles, Crown } from 'lucide-react';
+import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, Lock, CheckCircle2, ShieldCheck, BookOpen, Sparkles, Crown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -136,20 +136,16 @@ export function ProfileDashboard() {
            </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full md:w-auto">
-          <button className="flex-1 md:flex-none px-4 sm:px-6 py-2.5 sm:py-3 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center gap-2 sm:gap-3 group hover:border-orange-500/50 transition-all">
-            <FileText size={16} className="text-slate-500 group-hover:text-orange-500 transition-colors" />
-            <span className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest group-hover:text-white transition-colors">PDF</span>
-          </button>
           <button 
             onClick={() => navigate('/profile/settings')}
-            className="flex-1 md:flex-none px-4 sm:px-6 py-2.5 sm:py-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center gap-2 sm:gap-3 group hover:border-orange-500/50 transition-all active:scale-95"
+            className="flex-1 md:flex-none px-4 sm:px-6 py-2.5 sm:py-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center gap-2 sm:gap-3 group hover:border-orange-500/50 transition-all active:scale-95 cursor-pointer"
           >
             <Settings size={16} className="text-slate-500 group-hover:text-orange-500 transition-colors" />
             <span className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest group-hover:text-white transition-colors">CONFIGURAÇÕES</span>
           </button>
           <button 
             onClick={() => navigate('/logbook')}
-            className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-orange-600 rounded-2xl flex items-center justify-center gap-2 sm:gap-3 shadow-xl shadow-orange-600/20 hover:bg-orange-500 transition-all active:scale-95"
+            className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-orange-600 rounded-2xl flex items-center justify-center gap-2 sm:gap-3 shadow-xl shadow-orange-600/20 hover:bg-orange-500 transition-all active:scale-95 cursor-pointer"
           >
             <span className="text-[10px] sm:text-[11px] font-black text-white uppercase tracking-widest">DIÁRIO DE BORDO</span>
           </button>

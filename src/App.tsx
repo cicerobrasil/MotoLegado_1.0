@@ -25,6 +25,8 @@ import { PWAInstallBanner } from "./components/PWAInstallBanner";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { AccessibilityModal } from "./components/AccessibilityModal";
 import { OnboardingTour } from "./components/OnboardingTour";
+import { PilotGuideModal } from "./components/PilotGuideModal";
+import { ScrollToTop } from "./components/ScrollToTop";
 import { cn } from "./lib/utils";
 import "./utils/systemReset";
 
@@ -76,8 +78,14 @@ function AppLayout() {
       {/* Modal for Visual & Typography Settings */}
       <AccessibilityModal />
 
+      {/* Comprehensive Pilot's Guide & Manual Modal */}
+      <PilotGuideModal />
+
       {/* Interactive First Access Onboarding Tour & Tooltips */}
       <OnboardingTour />
+
+      {/* Floating Scroll to Top Button & Route Scroll Reset */}
+      <ScrollToTop />
 
       {/* PWA In-App Mobile Install Banner & Offline Connectivity Indicator */}
       <PWAInstallBanner />

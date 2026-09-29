@@ -86,6 +86,9 @@ interface TourContextType {
   prevStep: () => void;
   skipTour: () => void;
   goToStep: (index: number) => void;
+  isGuideModalOpen: boolean;
+  openGuideModal: () => void;
+  closeGuideModal: () => void;
 }
 
 const TourContext = createContext<TourContextType | undefined>(undefined);
@@ -93,6 +96,7 @@ const TourContext = createContext<TourContextType | undefined>(undefined);
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const [isActive, setIsActive] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
 
   // Check if first-time user on dashboard
   useEffect(() => {
@@ -107,7 +111,17 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const openGuideModal = () => {
+    setIsActive(false);
+    setIsGuideModalOpen(true);
+  };
+
+  const closeGuideModal = () => {
+    setIsGuideModalOpen(false);
+  };
+
   const startTour = (fromBeginning = true) => {
+    setIsGuideModalOpen(false);
     if (fromBeginning) {
       setCurrentStepIndex(0);
     }
@@ -155,7 +169,10 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         nextStep,
         prevStep,
         skipTour,
-        goToStep
+        goToStep,
+        isGuideModalOpen,
+        openGuideModal,
+        closeGuideModal
       }}
     >
       {children}
