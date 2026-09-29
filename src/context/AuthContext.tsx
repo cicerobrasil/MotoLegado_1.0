@@ -183,6 +183,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!parsed.city) parsed.city = localStorage.getItem('motolegado_pilot_city') || '';
           if (!parsed.state) parsed.state = localStorage.getItem('motolegado_pilot_state') || '';
 
+          // Verificar registro persistente permanente por email
+          if (parsed.email) {
+            try {
+              const savedPermanent = localStorage.getItem('motolegado_pilot_saved_' + parsed.email.toLowerCase().trim());
+              if (savedPermanent) {
+                const sp = JSON.parse(savedPermanent);
+                if (!parsed.motorcycle && sp.motorcycle) parsed.motorcycle = sp.motorcycle;
+                if (!parsed.motorcycle_nickname && sp.motorcycle_nickname) parsed.motorcycle_nickname = sp.motorcycle_nickname;
+                if (!parsed.motorcycle_year && sp.motorcycle_year) parsed.motorcycle_year = sp.motorcycle_year;
+                if (!parsed.motorcycle_plate && sp.motorcycle_plate) parsed.motorcycle_plate = sp.motorcycle_plate;
+                if ((!parsed.motorcycle_photos || parsed.motorcycle_photos.length === 0) && sp.motorcycle_photos) {
+                  parsed.motorcycle_photos = sp.motorcycle_photos;
+                }
+              }
+            } catch {}
+          }
+
           setProfile(parsed);
           setUser({
             id: parsed.id,
@@ -313,15 +330,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Entrar com E-mail e Senha (Autenticação Real com Senha no MySQL da Hostinger)
+  // Entrar com E-mail e Senha (Autenticação Real com Senha no MySQL da Hostinger / Armazenamento Resiliente)
   const signInWithEmail = async (email: string, password: string) => {
-    // 1. Tentar Login Real na API MySQL do MotoLegado (Hostinger)
+    // 1. Tentar Login na API do MotoLegado
     const res = await apiLogin(email, password);
 
     if (res.data?.success && res.data.pilot) {
       const pilot = res.data.pilot;
+      const cleanEmail = email.toLowerCase().trim();
+      let savedPermanent: any = null;
+      try {
+        const savedStr = localStorage.getItem('motolegado_pilot_saved_' + cleanEmail);
+        if (savedStr) savedPermanent = JSON.parse(savedStr);
+      } catch {}
+
+      const motorcycleVal = pilot.motorcycle || savedPermanent?.motorcycle || localStorage.getItem('motolegado_pilot_bike') || '';
+      const motorcycleNicknameVal = pilot.motorcycle_nickname || savedPermanent?.motorcycle_nickname || localStorage.getItem('motolegado_pilot_bike_nickname') || '';
+      const motorcycleYearVal = pilot.motorcycle_year || savedPermanent?.motorcycle_year || localStorage.getItem('motolegado_pilot_bike_year') || '2023';
+      const motorcyclePlateVal = pilot.motorcycle_plate || savedPermanent?.motorcycle_plate || localStorage.getItem('motolegado_pilot_bike_plate') || '';
+      const motorcyclePhotosVal = (pilot.motorcycle_photos && pilot.motorcycle_photos.length > 0)
+        ? (typeof pilot.motorcycle_photos === 'string' ? JSON.parse(pilot.motorcycle_photos) : pilot.motorcycle_photos)
+        : (savedPermanent?.motorcycle_photos || []);
+
       const normalizedProfile: PilotProfile = {
         ...pilot,
+        motorcycle: motorcycleVal,
+        motorcycle_nickname: motorcycleNicknameVal,
+        motorcycle_year: motorcycleYearVal,
+        motorcycle_plate: motorcyclePlateVal,
+        motorcycle_photos: motorcyclePhotosVal,
         plan_type: pilot.plan || 'gratuito',
         is_pro: pilot.role === 'admin' || pilot.plan === 'pago' || pilot.plan === 'bonificado',
         avatar_url: pilot.avatar_url || getCleanAvatar(pilot.name || email),
@@ -342,9 +379,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('motolegado_pilot_name', normalizedProfile.name);
       localStorage.setItem('motolegado_pilot_email', normalizedProfile.email);
       localStorage.setItem('motolegado_pilot_plan', normalizedProfile.plan_type);
-      if (normalizedProfile.motorcycle) {
-        localStorage.setItem('motolegado_pilot_bike', normalizedProfile.motorcycle);
+      if (motorcycleVal) {
+        localStorage.setItem('motolegado_pilot_bike', motorcycleVal);
       }
+      try {
+        localStorage.setItem('motolegado_pilot_saved_' + cleanEmail, JSON.stringify(normalizedProfile));
+      } catch {}
 
       return { error: null };
     }
@@ -544,26 +584,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Login com a conta Google identificada
+  // Login com a conta Google identificada (com recuperação instantânea do perfil e motocicleta)
   const signInWithGoogleQuick = async (
     email = 'ciceroranieri@gmail.com',
     name = 'Cícero Ranieri',
     avatarUrl?: string
   ): Promise<{ error: Error | null }> => {
-    const assignedRole = checkIfAdmin(email, name);
+    const cleanEmail = email.toLowerCase().trim();
+    const assignedRole = checkIfAdmin(cleanEmail, name);
     const storedPlan = (localStorage.getItem('motolegado_pilot_plan') as 'gratuito' | 'pago' | 'bonificado') || (assignedRole === 'admin' ? 'pago' : 'gratuito');
     const isPro = assignedRole === 'admin' || storedPlan === 'pago' || storedPlan === 'bonificado';
+
+    // Recuperar dados persistentes salvos da motocicleta e biografia para este piloto
+    let savedPermanent: any = null;
+    try {
+      const savedStr = localStorage.getItem('motolegado_pilot_saved_' + cleanEmail);
+      if (savedStr) savedPermanent = JSON.parse(savedStr);
+    } catch {}
+
+    const motorcycleVal = savedPermanent?.motorcycle || localStorage.getItem('motolegado_pilot_bike') || '';
+    const motorcycleNicknameVal = savedPermanent?.motorcycle_nickname || localStorage.getItem('motolegado_pilot_bike_nickname') || '';
+    const motorcycleYearVal = savedPermanent?.motorcycle_year || localStorage.getItem('motolegado_pilot_bike_year') || '2023';
+    const motorcyclePlateVal = savedPermanent?.motorcycle_plate || localStorage.getItem('motolegado_pilot_bike_plate') || '';
+    const motorcyclePhotosVal = savedPermanent?.motorcycle_photos || [];
+
     const customProfile: PilotProfile = {
-      id: 'google-pilot-' + email.replace(/[^a-zA-Z0-9]/g, '_'),
-      name,
-      email,
-      motorcycle: localStorage.getItem('motolegado_pilot_bike') || '',
-      points: 0,
-      tier: 'Bronze',
+      id: savedPermanent?.id || ('google-pilot-' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')),
+      name: savedPermanent?.name || name,
+      email: cleanEmail,
+      phone: savedPermanent?.phone || localStorage.getItem('motolegado_pilot_phone') || '',
+      bio: savedPermanent?.bio || localStorage.getItem('motolegado_pilot_bio') || '',
+      city: savedPermanent?.city || localStorage.getItem('motolegado_pilot_city') || '',
+      state: savedPermanent?.state || localStorage.getItem('motolegado_pilot_state') || '',
+      cep: savedPermanent?.cep || '',
+      street: savedPermanent?.street || '',
+      street_number: savedPermanent?.street_number || '',
+      neighborhood: savedPermanent?.neighborhood || '',
+      default_start_point: savedPermanent?.default_start_point ?? true,
+      motorcycle: motorcycleVal,
+      motorcycle_nickname: motorcycleNicknameVal,
+      motorcycle_year: motorcycleYearVal,
+      motorcycle_plate: motorcyclePlateVal,
+      motorcycle_photos: motorcyclePhotosVal,
+      personal_logo_url: savedPermanent?.personal_logo_url || localStorage.getItem('motolegado_pilot_logo') || undefined,
+      points: savedPermanent?.points ?? (assignedRole === 'admin' ? 1000 : 0),
+      tier: savedPermanent?.tier || (assignedRole === 'admin' ? 'Diamante' : 'Bronze'),
       is_pro: isPro,
       plan_type: storedPlan,
       role: assignedRole,
-      avatar_url: avatarUrl || getCleanAvatar(name),
+      avatar_url: avatarUrl || savedPermanent?.avatar_url || getCleanAvatar(name),
     };
 
     setProfile(customProfile);
@@ -575,9 +644,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       aud: 'authenticated',
       created_at: new Date().toISOString(),
     } as any);
-    localStorage.setItem('motolegado_pilot_name', name);
-    localStorage.setItem('motolegado_pilot_email', email);
+
+    localStorage.setItem('motolegado_pilot_session', JSON.stringify(customProfile));
+    localStorage.setItem('motolegado_pilot_id', customProfile.id);
+    localStorage.setItem('motolegado_pilot_name', customProfile.name);
+    localStorage.setItem('motolegado_pilot_email', cleanEmail);
     localStorage.setItem('motolegado_pilot_plan', storedPlan);
+    if (motorcycleVal) {
+      localStorage.setItem('motolegado_pilot_bike', motorcycleVal);
+    }
+    try {
+      localStorage.setItem('motolegado_pilot_saved_' + cleanEmail, JSON.stringify(customProfile));
+    } catch {}
+
+    // Sincronizar em segundo plano com a API do servidor
+    apiGetMe(cleanEmail).then((res) => {
+      if (res.data?.success && res.data.pilot) {
+        const p = res.data.pilot;
+        setProfile(prev => {
+          if (!prev) return prev;
+          const merged: PilotProfile = {
+            ...prev,
+            motorcycle: p.motorcycle || prev.motorcycle,
+            motorcycle_nickname: p.motorcycle_nickname || prev.motorcycle_nickname,
+            motorcycle_year: p.motorcycle_year || prev.motorcycle_year,
+            motorcycle_plate: p.motorcycle_plate || prev.motorcycle_plate,
+            bio: p.bio || prev.bio,
+            phone: p.phone || prev.phone,
+            city: p.city || prev.city,
+            state: p.state || prev.state,
+          };
+          localStorage.setItem('motolegado_pilot_session', JSON.stringify(merged));
+          if (merged.motorcycle) localStorage.setItem('motolegado_pilot_bike', merged.motorcycle);
+          return merged;
+        });
+      }
+    }).catch(() => {});
 
     if (isSupabaseConfigured) {
       try {
@@ -590,22 +692,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
-  // Encerrar Sessão
+  // Encerrar Sessão (Mantém dados do piloto guardados no dispositivo sem apagá-los)
   const signOut = async () => {
-    // 1. Limpeza imediata e síncrona de todas as chaves do piloto no armazenamento local
+    // 1. Limpeza apenas dos tokens de sessão ativa atual (preserva o perfil da moto e histórico do piloto no dispositivo)
     localStorage.removeItem('motolegado_pilot_session');
     localStorage.removeItem('motolegado_pilot_id');
-    localStorage.removeItem('motolegado_pilot_email');
-    localStorage.removeItem('motolegado_pilot_name');
-    localStorage.removeItem('motolegado_pilot_plan');
-    localStorage.removeItem('motolegado_pilot_bike');
-    localStorage.removeItem('motolegado_pilot_bike_nickname');
-    localStorage.removeItem('motolegado_pilot_bike_year');
-    localStorage.removeItem('motolegado_pilot_bike_plate');
-    localStorage.removeItem('motolegado_pilot_bike_photos');
-    localStorage.removeItem('motolegado_pilot_address');
-    localStorage.removeItem('motolegado_pilot_profile');
-    localStorage.removeItem('motolegado_demo_mode');
 
     // Limpa tokens do Supabase no localStorage para garantir deslogue instantâneo
     try {
@@ -617,7 +708,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch {}
 
-    // 2. Limpeza imediata dos estados React
+    // 2. Limpeza imediata dos estados React de autenticação ativa
     setUser(null);
     setProfile(null);
     setSession(null);
@@ -644,28 +735,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = async (updates: Partial<PilotProfile>) => {
     if (!profile) return { error: new Error('Nenhum perfil ativo.') };
 
-    const updated = { ...profile, ...updates };
+    const updated: PilotProfile = { ...profile, ...updates };
     setProfile(updated);
-    localStorage.setItem('motolegado_pilot_session', JSON.stringify(updated));
-    if (updates.name !== undefined) localStorage.setItem('motolegado_pilot_name', updates.name);
-    if (updates.email !== undefined) localStorage.setItem('motolegado_pilot_email', updates.email);
-    if (updates.phone !== undefined) localStorage.setItem('motolegado_pilot_phone', updates.phone);
-    if (updates.bio !== undefined) localStorage.setItem('motolegado_pilot_bio', updates.bio);
-    if (updates.motorcycle !== undefined) localStorage.setItem('motolegado_pilot_bike', updates.motorcycle);
-    if (updates.motorcycle_nickname !== undefined) localStorage.setItem('motolegado_pilot_bike_nickname', updates.motorcycle_nickname);
-    if (updates.motorcycle_year !== undefined) localStorage.setItem('motolegado_pilot_bike_year', updates.motorcycle_year);
-    if (updates.motorcycle_plate !== undefined) localStorage.setItem('motolegado_pilot_bike_plate', updates.motorcycle_plate);
-    if (updates.motorcycle_photos !== undefined) localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(updates.motorcycle_photos));
-    if (updates.city !== undefined) localStorage.setItem('motolegado_pilot_city', updates.city);
-    if (updates.state !== undefined) localStorage.setItem('motolegado_pilot_state', updates.state);
-    if (updates.personal_logo_url !== undefined) localStorage.setItem('motolegado_pilot_logo', updates.personal_logo_url || '');
-    if (updates.avatar_url !== undefined) localStorage.setItem('motolegado_pilot_avatar', updates.avatar_url);
 
-    // Sincroniza atualização no MySQL da Hostinger com tratamento seguro
+    try {
+      localStorage.setItem('motolegado_pilot_session', JSON.stringify(updated));
+    } catch (e) {}
+
+    // Salvar permanentemente por chave de e-mail para nunca perder dados ao trocar de sessão
+    if (updated.email) {
+      try {
+        localStorage.setItem('motolegado_pilot_saved_' + updated.email.toLowerCase().trim(), JSON.stringify(updated));
+      } catch {}
+    }
+
+    try {
+      if (updates.name !== undefined) localStorage.setItem('motolegado_pilot_name', updates.name);
+      if (updates.email !== undefined) localStorage.setItem('motolegado_pilot_email', updates.email);
+      if (updates.phone !== undefined) localStorage.setItem('motolegado_pilot_phone', updates.phone);
+      if (updates.bio !== undefined) localStorage.setItem('motolegado_pilot_bio', updates.bio);
+      if (updates.motorcycle !== undefined) localStorage.setItem('motolegado_pilot_bike', updates.motorcycle);
+      if (updates.motorcycle_nickname !== undefined) localStorage.setItem('motolegado_pilot_bike_nickname', updates.motorcycle_nickname);
+      if (updates.motorcycle_year !== undefined) localStorage.setItem('motolegado_pilot_bike_year', updates.motorcycle_year);
+      if (updates.motorcycle_plate !== undefined) localStorage.setItem('motolegado_pilot_bike_plate', updates.motorcycle_plate);
+      if (updates.motorcycle_photos !== undefined) localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(updates.motorcycle_photos));
+      if (updates.city !== undefined) localStorage.setItem('motolegado_pilot_city', updates.city);
+      if (updates.state !== undefined) localStorage.setItem('motolegado_pilot_state', updates.state);
+      if (updates.personal_logo_url !== undefined) localStorage.setItem('motolegado_pilot_logo', updates.personal_logo_url || '');
+      if (updates.avatar_url !== undefined) localStorage.setItem('motolegado_pilot_avatar', updates.avatar_url);
+    } catch (storageErr) {
+      console.warn('Armazenamento local cheio, dados mantidos no estado e servidor:', storageErr);
+    }
+
+    // Sincroniza atualização com o backend com tratamento seguro
     try {
       await syncPilotToHostinger(updated);
     } catch (e) {
-      console.warn('Aviso ao sincronizar perfil com MySQL:', e);
+      console.warn('Aviso ao sincronizar perfil com backend:', e);
     }
 
     if (isSupabaseConfigured && user) {

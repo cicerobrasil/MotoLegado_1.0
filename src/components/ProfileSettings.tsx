@@ -13,6 +13,8 @@ import {
   AlertCircle, 
   Plus, 
   ArrowLeft,
+  ArrowRight,
+  Lock,
   Loader2,
   Trash2,
   UploadCloud,
@@ -423,31 +425,35 @@ export function ProfileSettings() {
     setSaveSuccess(false);
 
     try {
-      // Salvar metadados localmente como garantia imediata
-      localStorage.setItem('motolegado_pilot_name', name);
-      localStorage.setItem('motolegado_pilot_email', email);
-      localStorage.setItem('motolegado_pilot_phone', phone);
-      localStorage.setItem('motolegado_pilot_bio', bio);
-      localStorage.setItem('motolegado_pilot_city', city);
-      localStorage.setItem('motolegado_pilot_state', state);
-      if (personalLogo) localStorage.setItem('motolegado_pilot_logo', personalLogo);
-      if (profilePhoto) localStorage.setItem('motolegado_pilot_avatar', profilePhoto);
-      localStorage.setItem('motolegado_pilot_bike', motorcycle);
-      localStorage.setItem('motolegado_pilot_bike_nickname', motorcycleNickname);
-      localStorage.setItem('motolegado_pilot_bike_year', motorcycleYear);
-      localStorage.setItem('motolegado_pilot_bike_plate', motorcyclePlate);
-      localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(motorcyclePhotos));
-      localStorage.setItem('motolegado_pilot_address', JSON.stringify({
-        cep,
-        street,
-        streetNumber,
-        neighborhood,
-        city,
-        state,
-        isDefaultStartPoint
-      }));
+      // Salvar metadados localmente como garantia imediata com proteção contra cota
+      try {
+        localStorage.setItem('motolegado_pilot_name', name);
+        localStorage.setItem('motolegado_pilot_email', email);
+        localStorage.setItem('motolegado_pilot_phone', phone);
+        localStorage.setItem('motolegado_pilot_bio', bio);
+        localStorage.setItem('motolegado_pilot_city', city);
+        localStorage.setItem('motolegado_pilot_state', state);
+        if (personalLogo) localStorage.setItem('motolegado_pilot_logo', personalLogo);
+        if (profilePhoto) localStorage.setItem('motolegado_pilot_avatar', profilePhoto);
+        localStorage.setItem('motolegado_pilot_bike', motorcycle);
+        localStorage.setItem('motolegado_pilot_bike_nickname', motorcycleNickname);
+        localStorage.setItem('motolegado_pilot_bike_year', motorcycleYear);
+        localStorage.setItem('motolegado_pilot_bike_plate', motorcyclePlate);
+        localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(motorcyclePhotos));
+        localStorage.setItem('motolegado_pilot_address', JSON.stringify({
+          cep,
+          street,
+          streetNumber,
+          neighborhood,
+          city,
+          state,
+          isDefaultStartPoint
+        }));
+      } catch (storageErr) {
+        console.warn('Aviso armazenamento local:', storageErr);
+      }
 
-      await updateProfile({
+      const res = await updateProfile({
         name,
         email,
         phone,
@@ -468,15 +474,19 @@ export function ProfileSettings() {
         motorcycle_photos: motorcyclePhotos,
       });
 
+      if (res?.error) {
+        console.warn('Aviso ao atualizar perfil:', res.error);
+      }
+
       setSaveSuccess(true);
       showToast('Configurações gravadas com sucesso no banco de dados!', 'success');
-      // Permanece na mesma tela com status de GRAVADO (sem redirecionar)
+      // Permanece na mesma tela e aba atual com status de GRAVADO (sem redirecionar)
       setTimeout(() => {
         setSaveSuccess(false);
-      }, 4000);
-    } catch (e) {
+      }, 5000);
+    } catch (e: any) {
       console.error('Erro ao salvar perfil:', e);
-      showToast('Erro ao salvar as configurações.', 'error');
+      showToast('Erro ao salvar as configurações: ' + (e?.message || 'Tente novamente'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -615,14 +625,35 @@ export function ProfileSettings() {
                   />
                 </div>
                 <div className="space-y-2 sm:space-y-3">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Motocicleta Principal</label>
-                  <input 
-                    type="text" 
-                    value={motorcycle}
-                    onChange={(e) => setMotorcycle(e.target.value)}
-                    placeholder="Ex: BMW R 1250 GS, Triumph Tiger 900..."
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white" 
-                  />
+                  <div className="flex items-center justify-between ml-2">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Motocicleta Principal</label>
+                    <span className="text-[9px] font-bold text-slate-400 tracking-wider uppercase flex items-center gap-1 bg-slate-900/90 px-2 py-0.5 rounded-md border border-slate-800">
+                      <Lock size={10} className="text-orange-400" /> Somente Leitura
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      value={motorcycle}
+                      readOnly
+                      placeholder="Preencha o campo Marca / Modelo na aba Motocicleta"
+                      className="w-full bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 pr-36 text-xs sm:text-sm font-bold text-slate-200 outline-none cursor-default select-none placeholder:text-slate-600 focus:border-slate-700" 
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('motocicleta')}
+                        className="text-[10px] font-black uppercase tracking-wider text-orange-400 hover:text-orange-300 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        title="Ir para a aba Motocicleta para alterar a Marca/Modelo"
+                      >
+                        <span>Aba Motocicleta</span>
+                        <ArrowRight size={12} />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 ml-2 flex items-center gap-1.5">
+                    <span>💡 Preenchido automaticamente com as informações do campo <strong>Marca / Modelo</strong> da aba <em>Motocicleta</em>.</span>
+                  </p>
                 </div>
                 <div className="space-y-2 sm:space-y-3 relative">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">E-mail de Contato</label>
@@ -1135,8 +1166,13 @@ export function ProfileSettings() {
                     className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
                   />
                 </div>
-                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Marca / Modelo</label>
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group border-l-2 border-l-orange-500">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Marca / Modelo</label>
+                    <span className="text-[9px] font-black uppercase text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded tracking-wider">
+                      ★ Motocicleta Principal
+                    </span>
+                  </div>
                   <input 
                     type="text" 
                     value={motorcycle} 
@@ -1144,6 +1180,9 @@ export function ProfileSettings() {
                     placeholder="Ex: Harley-Davidson Iron 883, BMW GS 1250" 
                     className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
                   />
+                  <p className="text-[9px] text-slate-500 ml-1">
+                    Este valor preenche automaticamente a <strong>Motocicleta Principal</strong> na aba do perfil do piloto.
+                  </p>
                 </div>
                 <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Ano de Fabricação</label>

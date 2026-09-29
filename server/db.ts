@@ -15,11 +15,37 @@ export const dbConfig = {
 
 let pool: mysql.Pool | null = null;
 
+let isMysqlOnline = false;
+let lastCheckTime = 0;
+const CHECK_INTERVAL = 30000; // 30 segundos
+
 export function getDbPool(): mysql.Pool {
   if (!pool) {
     pool = mysql.createPool(dbConfig);
   }
   return pool;
+}
+
+export async function safeMySqlQuery<T = any>(sql: string, params: any[] = []): Promise<T | null> {
+  const now = Date.now();
+  if (!isMysqlOnline && (now - lastCheckTime < CHECK_INTERVAL)) {
+    return null;
+  }
+
+  try {
+    const p = getDbPool();
+    const result: any = await Promise.race([
+      p.query(sql, params),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500))
+    ]);
+    isMysqlOnline = true;
+    lastCheckTime = now;
+    return result;
+  } catch (err: any) {
+    isMysqlOnline = false;
+    lastCheckTime = now;
+    return null;
+  }
 }
 
 // Criação automática de tabelas na inicialização do servidor
@@ -66,8 +92,13 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
       "ALTER TABLE pilots ADD COLUMN tier VARCHAR(50) DEFAULT 'Bronze'",
       "ALTER TABLE pilots ADD COLUMN role ENUM('admin', 'pilot', 'partner', 'organizer') DEFAULT 'pilot'",
       "ALTER TABLE pilots ADD COLUMN plan ENUM('gratuito', 'pago', 'bonificado') DEFAULT 'gratuito'",
+      "ALTER TABLE pilots ADD COLUMN motorcycle VARCHAR(150) NULL",
+      "ALTER TABLE pilots ADD COLUMN motorcycle_year VARCHAR(10) NULL",
+      "ALTER TABLE pilots ADD COLUMN motorcycle_plate VARCHAR(20) NULL",
       "ALTER TABLE pilots ADD COLUMN motorcycle_nickname VARCHAR(100) NULL",
       "ALTER TABLE pilots ADD COLUMN motorcycle_photos JSON NULL",
+      "ALTER TABLE pilots ADD COLUMN bio TEXT NULL",
+      "ALTER TABLE pilots ADD COLUMN avatar_url TEXT NULL",
       "ALTER TABLE pilots ADD COLUMN personal_logo_url TEXT NULL",
       "ALTER TABLE pilots ADD COLUMN city VARCHAR(100) NULL",
       "ALTER TABLE pilots ADD COLUMN state VARCHAR(10) NULL",
@@ -76,7 +107,10 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
       "ALTER TABLE pilots ADD COLUMN street_number VARCHAR(50) NULL",
       "ALTER TABLE pilots ADD COLUMN neighborhood VARCHAR(100) NULL",
       "ALTER TABLE pilots ADD COLUMN default_start_point TINYINT(1) DEFAULT 1",
-      "ALTER TABLE pilots ADD COLUMN club_name VARCHAR(150) NULL"
+      "ALTER TABLE pilots ADD COLUMN club_name VARCHAR(150) NULL",
+      "ALTER TABLE pilots ADD COLUMN blood_type VARCHAR(10) NULL",
+      "ALTER TABLE pilots ADD COLUMN emergency_contact VARCHAR(150) NULL",
+      "ALTER TABLE pilots ADD COLUMN emergency_phone VARCHAR(30) NULL"
     ];
     for (const sql of columnsToEnsure) {
       try {

@@ -13,8 +13,7 @@ import {
   Store,
   X,
   BookOpen,
-  Crown,
-  Globe
+  Crown
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
@@ -251,15 +250,6 @@ export function Sidebar({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }
           )}
 
           <div className="pt-2 border-t border-[#1e293b] flex flex-col gap-1.5">
-            <Link
-              to="/"
-              onClick={() => setIsOpen(false)}
-              className="w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors py-1 cursor-pointer group"
-            >
-              <Globe size={14} className="text-[#ff751f] group-hover:rotate-12 transition-transform" />
-              <span>Ver Landing Page</span>
-            </Link>
-
             <button 
               type="button"
               onClick={handleSignOut}
