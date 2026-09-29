@@ -20,7 +20,8 @@ import {
   QrCode,
   ShieldCheck,
   Copy,
-  Sparkles
+  Sparkles,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -47,13 +48,13 @@ export function ProfileSettings() {
     }
   }, [searchParams]);
   
-  // Form States vinculados ao perfil real
-  const [name, setName] = useState(profile?.name || '');
-  const [email, setEmail] = useState(profile?.email || '');
-  const [phone, setPhone] = useState(profile?.phone || '');
-  const [bio, setBio] = useState(profile?.bio || '');
-  const [city, setCity] = useState(profile?.city || '');
-  const [state, setState] = useState(profile?.state || '');
+  // Form States vinculados ao perfil real com fallback seguro ao armazenamento local
+  const [name, setName] = useState(profile?.name || localStorage.getItem('motolegado_pilot_name') || '');
+  const [email, setEmail] = useState(profile?.email || localStorage.getItem('motolegado_pilot_email') || '');
+  const [phone, setPhone] = useState(profile?.phone || localStorage.getItem('motolegado_pilot_phone') || '');
+  const [bio, setBio] = useState(profile?.bio || localStorage.getItem('motolegado_pilot_bio') || '');
+  const [city, setCity] = useState(profile?.city || localStorage.getItem('motolegado_pilot_city') || '');
+  const [state, setState] = useState(profile?.state || localStorage.getItem('motolegado_pilot_state') || '');
   const [cep, setCep] = useState(() => {
     if (profile?.cep) return profile.cep;
     try {
@@ -102,7 +103,9 @@ export function ProfileSettings() {
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const numberInputRef = useRef<HTMLInputElement>(null);
 
-  const [motorcycle, setMotorcycle] = useState(profile?.motorcycle || '');
+  const [motorcycle, setMotorcycle] = useState(
+    profile?.motorcycle || localStorage.getItem('motolegado_pilot_bike') || ''
+  );
   const [motorcycleNickname, setMotorcycleNickname] = useState(
     profile?.motorcycle_nickname || localStorage.getItem('motolegado_pilot_bike_nickname') || ''
   );
@@ -135,23 +138,29 @@ export function ProfileSettings() {
   const [uploadingBikeSlot, setUploadingBikeSlot] = useState<number | null>(null);
 
   const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || 'Piloto')}&background=ea580c&color=ffffff&bold=true`;
-  const [personalLogo, setPersonalLogo] = useState<string | null>(profile?.personal_logo_url || null);
-  const [profilePhoto, setProfilePhoto] = useState((profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61')) ? profile.avatar_url : defaultAvatar);
+  const [personalLogo, setPersonalLogo] = useState<string | null>(
+    profile?.personal_logo_url || localStorage.getItem('motolegado_pilot_logo') || null
+  );
+  const [profilePhoto, setProfilePhoto] = useState(
+    (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61')) 
+      ? profile.avatar_url 
+      : (localStorage.getItem('motolegado_pilot_avatar') || defaultAvatar)
+  );
 
   useEffect(() => {
     if (profile) {
-      setName(profile.name || '');
-      setEmail(profile.email || '');
-      setPhone(profile.phone || '');
-      setBio(profile.bio || '');
-      setCity(profile.city || '');
-      setState(profile.state || '');
+      if (profile.name) setName(profile.name);
+      if (profile.email) setEmail(profile.email);
+      if (profile.phone) setPhone(profile.phone);
+      if (profile.bio) setBio(profile.bio);
+      if (profile.city) setCity(profile.city);
+      if (profile.state) setState(profile.state);
       if (profile.cep) setCep(profile.cep);
       if (profile.street) setStreet(profile.street);
       if (profile.street_number) setStreetNumber(profile.street_number);
       if (profile.neighborhood) setNeighborhood(profile.neighborhood);
       if (profile.default_start_point !== undefined) setIsDefaultStartPoint(Boolean(profile.default_start_point));
-      setMotorcycle(profile.motorcycle || '');
+      if (profile.motorcycle) setMotorcycle(profile.motorcycle);
       if (profile.avatar_url) setProfilePhoto(profile.avatar_url);
       if (profile.personal_logo_url) setPersonalLogo(profile.personal_logo_url);
       if (profile.motorcycle_nickname) setMotorcycleNickname(profile.motorcycle_nickname);
@@ -317,10 +326,14 @@ export function ProfileSettings() {
       if (result.success && result.url) {
         if (type === 'logo') {
           setPersonalLogo(result.url);
-          showToast('Logotipo atualizado e salvo com sucesso!', 'success');
+          localStorage.setItem('motolegado_pilot_logo', result.url);
+          updateProfile({ personal_logo_url: result.url });
+          showToast('Brasão / Símbolo pessoal enviado e salvo com sucesso!', 'success');
         } else {
           setProfilePhoto(result.url);
-          showToast('Foto de perfil atualizada com sucesso!', 'success');
+          localStorage.setItem('motolegado_pilot_avatar', result.url);
+          updateProfile({ avatar_url: result.url });
+          showToast('Foto de perfil atualizada e salva com sucesso!', 'success');
         }
       } else {
         showToast(result.error || 'Erro ao processar o arquivo.', 'error');
@@ -411,11 +424,19 @@ export function ProfileSettings() {
 
     try {
       // Salvar metadados localmente como garantia imediata
+      localStorage.setItem('motolegado_pilot_name', name);
+      localStorage.setItem('motolegado_pilot_email', email);
+      localStorage.setItem('motolegado_pilot_phone', phone);
+      localStorage.setItem('motolegado_pilot_bio', bio);
+      localStorage.setItem('motolegado_pilot_city', city);
+      localStorage.setItem('motolegado_pilot_state', state);
+      if (personalLogo) localStorage.setItem('motolegado_pilot_logo', personalLogo);
+      if (profilePhoto) localStorage.setItem('motolegado_pilot_avatar', profilePhoto);
+      localStorage.setItem('motolegado_pilot_bike', motorcycle);
       localStorage.setItem('motolegado_pilot_bike_nickname', motorcycleNickname);
       localStorage.setItem('motolegado_pilot_bike_year', motorcycleYear);
       localStorage.setItem('motolegado_pilot_bike_plate', motorcyclePlate);
       localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(motorcyclePhotos));
-      localStorage.setItem('motolegado_pilot_bike', motorcycle);
       localStorage.setItem('motolegado_pilot_address', JSON.stringify({
         cep,
         street,
@@ -428,6 +449,7 @@ export function ProfileSettings() {
 
       await updateProfile({
         name,
+        email,
         phone,
         bio,
         city,
@@ -447,10 +469,11 @@ export function ProfileSettings() {
       });
 
       setSaveSuccess(true);
-      showToast('Configurações salvas com sucesso!', 'success');
+      showToast('Configurações gravadas com sucesso no banco de dados!', 'success');
+      // Permanece na mesma tela com status de GRAVADO (sem redirecionar)
       setTimeout(() => {
-        navigate('/profile');
-      }, 900);
+        setSaveSuccess(false);
+      }, 4000);
     } catch (e) {
       console.error('Erro ao salvar perfil:', e);
       showToast('Erro ao salvar as configurações.', 'error');
@@ -479,13 +502,26 @@ export function ProfileSettings() {
           </p>
         </div>
 
-        <button
-          onClick={() => navigate('/profile')}
-          className="self-start md:self-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"
-        >
-          <ArrowLeft size={16} />
-          <span>Sair do Ajuste</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          <button
+            type="button"
+            onClick={() => navigate('/profile')}
+            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+            title="Voltar ao Perfil do Piloto"
+          >
+            <ArrowLeft size={16} />
+            <span>Voltar ao Perfil</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-orange-500/50 text-slate-300 hover:text-orange-400 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer group"
+            title="Ir para a Landing Page (Página Inicial)"
+          >
+            <Globe size={16} className="text-orange-500 group-hover:rotate-12 transition-transform" />
+            <span>Landing Page</span>
+          </button>
+        </div>
       </header>
 
       {/* Tab Switcher */}
@@ -665,15 +701,26 @@ export function ProfileSettings() {
                       <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">Ative para vincular seu brasão oficial</p>
                     </div>
                   </div>
-                  <div className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer" 
-                      checked={isMemberOfClub}
-                      readOnly
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isMemberOfClub}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsMemberOfClub(!isMemberOfClub);
+                    }}
+                    className={cn(
+                      "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                      isMemberOfClub ? "bg-orange-600 shadow-md shadow-orange-600/30" : "bg-slate-800"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                        isMemberOfClub ? "translate-x-5" : "translate-x-0"
+                      )}
                     />
-                    <div className="w-10 h-5 sm:w-12 sm:h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] sm:after:top-[3px] after:left-[2px] sm:after:left-[3px] after:bg-white after:rounded-full after:h-[16px] sm:after:h-[18px] after:w-[16px] sm:after:w-[18px] after:transition-all peer-checked:bg-orange-600 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"></div>
-                  </div>
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
@@ -1013,20 +1060,64 @@ export function ProfileSettings() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 pt-4 px-2">
-                <div className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer" 
-                    id="start-point" 
-                    checked={isDefaultStartPoint}
-                    onChange={(e) => setIsDefaultStartPoint(e.target.checked)}
+              <div 
+                onClick={() => {
+                  setIsDefaultStartPoint(prev => {
+                    const next = !prev;
+                    try {
+                      const saved = localStorage.getItem('motolegado_pilot_address');
+                      const parsed = saved ? JSON.parse(saved) : {};
+                      localStorage.setItem('motolegado_pilot_address', JSON.stringify({
+                        ...parsed,
+                        isDefaultStartPoint: next
+                      }));
+                    } catch (e) {
+                      console.error(e);
+                    }
+                    return next;
+                  });
+                }}
+                className="flex items-center gap-3 sm:gap-4 pt-4 px-2 cursor-pointer select-none group w-fit"
+              >
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isDefaultStartPoint}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsDefaultStartPoint(prev => {
+                      const next = !prev;
+                      try {
+                        const saved = localStorage.getItem('motolegado_pilot_address');
+                        const parsed = saved ? JSON.parse(saved) : {};
+                        localStorage.setItem('motolegado_pilot_address', JSON.stringify({
+                          ...parsed,
+                          isDefaultStartPoint: next
+                        }));
+                      } catch (err) {
+                        console.error(err);
+                      }
+                      return next;
+                    });
+                  }}
+                  className={cn(
+                    "relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-slate-950",
+                    isDefaultStartPoint ? "bg-orange-600 shadow-md shadow-orange-600/30" : "bg-slate-800"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                      isDefaultStartPoint ? "translate-x-5" : "translate-x-0"
+                    )}
                   />
-                  <div className="w-12 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-[18px] after:w-[18px] after:transition-all peer-checked:bg-orange-600 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"></div>
-                </div>
-                <label htmlFor="start-point" className="text-[11px] font-black uppercase tracking-widest text-slate-400 cursor-pointer select-none hover:text-white transition-colors">
+                </button>
+                <span className={cn(
+                  "text-[11px] font-black uppercase tracking-widest transition-colors",
+                  isDefaultStartPoint ? "text-white" : "text-slate-400 group-hover:text-slate-200"
+                )}>
                   Definir como ponto de partida padrão
-                </label>
+                </span>
               </div>
             </div>
           )}
@@ -1207,7 +1298,12 @@ export function ProfileSettings() {
         <button 
           onClick={handleSave}
           disabled={isSaving}
-          className="w-full sm:w-auto flex items-center justify-center gap-3 px-10 py-3.5 bg-gradient-to-r from-orange-600 to-orange-500 text-white rounded-2xl font-black italic uppercase text-xs tracking-[0.15em] hover:from-orange-500 hover:to-orange-400 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_25px_-5px_rgba(255,85,0,0.4)] relative overflow-hidden group cursor-pointer disabled:opacity-50"
+          className={cn(
+            "w-full sm:w-auto flex items-center justify-center gap-3 px-10 py-3.5 text-white rounded-2xl font-black italic uppercase text-xs tracking-[0.15em] transition-all relative overflow-hidden group cursor-pointer disabled:opacity-50",
+            saveSuccess 
+              ? "bg-gradient-to-r from-emerald-600 to-emerald-500 shadow-[0_10px_25px_-5px_rgba(16,185,129,0.5)] scale-[1.02]"
+              : "bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 hover:scale-[1.02] active:scale-[0.98] shadow-[0_10px_25px_-5px_rgba(255,85,0,0.4)]"
+          )}
         >
           {isSaving ? (
             <>
@@ -1216,8 +1312,8 @@ export function ProfileSettings() {
             </>
           ) : saveSuccess ? (
             <>
-              <Check size={18} className="text-white" />
-              <span>SALVO COM SUCESSO!</span>
+              <CheckCircle2 size={18} className="text-white animate-pulse" />
+              <span className="tracking-widest">GRAVADO COM SUCESSO!</span>
             </>
           ) : (
             <>

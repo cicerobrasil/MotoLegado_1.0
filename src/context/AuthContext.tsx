@@ -161,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const parsed = JSON.parse(storedSession);
 
-          // Preservar fotos e dados da moto caso não estejam na sessão salva
+          // Preservar dados caso não estejam na sessão salva
           if (!parsed.motorcycle_photos || parsed.motorcycle_photos.length === 0) {
             const savedPhotos = localStorage.getItem('motolegado_pilot_bike_photos');
             if (savedPhotos) {
@@ -173,10 +173,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               } catch (e) {}
             }
           }
+          if (!parsed.phone) parsed.phone = localStorage.getItem('motolegado_pilot_phone') || '';
+          if (!parsed.bio) parsed.bio = localStorage.getItem('motolegado_pilot_bio') || '';
           if (!parsed.motorcycle) parsed.motorcycle = localStorage.getItem('motolegado_pilot_bike') || '';
           if (!parsed.motorcycle_nickname) parsed.motorcycle_nickname = localStorage.getItem('motolegado_pilot_bike_nickname') || '';
           if (!parsed.motorcycle_year) parsed.motorcycle_year = localStorage.getItem('motolegado_pilot_bike_year') || '2023';
           if (!parsed.motorcycle_plate) parsed.motorcycle_plate = localStorage.getItem('motolegado_pilot_bike_plate') || '';
+          if (!parsed.personal_logo_url) parsed.personal_logo_url = localStorage.getItem('motolegado_pilot_logo') || undefined;
+          if (!parsed.city) parsed.city = localStorage.getItem('motolegado_pilot_city') || '';
+          if (!parsed.state) parsed.state = localStorage.getItem('motolegado_pilot_state') || '';
 
           setProfile(parsed);
           setUser({
@@ -188,23 +193,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             created_at: new Date().toISOString(),
           } as any);
 
-          // Atualiza dados frescos do MySQL na Hostinger em segundo plano sem apagar dados locais da moto
+          // Atualiza dados frescos do MySQL na Hostinger em segundo plano sem apagar dados locais do piloto
           if (parsed.id) {
             apiGetMe(parsed.id).then((res) => {
               if (res.data?.success && res.data.pilot) {
+                const p = res.data.pilot;
                 const updated: PilotProfile = {
                   ...parsed,
-                  ...res.data.pilot,
-                  plan_type: res.data.pilot.plan || parsed.plan_type || 'gratuito',
-                  is_pro: res.data.pilot.role === 'admin' || res.data.pilot.plan === 'pago' || res.data.pilot.plan === 'bonificado' || parsed.is_pro,
-                  avatar_url: res.data.pilot.avatar_url || parsed.avatar_url || getCleanAvatar(res.data.pilot.name || res.data.pilot.email),
+                  name: p.name || parsed.name,
+                  email: p.email || parsed.email,
+                  phone: p.phone || parsed.phone || '',
+                  bio: p.bio || parsed.bio || '',
+                  motorcycle: p.motorcycle || parsed.motorcycle || '',
+                  motorcycle_nickname: p.motorcycle_nickname || parsed.motorcycle_nickname || '',
+                  motorcycle_year: p.motorcycle_year || parsed.motorcycle_year || '2023',
+                  motorcycle_plate: p.motorcycle_plate || parsed.motorcycle_plate || '',
+                  city: p.city || parsed.city || '',
+                  state: p.state || parsed.state || '',
+                  cep: p.cep || parsed.cep || '',
+                  street: p.street || parsed.street || '',
+                  street_number: p.street_number || parsed.street_number || '',
+                  neighborhood: p.neighborhood || parsed.neighborhood || '',
+                  default_start_point: p.default_start_point !== undefined ? Boolean(p.default_start_point) : parsed.default_start_point,
+                  club_name: p.club_name || parsed.club_name || '',
+                  personal_logo_url: p.personal_logo_url || parsed.personal_logo_url,
+                  plan_type: p.plan || parsed.plan_type || 'gratuito',
+                  is_pro: p.role === 'admin' || p.plan === 'pago' || p.plan === 'bonificado' || parsed.is_pro,
+                  role: p.role || parsed.role || 'pilot',
+                  points: p.points ?? parsed.points ?? 0,
+                  tier: p.tier || parsed.tier || 'Bronze',
+                  avatar_url: p.avatar_url || parsed.avatar_url || getCleanAvatar(p.name || parsed.name),
                   motorcycle_photos: (parsed.motorcycle_photos && parsed.motorcycle_photos.length > 0) 
                     ? parsed.motorcycle_photos 
-                    : (res.data.pilot.motorcycle_photos ? (typeof res.data.pilot.motorcycle_photos === 'string' ? JSON.parse(res.data.pilot.motorcycle_photos) : res.data.pilot.motorcycle_photos) : []),
-                  motorcycle: res.data.pilot.motorcycle || parsed.motorcycle,
-                  motorcycle_nickname: res.data.pilot.motorcycle_nickname || parsed.motorcycle_nickname,
-                  motorcycle_year: res.data.pilot.motorcycle_year || parsed.motorcycle_year,
-                  motorcycle_plate: res.data.pilot.motorcycle_plate || parsed.motorcycle_plate,
+                    : (p.motorcycle_photos ? (typeof p.motorcycle_photos === 'string' ? JSON.parse(p.motorcycle_photos) : p.motorcycle_photos) : []),
                 };
                 setProfile(updated);
                 localStorage.setItem('motolegado_pilot_session', JSON.stringify(updated));
@@ -278,7 +299,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(session.user);
           fetchProfile(session.user.id, session.user.email);
         } else if (event === 'SIGNED_OUT') {
-          signOut();
+          // Apenas atualiza estados locais, nunca chama signOut() reentrante (evita deadlock com mutex do Supabase)
+          setUser(null);
+          setProfile(null);
+          setSession(null);
         }
         setLoading(false);
       });
@@ -568,22 +592,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Encerrar Sessão
   const signOut = async () => {
+    // 1. Limpeza imediata e síncrona de todas as chaves do piloto no armazenamento local
     localStorage.removeItem('motolegado_pilot_session');
     localStorage.removeItem('motolegado_pilot_id');
     localStorage.removeItem('motolegado_pilot_email');
     localStorage.removeItem('motolegado_pilot_name');
     localStorage.removeItem('motolegado_pilot_plan');
     localStorage.removeItem('motolegado_pilot_bike');
+    localStorage.removeItem('motolegado_pilot_bike_nickname');
+    localStorage.removeItem('motolegado_pilot_bike_year');
+    localStorage.removeItem('motolegado_pilot_bike_plate');
+    localStorage.removeItem('motolegado_pilot_bike_photos');
+    localStorage.removeItem('motolegado_pilot_address');
+    localStorage.removeItem('motolegado_pilot_profile');
     localStorage.removeItem('motolegado_demo_mode');
+
+    // Limpa tokens do Supabase no localStorage para garantir deslogue instantâneo
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch {}
+
+    // 2. Limpeza imediata dos estados React
     setUser(null);
     setProfile(null);
     setSession(null);
 
+    // Dispara evento de armazenamento para sincronizar outros componentes abertos
+    try {
+      window.dispatchEvent(new Event('storage'));
+    } catch {}
+
+    // 3. Encerrar sessão no Supabase em segundo plano com timeout seguro de 600ms (não trava UI)
     if (isSupabaseConfigured) {
       try {
-        await supabase.auth.signOut();
+        await Promise.race([
+          supabase.auth.signOut(),
+          new Promise((resolve) => setTimeout(resolve, 600))
+        ]);
       } catch (err) {
-        console.error('Erro ao deslogar do Supabase:', err);
+        console.warn('Aviso ao deslogar do Supabase (ignorado com segurança):', err);
       }
     }
   };
@@ -595,12 +647,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const updated = { ...profile, ...updates };
     setProfile(updated);
     localStorage.setItem('motolegado_pilot_session', JSON.stringify(updated));
-    if (updates.name) {
-      localStorage.setItem('motolegado_pilot_name', updates.name);
-    }
+    if (updates.name !== undefined) localStorage.setItem('motolegado_pilot_name', updates.name);
+    if (updates.email !== undefined) localStorage.setItem('motolegado_pilot_email', updates.email);
+    if (updates.phone !== undefined) localStorage.setItem('motolegado_pilot_phone', updates.phone);
+    if (updates.bio !== undefined) localStorage.setItem('motolegado_pilot_bio', updates.bio);
+    if (updates.motorcycle !== undefined) localStorage.setItem('motolegado_pilot_bike', updates.motorcycle);
+    if (updates.motorcycle_nickname !== undefined) localStorage.setItem('motolegado_pilot_bike_nickname', updates.motorcycle_nickname);
+    if (updates.motorcycle_year !== undefined) localStorage.setItem('motolegado_pilot_bike_year', updates.motorcycle_year);
+    if (updates.motorcycle_plate !== undefined) localStorage.setItem('motolegado_pilot_bike_plate', updates.motorcycle_plate);
+    if (updates.motorcycle_photos !== undefined) localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(updates.motorcycle_photos));
+    if (updates.city !== undefined) localStorage.setItem('motolegado_pilot_city', updates.city);
+    if (updates.state !== undefined) localStorage.setItem('motolegado_pilot_state', updates.state);
+    if (updates.personal_logo_url !== undefined) localStorage.setItem('motolegado_pilot_logo', updates.personal_logo_url || '');
+    if (updates.avatar_url !== undefined) localStorage.setItem('motolegado_pilot_avatar', updates.avatar_url);
 
-    // Sincroniza atualização no MySQL da Hostinger
-    syncPilotToHostinger(updated).catch(() => {});
+    // Sincroniza atualização no MySQL da Hostinger com tratamento seguro
+    try {
+      await syncPilotToHostinger(updated);
+    } catch (e) {
+      console.warn('Aviso ao sincronizar perfil com MySQL:', e);
+    }
 
     if (isSupabaseConfigured && user) {
       try {
@@ -609,9 +675,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .update(updates)
           .eq('id', user.id);
 
-        if (error) throw error;
+        if (error) console.warn('Aviso Supabase update:', error.message);
       } catch (err: any) {
-        return { error: err };
+        console.warn('Aviso Supabase exceção:', err);
       }
     }
 

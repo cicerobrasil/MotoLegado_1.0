@@ -13,7 +13,8 @@ import {
   Store,
   X,
   BookOpen,
-  Crown
+  Crown,
+  Globe
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
@@ -105,9 +106,18 @@ export function Sidebar({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }
   });
 
   const handleSignOut = async () => {
-    setIsOpen(false);
-    await signOut();
-    navigate('/');
+    try {
+      setIsOpen(false);
+      navigate('/', { replace: true });
+      await signOut();
+    } catch (err) {
+      console.error('Erro ao encerrar sessão:', err);
+      window.location.href = '/';
+    } finally {
+      if (window.location.pathname !== '/') {
+        window.location.href = '/';
+      }
+    }
   };
 
   // Do not render sidebar on the landing page ("/")
@@ -240,8 +250,18 @@ export function Sidebar({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }
             </button>
           )}
 
-          <div className="pt-2 border-t border-[#1e293b] flex flex-col gap-2">
+          <div className="pt-2 border-t border-[#1e293b] flex flex-col gap-1.5">
+            <Link
+              to="/"
+              onClick={() => setIsOpen(false)}
+              className="w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors py-1 cursor-pointer group"
+            >
+              <Globe size={14} className="text-[#ff751f] group-hover:rotate-12 transition-transform" />
+              <span>Ver Landing Page</span>
+            </Link>
+
             <button 
+              type="button"
               onClick={handleSignOut}
               className="w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-400 transition-colors py-1 cursor-pointer"
             >

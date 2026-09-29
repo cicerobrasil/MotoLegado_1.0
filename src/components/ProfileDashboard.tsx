@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, Lock, CheckCircle2, ShieldCheck, BookOpen, Sparkles, Crown, Camera, Maximize2, X } from 'lucide-react';
+import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, Lock, CheckCircle2, ShieldCheck, BookOpen, Sparkles, Crown, Camera, Maximize2, X, LogOut, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -11,7 +11,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export function ProfileDashboard() {
   const navigate = useNavigate();
-  const { profile, user } = useAuth();
+  const { profile, user, signOut } = useAuth();
   const [achievementFilter, setAchievementFilter] = useState<'todas' | 'desbloqueadas' | 'bloqueadas'>('todas');
   const [showRankHierarchyModal, setShowRankHierarchyModal] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -180,6 +180,7 @@ export function ProfileDashboard() {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full md:w-auto">
           <button 
+            type="button"
             onClick={() => navigate('/profile/settings')}
             className="flex-1 md:flex-none px-4 sm:px-6 py-2.5 sm:py-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center gap-2 sm:gap-3 group hover:border-orange-500/50 transition-all active:scale-95 cursor-pointer"
           >
@@ -187,10 +188,32 @@ export function ProfileDashboard() {
             <span className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest group-hover:text-white transition-colors">CONFIGURAÇÕES</span>
           </button>
           <button 
+            type="button"
             onClick={() => navigate('/logbook')}
             className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-orange-600 rounded-2xl flex items-center justify-center gap-2 sm:gap-3 shadow-xl shadow-orange-600/20 hover:bg-orange-500 transition-all active:scale-95 cursor-pointer"
           >
             <span className="text-[10px] sm:text-[11px] font-black text-white uppercase tracking-widest">DIÁRIO DE BORDO</span>
+          </button>
+          <button 
+            type="button"
+            onClick={async () => {
+              try {
+                navigate('/', { replace: true });
+                await signOut();
+              } catch (e) {
+                console.error('Erro ao sair:', e);
+                window.location.href = '/';
+              } finally {
+                if (window.location.pathname !== '/') {
+                  window.location.href = '/';
+                }
+              }
+            }}
+            className="flex-1 md:flex-none px-4 sm:px-6 py-2.5 sm:py-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center gap-2 group hover:border-red-500/50 hover:bg-red-950/20 transition-all active:scale-95 cursor-pointer text-slate-400 hover:text-red-400"
+            title="Encerrar Sessão e Retornar à Landing Page"
+          >
+            <LogOut size={16} />
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest">SAIR</span>
           </button>
         </div>
       </div>

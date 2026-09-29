@@ -293,11 +293,21 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
   app.post('/api/pilots', async (req, res) => {
     try {
       const pool = getDbPool();
-      const { id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone, role, plan, motorcycle_nickname, motorcycle_photos } = req.body;
+      const {
+        id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone,
+        role, plan, motorcycle_nickname, motorcycle_photos, motorcycle_year, motorcycle_plate,
+        bio, avatar_url, personal_logo_url, city, state, cep, street, street_number, neighborhood,
+        default_start_point, club_name
+      } = req.body;
       const photosJson = Array.isArray(motorcycle_photos) ? JSON.stringify(motorcycle_photos) : (motorcycle_photos || null);
       await pool.query(`
-        INSERT INTO pilots (id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone, role, plan, motorcycle_nickname, motorcycle_photos)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO pilots (
+          id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone,
+          role, plan, motorcycle_nickname, motorcycle_photos, motorcycle_year, motorcycle_plate,
+          bio, avatar_url, personal_logo_url, city, state, cep, street, street_number, neighborhood,
+          default_start_point, club_name
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           name = VALUES(name),
           motorcycle = VALUES(motorcycle),
@@ -308,10 +318,29 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
           role = VALUES(role),
           plan = VALUES(plan),
           motorcycle_nickname = VALUES(motorcycle_nickname),
-          motorcycle_photos = VALUES(motorcycle_photos)
-      `, [id, email, name, motorcycle || null, phone || null, blood_type || null, emergency_contact || null, emergency_phone || null, role || 'pilot', plan || 'gratuito', motorcycle_nickname || null, photosJson]);
+          motorcycle_photos = VALUES(motorcycle_photos),
+          motorcycle_year = VALUES(motorcycle_year),
+          motorcycle_plate = VALUES(motorcycle_plate),
+          bio = VALUES(bio),
+          avatar_url = VALUES(avatar_url),
+          personal_logo_url = VALUES(personal_logo_url),
+          city = VALUES(city),
+          state = VALUES(state),
+          cep = VALUES(cep),
+          street = VALUES(street),
+          street_number = VALUES(street_number),
+          neighborhood = VALUES(neighborhood),
+          default_start_point = VALUES(default_start_point),
+          club_name = VALUES(club_name)
+      `, [
+        id, email, name, motorcycle || null, phone || null, blood_type || null, emergency_contact || null, emergency_phone || null,
+        role || 'pilot', plan || 'gratuito', motorcycle_nickname || null, photosJson, motorcycle_year || null, motorcycle_plate || null,
+        bio || null, avatar_url || null, personal_logo_url || null, city || null, state || null, cep || null, street || null, street_number || null, neighborhood || null,
+        default_start_point !== undefined ? (default_start_point ? 1 : 0) : 1, club_name || null
+      ]);
       res.json({ success: true, message: 'Perfil do piloto salvo no MySQL com sucesso!' });
     } catch (err: any) {
+      console.error('[API PILOTS ERROR]:', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });
