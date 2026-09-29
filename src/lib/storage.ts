@@ -1,5 +1,3 @@
-import { supabase, isSupabaseConfigured } from './supabase';
-
 export const STORAGE_BUCKET = 'motolegado-media';
 
 export type StorageFolder = 
@@ -108,8 +106,10 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 /**
- * Realiza o upload real para o bucket 'motolegado-media' no Supabase Storage.
- * Retorna a URL pública do arquivo na CDN do Supabase.
+ * Realiza o upload da imagem otimizada para o servidor (/api/upload).
+ * Se o servidor responder com sucesso, retorna a URL estática (/uploads/...).
+ * Caso o servidor esteja temporariamente offline ou ocorra algum erro, 
+ * recorre ao DataURL comprimido para não interromper a experiência do piloto.
  */
 export async function uploadImageToStorage(
   file: File,
@@ -127,7 +127,7 @@ export async function uploadImageToStorage(
     };
   }
 
-  // Comprimir imagem no cliente
+  // 1. Comprimir imagem no cliente (Canvas) para economizar banda e armazenamento
   let blobToUpload: Blob;
   try {
     blobToUpload = await compressImage(file, maxDimension, quality);
@@ -135,62 +135,57 @@ export async function uploadImageToStorage(
     blobToUpload = file;
   }
 
-  // Sanitizar nome do arquivo
-  const timestamp = Date.now();
-  const randomStr = Math.random().toString(36).substring(2, 8);
-  const cleanUserId = (userId || 'pilot').replace(/[^a-zA-Z0-9_-]/g, '_');
-  const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
-  const filePath = `${folder}/${cleanUserId}_${timestamp}_${randomStr}.${extension}`;
-
-  // Se o Supabase estiver configurado, realizar upload real no bucket
-  if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(filePath, blobToUpload, {
-          cacheControl: '3600',
-          upsert: true,
-          contentType: file.type || 'image/jpeg'
-        });
-
-      if (!error && data) {
-        const { data: publicUrlData } = supabase.storage
-          .from(STORAGE_BUCKET)
-          .getPublicUrl(filePath);
-
-        if (publicUrlData?.publicUrl) {
-          return {
-            url: publicUrlData.publicUrl,
-            success: true,
-            isCloudStorage: true
-          };
-        }
-      } else if (error) {
-        console.warn('Erro ao subir para o Supabase Storage, ativando fallback local:', error.message);
-      }
-    } catch (err: any) {
-      console.warn('Exceção ao comunicar com o Supabase Storage:', err?.message || err);
-    }
-  }
-
-  // Fallback Resiliente: se offline ou erro no Supabase, salva como DataURL comprimido
-  // para que o usuário não perca a foto nem tenha o fluxo bloqueado
+  // Converter para DataURL (Base64)
+  let dataUrl: string;
   try {
-    const fallbackDataUrl = await blobToDataUrl(blobToUpload);
-    return {
-      url: fallbackDataUrl,
-      success: true,
-      isCloudStorage: false,
-      error: !isSupabaseConfigured 
-        ? 'Supabase Storage não configurado (.env). Salvo temporariamente em memória local.' 
-        : undefined
-    };
-  } catch (fallbackErr: any) {
+    dataUrl = await blobToDataUrl(blobToUpload);
+  } catch (err: any) {
     return {
       url: '',
       success: false,
       isCloudStorage: false,
-      error: 'Falha ao processar a imagem: ' + (fallbackErr?.message || 'Erro desconhecido')
+      error: 'Falha ao processar a imagem: ' + (err?.message || 'Erro desconhecido')
     };
   }
+
+  // 2. Enviar para a API do Servidor Node.js (/api/upload)
+  try {
+    const cleanUserId = (userId || 'pilot').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const timestamp = Date.now();
+    const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+    const filename = `${cleanUserId}_${timestamp}.${extension}`;
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image: dataUrl,
+        folder,
+        filename
+      })
+    });
+
+    const json = await response.json().catch(() => null);
+
+    if (response.ok && json && json.success && json.url) {
+      return {
+        url: json.url,
+        success: true,
+        isCloudStorage: true
+      };
+    } else {
+      console.warn('Servidor retornou erro no upload, utilizando armazenamento resiliente em dataURL:', json?.error);
+    }
+  } catch (apiErr: any) {
+    console.warn('Erro ao conectar ao endpoint /api/upload, ativando fallback local:', apiErr?.message);
+  }
+
+  // 3. Fallback Resiliente: se a API falhar ou estiver desconectada, retorna o DataURL comprimido
+  return {
+    url: dataUrl,
+    success: true,
+    isCloudStorage: false
+  };
 }

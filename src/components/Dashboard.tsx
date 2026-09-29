@@ -102,13 +102,19 @@ export function Dashboard() {
   // Active or latest trip
   const latestLog = logs.length > 0 ? logs[0] : null;
 
-  // Dynamic telemetry chart data
-  const chartKmData = [
-    { name: 'Jan', km: logs.length > 0 ? Math.round(loggedKm * 0.15) : 0 },
-    { name: 'Fev', km: logs.length > 0 ? Math.round(loggedKm * 0.25) : 0 },
-    { name: 'Mar', km: logs.length > 0 ? Math.round(loggedKm * 0.35) : 0 },
-    { name: 'Abr', km: logs.length > 0 ? Math.round(loggedKm * 0.15) : 0 },
-    { name: 'Mai', km: logs.length > 0 ? Math.round(loggedKm * 0.10) : 0 },
+  // Dynamic telemetry chart data (with dynamic demonstrative curve when no trips are logged yet)
+  const chartKmData = logs.length > 0 ? [
+    { name: 'Jan', km: Math.round(loggedKm * 0.15) },
+    { name: 'Fev', km: Math.round(loggedKm * 0.25) },
+    { name: 'Mar', km: Math.round(loggedKm * 0.35) },
+    { name: 'Abr', km: Math.round(loggedKm * 0.15) },
+    { name: 'Mai', km: Math.round(loggedKm * 0.10) },
+  ] : [
+    { name: 'Km 0', km: 0 },
+    { name: 'Km 150', km: 150 },
+    { name: 'Km 320', km: 320 },
+    { name: 'Km 580', km: 580 },
+    { name: 'Km 900', km: 900 },
   ];
 
   // Live Gamification Engine (KM + Eventos + Diário + Badges)
@@ -173,6 +179,45 @@ export function Dashboard() {
               <Plus size={15} />
               <span>NOVO REGISTRO</span>
             </button>
+          </div>
+
+          {/* Quick Telemetry Metric Badges */}
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-4 mb-4">
+            <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-orange-600/20 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0 font-bold text-xs">
+                KM
+              </div>
+              <div className="min-w-0">
+                <span className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-wider block">Odômetro</span>
+                <span className="text-xs sm:text-sm font-black text-white font-mono truncate block">
+                  {loggedKm > 0 ? `${loggedKm.toLocaleString()} KM` : '0 KM'}
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 font-bold text-xs">
+                RT
+              </div>
+              <div className="min-w-0">
+                <span className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-wider block">Viagens Diário</span>
+                <span className="text-xs sm:text-sm font-black text-emerald-400 font-mono truncate block">
+                  {logs.length} no Diário
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 font-bold text-xs">
+                {rankInfo.currentTier.icon}
+              </div>
+              <div className="min-w-0">
+                <span className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-wider block">Patente Piloto</span>
+                <span className="text-xs sm:text-sm font-black text-amber-400 truncate block">
+                  {rankInfo.currentTier.title}
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="flex-1 min-h-[220px] bg-slate-950/60 rounded-2xl border border-slate-800/50 p-4 relative overflow-hidden backdrop-blur-sm flex flex-col justify-between">

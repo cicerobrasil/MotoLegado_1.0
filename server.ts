@@ -2,6 +2,7 @@ import 'dotenv/config';
 import http from 'http';
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { testDbConnection, initDatabaseTables, getDbPool, dbConfig } from './server/db';
@@ -12,7 +13,58 @@ async function startServer() {
   const httpServer = http.createServer(app);
   const PORT = parseInt(process.env.PORT || '3000', 10);
 
-  app.use(express.json());
+  app.use(express.json({ limit: '25mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+
+  // Armazenamento local de uploads no próprio servidor Hostinger / VPS
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use('/uploads', express.static(uploadsDir));
+
+  // Endpoint de Upload de Imagens direto no servidor
+  app.post('/api/upload', (req, res) => {
+    try {
+      const { image, folder = 'general', filename } = req.body;
+      if (!image) {
+        return res.status(400).json({ success: false, error: 'Nenhuma imagem enviada.' });
+      }
+
+      let buffer: Buffer;
+      let extension = 'jpg';
+
+      const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const mime = matches[1];
+        if (mime.includes('png')) extension = 'png';
+        else if (mime.includes('webp')) extension = 'webp';
+        else if (mime.includes('svg')) extension = 'svg';
+        buffer = Buffer.from(matches[2], 'base64');
+      } else {
+        buffer = Buffer.from(image, 'base64');
+      }
+
+      const safeFolder = folder.replace(/[^a-zA-Z0-9_-]/g, '');
+      const targetFolder = path.join(uploadsDir, safeFolder);
+      if (!fs.existsSync(targetFolder)) {
+        fs.mkdirSync(targetFolder, { recursive: true });
+      }
+
+      const safeName = filename 
+        ? `${Date.now()}_${filename.replace(/[^a-zA-Z0-9_.-]/g, '_')}`
+        : `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
+      
+      const filePath = path.join(targetFolder, safeName);
+      fs.writeFileSync(filePath, buffer);
+
+      const publicUrl = `/uploads/${safeFolder}/${safeName}`;
+      return res.json({ success: true, url: publicUrl });
+    } catch (err: any) {
+      console.error('Erro ao salvar upload no servidor:', err);
+      return res.status(500).json({ success: false, error: 'Falha ao salvar imagem: ' + err.message });
+    }
+  });
 
   // API Route to generate tourist & motorcycle info using Gemini AI
   app.post('/api/routes/ai-tourist-info', async (req, res) => {
