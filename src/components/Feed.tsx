@@ -113,7 +113,7 @@ export function Feed() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Image Upload Handler via Supabase Storage
+  // Image Upload Handler
   const handleImageFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -501,10 +501,10 @@ export function Feed() {
                       </div>
                       <div>
                         <p className="text-xs font-black uppercase text-slate-300">
-                          {isUploadingImage ? "Enviando para o Supabase Storage..." : "Clique aqui para Fazer Upload de Imagem"}
+                          {isUploadingImage ? "Enviando imagem..." : "Clique aqui para Fazer Upload de Imagem"}
                         </p>
                         <p className="text-[9px] font-medium text-slate-500 uppercase mt-0.5">
-                          {isUploadingImage ? "Comprimindo e salvando no bucket..." : "Suporta arquivos de foto do celular ou galeria até 8MB"}
+                          {isUploadingImage ? "Comprimindo e salvando com segurança..." : "Suporta arquivos de foto do celular ou galeria até 8MB"}
                         </p>
                       </div>
                       <input 

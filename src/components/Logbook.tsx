@@ -473,7 +473,7 @@ export function Logbook() {
                     {isUploadingPhoto ? (
                       <div className="flex flex-col items-center gap-2">
                         <Loader2 size={32} className="text-orange-500 animate-spin" />
-                        <span className="text-[9px] font-black text-white uppercase tracking-widest">Enviando para o Supabase Storage...</span>
+                        <span className="text-[9px] font-black text-white uppercase tracking-widest">Enviando foto da viagem...</span>
                       </div>
                     ) : image ? (
                       <>
@@ -495,7 +495,7 @@ export function Logbook() {
                             Tirar Foto ou Escolher da Galeria
                           </p>
                           <p className="text-[8px] font-bold text-slate-600 uppercase tracking-wider mt-0.5">
-                            Salva automaticamente no Supabase Storage
+                            Salva com segurança na nuvem do MotoLegado
                           </p>
                         </div>
                       </div>

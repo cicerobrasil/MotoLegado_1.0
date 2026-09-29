@@ -65,7 +65,9 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
       "ALTER TABLE pilots ADD COLUMN points INT DEFAULT 0",
       "ALTER TABLE pilots ADD COLUMN tier VARCHAR(50) DEFAULT 'Bronze'",
       "ALTER TABLE pilots ADD COLUMN role ENUM('admin', 'pilot', 'partner', 'organizer') DEFAULT 'pilot'",
-      "ALTER TABLE pilots ADD COLUMN plan ENUM('gratuito', 'pago', 'bonificado') DEFAULT 'gratuito'"
+      "ALTER TABLE pilots ADD COLUMN plan ENUM('gratuito', 'pago', 'bonificado') DEFAULT 'gratuito'",
+      "ALTER TABLE pilots ADD COLUMN motorcycle_nickname VARCHAR(100) NULL",
+      "ALTER TABLE pilots ADD COLUMN motorcycle_photos JSON NULL"
     ];
     for (const sql of columnsToEnsure) {
       try {

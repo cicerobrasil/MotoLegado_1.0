@@ -16,6 +16,11 @@ export interface PilotProfile {
   state?: string;
   phone?: string;
   bio?: string;
+  cep?: string;
+  street?: string;
+  street_number?: string;
+  neighborhood?: string;
+  default_start_point?: boolean;
   points: number;
   tier: string;
   is_pro: boolean;
@@ -155,6 +160,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (storedSession) {
         try {
           const parsed = JSON.parse(storedSession);
+
+          // Preservar fotos e dados da moto caso não estejam na sessão salva
+          if (!parsed.motorcycle_photos || parsed.motorcycle_photos.length === 0) {
+            const savedPhotos = localStorage.getItem('motolegado_pilot_bike_photos');
+            if (savedPhotos) {
+              try {
+                const photosArray = JSON.parse(savedPhotos);
+                if (Array.isArray(photosArray) && photosArray.length > 0) {
+                  parsed.motorcycle_photos = photosArray;
+                }
+              } catch (e) {}
+            }
+          }
+          if (!parsed.motorcycle) parsed.motorcycle = localStorage.getItem('motolegado_pilot_bike') || '';
+          if (!parsed.motorcycle_nickname) parsed.motorcycle_nickname = localStorage.getItem('motolegado_pilot_bike_nickname') || '';
+          if (!parsed.motorcycle_year) parsed.motorcycle_year = localStorage.getItem('motolegado_pilot_bike_year') || '2023';
+          if (!parsed.motorcycle_plate) parsed.motorcycle_plate = localStorage.getItem('motolegado_pilot_bike_plate') || '';
+
           setProfile(parsed);
           setUser({
             id: parsed.id,
@@ -165,15 +188,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             created_at: new Date().toISOString(),
           } as any);
 
-          // Atualiza dados frescos do MySQL na Hostinger em segundo plano
+          // Atualiza dados frescos do MySQL na Hostinger em segundo plano sem apagar dados locais da moto
           if (parsed.id) {
             apiGetMe(parsed.id).then((res) => {
               if (res.data?.success && res.data.pilot) {
                 const updated: PilotProfile = {
+                  ...parsed,
                   ...res.data.pilot,
-                  plan_type: res.data.pilot.plan || 'gratuito',
-                  is_pro: res.data.pilot.role === 'admin' || res.data.pilot.plan === 'pago' || res.data.pilot.plan === 'bonificado',
-                  avatar_url: res.data.pilot.avatar_url || getCleanAvatar(res.data.pilot.name || res.data.pilot.email),
+                  plan_type: res.data.pilot.plan || parsed.plan_type || 'gratuito',
+                  is_pro: res.data.pilot.role === 'admin' || res.data.pilot.plan === 'pago' || res.data.pilot.plan === 'bonificado' || parsed.is_pro,
+                  avatar_url: res.data.pilot.avatar_url || parsed.avatar_url || getCleanAvatar(res.data.pilot.name || res.data.pilot.email),
+                  motorcycle_photos: (parsed.motorcycle_photos && parsed.motorcycle_photos.length > 0) 
+                    ? parsed.motorcycle_photos 
+                    : (res.data.pilot.motorcycle_photos ? (typeof res.data.pilot.motorcycle_photos === 'string' ? JSON.parse(res.data.pilot.motorcycle_photos) : res.data.pilot.motorcycle_photos) : []),
+                  motorcycle: res.data.pilot.motorcycle || parsed.motorcycle,
+                  motorcycle_nickname: res.data.pilot.motorcycle_nickname || parsed.motorcycle_nickname,
+                  motorcycle_year: res.data.pilot.motorcycle_year || parsed.motorcycle_year,
+                  motorcycle_plate: res.data.pilot.motorcycle_plate || parsed.motorcycle_plate,
                 };
                 setProfile(updated);
                 localStorage.setItem('motolegado_pilot_session', JSON.stringify(updated));
@@ -188,11 +219,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (storedEmail && storedName) {
         const assignedRole = checkIfAdmin(storedEmail, storedName);
         const storedPlan = (localStorage.getItem('motolegado_pilot_plan') as 'gratuito' | 'pago' | 'bonificado') || (assignedRole === 'admin' ? 'pago' : 'gratuito');
+        let initialPhotos: string[] = [];
+        try {
+          const savedBikePhotos = localStorage.getItem('motolegado_pilot_bike_photos');
+          if (savedBikePhotos) initialPhotos = JSON.parse(savedBikePhotos);
+        } catch {}
         const fallbackProfile: PilotProfile = {
           id: storedId || ('pilot_' + storedEmail.replace(/[^a-zA-Z0-9]/g, '_')),
           name: storedName,
           email: storedEmail,
           motorcycle: localStorage.getItem('motolegado_pilot_bike') || '',
+          motorcycle_nickname: localStorage.getItem('motolegado_pilot_bike_nickname') || '',
+          motorcycle_year: localStorage.getItem('motolegado_pilot_bike_year') || '2023',
+          motorcycle_plate: localStorage.getItem('motolegado_pilot_bike_plate') || '',
+          motorcycle_photos: initialPhotos,
           points: 0,
           tier: 'Bronze',
           is_pro: assignedRole === 'admin' || storedPlan === 'pago' || storedPlan === 'bonificado',
@@ -375,7 +415,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async (): Promise<{ error: Error | null; isSetupNeeded?: boolean }> => {
     if (!isSupabaseConfigured) {
       return { 
-        error: new Error('As variáveis de configuração do Supabase não estão disponíveis.'),
+        error: new Error('Serviço de autenticação temporariamente indisponível.'),
         isSetupNeeded: true
       };
     }
@@ -405,7 +445,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           msg.toLowerCase().includes('unsupported provider')
         ) {
           return {
-            error: new Error('O provedor Google ainda precisa ser ativado no painel do Supabase.'),
+            error: new Error('O provedor de login com Google não está ativo no momento.'),
             isSetupNeeded: true,
           };
         }

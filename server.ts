@@ -293,10 +293,11 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
   app.post('/api/pilots', async (req, res) => {
     try {
       const pool = getDbPool();
-      const { id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone, role, plan } = req.body;
+      const { id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone, role, plan, motorcycle_nickname, motorcycle_photos } = req.body;
+      const photosJson = Array.isArray(motorcycle_photos) ? JSON.stringify(motorcycle_photos) : (motorcycle_photos || null);
       await pool.query(`
-        INSERT INTO pilots (id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone, role, plan)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO pilots (id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone, role, plan, motorcycle_nickname, motorcycle_photos)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           name = VALUES(name),
           motorcycle = VALUES(motorcycle),
@@ -305,8 +306,10 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
           emergency_contact = VALUES(emergency_contact),
           emergency_phone = VALUES(emergency_phone),
           role = VALUES(role),
-          plan = VALUES(plan)
-      `, [id, email, name, motorcycle || null, phone || null, blood_type || null, emergency_contact || null, emergency_phone || null, role || 'pilot', plan || 'gratuito']);
+          plan = VALUES(plan),
+          motorcycle_nickname = VALUES(motorcycle_nickname),
+          motorcycle_photos = VALUES(motorcycle_photos)
+      `, [id, email, name, motorcycle || null, phone || null, blood_type || null, emergency_contact || null, emergency_phone || null, role || 'pilot', plan || 'gratuito', motorcycle_nickname || null, photosJson]);
       res.json({ success: true, message: 'Perfil do piloto salvo no MySQL com sucesso!' });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });

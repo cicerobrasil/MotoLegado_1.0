@@ -16,18 +16,36 @@ import {
   Loader2,
   Trash2,
   UploadCloud,
-  CheckCircle2
+  CheckCircle2,
+  QrCode,
+  ShieldCheck,
+  Copy,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { uploadImageToStorage } from '../lib/storage';
 
 export function ProfileSettings() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { profile, user, updateProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'piloto' | 'identidade' | 'endereco' | 'motocicleta'>('piloto');
+
+  const tabParam = searchParams.get('tab');
+  const initialTab = (tabParam && ['piloto', 'identidade', 'endereco', 'motocicleta'].includes(tabParam)) 
+    ? (tabParam as 'piloto' | 'identidade' | 'endereco' | 'motocicleta') 
+    : 'piloto';
+
+  const [activeTab, setActiveTab] = useState<'piloto' | 'identidade' | 'endereco' | 'motocicleta'>(initialTab);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab && ['piloto', 'identidade', 'endereco', 'motocicleta'].includes(requestedTab)) {
+      setActiveTab(requestedTab as any);
+    }
+  }, [searchParams]);
   
   // Form States vinculados ao perfil real
   const [name, setName] = useState(profile?.name || '');
@@ -36,6 +54,54 @@ export function ProfileSettings() {
   const [bio, setBio] = useState(profile?.bio || '');
   const [city, setCity] = useState(profile?.city || '');
   const [state, setState] = useState(profile?.state || '');
+  const [cep, setCep] = useState(() => {
+    if (profile?.cep) return profile.cep;
+    try {
+      const saved = localStorage.getItem('motolegado_pilot_address');
+      return saved ? JSON.parse(saved).cep || '' : '';
+    } catch {
+      return '';
+    }
+  });
+  const [street, setStreet] = useState(() => {
+    if (profile?.street) return profile.street;
+    try {
+      const saved = localStorage.getItem('motolegado_pilot_address');
+      return saved ? JSON.parse(saved).street || '' : '';
+    } catch {
+      return '';
+    }
+  });
+  const [streetNumber, setStreetNumber] = useState(() => {
+    if (profile?.street_number) return profile.street_number;
+    try {
+      const saved = localStorage.getItem('motolegado_pilot_address');
+      return saved ? JSON.parse(saved).streetNumber || '' : '';
+    } catch {
+      return '';
+    }
+  });
+  const [neighborhood, setNeighborhood] = useState(() => {
+    if (profile?.neighborhood) return profile.neighborhood;
+    try {
+      const saved = localStorage.getItem('motolegado_pilot_address');
+      return saved ? JSON.parse(saved).neighborhood || '' : '';
+    } catch {
+      return '';
+    }
+  });
+  const [isDefaultStartPoint, setIsDefaultStartPoint] = useState(() => {
+    if (profile?.default_start_point !== undefined) return Boolean(profile.default_start_point);
+    try {
+      const saved = localStorage.getItem('motolegado_pilot_address');
+      return saved ? Boolean(JSON.parse(saved).isDefaultStartPoint) : true;
+    } catch {
+      return true;
+    }
+  });
+  const [isSearchingCep, setIsSearchingCep] = useState(false);
+  const numberInputRef = useRef<HTMLInputElement>(null);
+
   const [motorcycle, setMotorcycle] = useState(profile?.motorcycle || '');
   const [motorcycleNickname, setMotorcycleNickname] = useState(
     profile?.motorcycle_nickname || localStorage.getItem('motolegado_pilot_bike_nickname') || ''
@@ -80,6 +146,11 @@ export function ProfileSettings() {
       setBio(profile.bio || '');
       setCity(profile.city || '');
       setState(profile.state || '');
+      if (profile.cep) setCep(profile.cep);
+      if (profile.street) setStreet(profile.street);
+      if (profile.street_number) setStreetNumber(profile.street_number);
+      if (profile.neighborhood) setNeighborhood(profile.neighborhood);
+      if (profile.default_start_point !== undefined) setIsDefaultStartPoint(Boolean(profile.default_start_point));
       setMotorcycle(profile.motorcycle || '');
       if (profile.avatar_url) setProfilePhoto(profile.avatar_url);
       if (profile.personal_logo_url) setPersonalLogo(profile.personal_logo_url);
@@ -91,6 +162,100 @@ export function ProfileSettings() {
       }
     }
   }, [profile]);
+
+  // Formatar e Buscar CEP
+  const formatCep = (value: string) => {
+    const raw = value.replace(/\D/g, '').slice(0, 8);
+    if (raw.length <= 5) return raw;
+    return `${raw.slice(0, 5)}-${raw.slice(5)}`;
+  };
+
+  const handleCepChange = (value: string) => {
+    const formatted = formatCep(value);
+    setCep(formatted);
+    const raw = value.replace(/\D/g, '');
+    if (raw.length === 8 && !isSearchingCep) {
+      performCepSearch(raw);
+    }
+  };
+
+  const performCepSearch = async (cleanCepParam?: string) => {
+    const rawCep = (cleanCepParam || cep).replace(/\D/g, '');
+    if (rawCep.length !== 8) {
+      showToast('Digite um CEP válido com 8 dígitos (ex: 88311-285).', 'error');
+      return;
+    }
+
+    setIsSearchingCep(true);
+    try {
+      let data: { street: string; neighborhood: string; city: string; state: string } | null = null;
+
+      // 1. Provedor Primário: ViaCEP
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`https://viacep.com.br/ws/${rawCep}/json/`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const json = await res.json();
+          if (!json.erro) {
+            data = {
+              street: json.logradouro || '',
+              neighborhood: json.bairro || '',
+              city: json.localidade || '',
+              state: json.uf || ''
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('ViaCEP indisponível, tentando BrasilAPI...');
+      }
+
+      // 2. Provedor Secundário (Fallback): BrasilAPI
+      if (!data) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4000);
+          const res = await fetch(`https://brasilapi.com.br/api/cep/v1/${rawCep}`, {
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            const json = await res.json();
+            data = {
+              street: json.street || '',
+              neighborhood: json.neighborhood || '',
+              city: json.city || '',
+              state: json.state || ''
+            };
+          }
+        } catch (err) {
+          console.warn('BrasilAPI indisponível.');
+        }
+      }
+
+      if (data) {
+        if (data.street) setStreet(data.street);
+        if (data.neighborhood) setNeighborhood(data.neighborhood);
+        if (data.city) setCity(data.city);
+        if (data.state) setState(data.state.toUpperCase());
+        setCep(formatCep(rawCep));
+        showToast(`Endereço localizado: ${data.city} - ${data.state}!`, 'success');
+        setTimeout(() => {
+          numberInputRef.current?.focus();
+        }, 150);
+      } else {
+        showToast('CEP não encontrado. Preencha o endereço manualmente.', 'info');
+      }
+    } catch (err) {
+      console.error('Erro na consulta do CEP:', err);
+      showToast('Falha na consulta do CEP. Preencha manualmente.', 'error');
+    } finally {
+      setIsSearchingCep(false);
+    }
+  };
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -132,7 +297,7 @@ export function ProfileSettings() {
     setPhone(formatted.substring(0, 15));
   };
 
-  // Upload Real no Supabase Storage para Foto do Perfil ou Logotipo Pessoal
+  // Upload para Foto do Perfil ou Logotipo Pessoal
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>, type: 'logo' | 'photo') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -152,20 +317,10 @@ export function ProfileSettings() {
       if (result.success && result.url) {
         if (type === 'logo') {
           setPersonalLogo(result.url);
-          showToast(
-            result.isCloudStorage 
-              ? 'Logotipo enviado para o Supabase Storage com sucesso!' 
-              : 'Logotipo atualizado e salvo localmente!', 
-            'success'
-          );
+          showToast('Logotipo atualizado e salvo com sucesso!', 'success');
         } else {
           setProfilePhoto(result.url);
-          showToast(
-            result.isCloudStorage 
-              ? 'Foto de perfil enviada para o Supabase Storage!' 
-              : 'Foto de perfil atualizada!', 
-            'success'
-          );
+          showToast('Foto de perfil atualizada com sucesso!', 'success');
         }
       } else {
         showToast(result.error || 'Erro ao processar o arquivo.', 'error');
@@ -181,7 +336,7 @@ export function ProfileSettings() {
     }
   };
 
-  // Upload Real no Supabase Storage para Fotos da Motocicleta
+  // Upload para Fotos da Motocicleta
   const handleBikePhotoUpload = async (e: ChangeEvent<HTMLInputElement>, slotIndex: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -194,17 +349,29 @@ export function ProfileSettings() {
       });
 
       if (result.success && result.url) {
+        let updatedPhotos: string[] = [];
         setMotorcyclePhotos(prev => {
           const next = [...prev];
           next[slotIndex] = result.url;
+          updatedPhotos = next;
+          try {
+            localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(next));
+          } catch (e) {
+            console.error(e);
+          }
           return next;
         });
-        showToast(
-          result.isCloudStorage
-            ? `Foto ${slotIndex + 1} da moto salva no Supabase Storage!`
-            : `Foto ${slotIndex + 1} da moto atualizada com sucesso!`,
-          'success'
-        );
+
+        // Garantir sincronização imediata no perfil
+        updateProfile({
+          motorcycle_photos: updatedPhotos.length > 0 ? updatedPhotos : [result.url],
+          motorcycle: motorcycle || profile?.motorcycle,
+          motorcycle_nickname: motorcycleNickname || profile?.motorcycle_nickname,
+          motorcycle_year: motorcycleYear || profile?.motorcycle_year,
+          motorcycle_plate: motorcyclePlate || profile?.motorcycle_plate,
+        }).catch(() => {});
+
+        showToast(`Foto ${slotIndex + 1} da moto salva com sucesso!`, 'success');
       } else {
         showToast(result.error || 'Erro no upload da foto da moto.', 'error');
       }
@@ -218,11 +385,23 @@ export function ProfileSettings() {
   };
 
   const handleRemoveBikePhoto = (slotIndex: number) => {
+    let updatedPhotos: string[] = [];
     setMotorcyclePhotos(prev => {
       const next = [...prev];
       next.splice(slotIndex, 1);
+      updatedPhotos = next;
+      try {
+        localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(next));
+      } catch (e) {
+        console.error(e);
+      }
       return next;
     });
+
+    updateProfile({
+      motorcycle_photos: updatedPhotos,
+    }).catch(() => {});
+
     showToast(`Foto ${slotIndex + 1} removida.`, 'info');
   };
 
@@ -237,6 +416,15 @@ export function ProfileSettings() {
       localStorage.setItem('motolegado_pilot_bike_plate', motorcyclePlate);
       localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(motorcyclePhotos));
       localStorage.setItem('motolegado_pilot_bike', motorcycle);
+      localStorage.setItem('motolegado_pilot_address', JSON.stringify({
+        cep,
+        street,
+        streetNumber,
+        neighborhood,
+        city,
+        state,
+        isDefaultStartPoint
+      }));
 
       await updateProfile({
         name,
@@ -244,6 +432,11 @@ export function ProfileSettings() {
         bio,
         city,
         state,
+        cep,
+        street,
+        street_number: streetNumber,
+        neighborhood,
+        default_start_point: isDefaultStartPoint,
         motorcycle,
         avatar_url: profilePhoto,
         personal_logo_url: personalLogo || undefined,
@@ -555,102 +748,232 @@ export function ProfileSettings() {
             </div>
           )}
 
-          {activeTab === 'identidade' && (
-            <div className="md:col-span-2 space-y-6 flex flex-col items-center">
-              {/* Member Card */}
-              <div className="w-full max-w-xl bg-slate-950 border-2 border-orange-600 rounded-3xl sm:rounded-[2.8rem] p-5 sm:p-8 md:p-10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_rgba(255,85,0,0.1)] relative overflow-hidden group">
-                {/* Background Pattern */}
-                <div className="absolute inset-0 opacity-10 pointer-events-none transition-opacity group-hover:opacity-15">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.1),transparent)]"></div>
-                  <div className="h-full w-full bg-[repeating-linear-gradient(45deg,transparent,transparent_30px,rgba(255,255,255,0.02)_30px,rgba(255,255,255,0.02)_31px)]"></div>
+          {activeTab === 'identidade' && (() => {
+            const displayName = (name || profile?.name || 'Piloto MotoLegado').trim();
+            const displayBike = motorcycleNickname 
+              ? `${motorcycleNickname} • ${motorcycle || 'Motocicleta'}` 
+              : (motorcycle || profile?.motorcycle || 'Motocicleta Principal');
+            const displayYearPlate = `${motorcycleYear || '2023'}${motorcyclePlate ? ` • ${motorcyclePlate}` : ''}`;
+            const displayLocation = (city && state) 
+              ? `${city}/${state}` 
+              : (city || state || profile?.city || profile?.state || 'Brasil');
+            const displayClub = profile?.club_name || localStorage.getItem('motolegado_pilot_club') || 'Piloto Independente';
+            const displayTier = profile?.tier || 'Bronze';
+            const displayPlanBadge = profile?.plan_type === 'bonificado'
+              ? '⭐ MODO BONIFICADO'
+              : (profile?.plan_type === 'pago' || profile?.is_pro)
+              ? '🔥 PLANO PRO'
+              : `PATENTE ${displayTier.toUpperCase()}`;
+
+            const cleanPilotId = profile?.id 
+              ? (profile.id.startsWith('PIL-') ? profile.id : `PIL-${profile.id.replace(/[^0-9]/g, '').slice(-6) || '77892'}`)
+              : 'PIL-77892';
+
+            const handleShare = () => {
+              const shareText = `Passaporte Oficial MotoLegado\nPiloto: ${displayName}\nID: ${cleanPilotId}\nMoto: ${displayBike}\nBase: ${displayLocation}\nPatente: ${displayTier}`;
+              if (navigator.clipboard) {
+                navigator.clipboard.writeText(shareText);
+                showToast('Credencial copiada para a área de transferência!', 'success');
+              } else {
+                showToast('Link do ID Digital pronto para compartilhamento.', 'info');
+              }
+            };
+
+            return (
+              <div className="md:col-span-2 space-y-8 flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Official Member Card */}
+                <div className="w-full max-w-xl bg-slate-950 border-2 border-orange-500/80 rounded-3xl sm:rounded-[2.8rem] p-5 sm:p-8 md:p-10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_rgba(255,85,0,0.15)] relative overflow-hidden group">
+                  {/* Background Ambient Glow & Patterns */}
+                  <div className="absolute top-0 right-0 w-72 h-72 bg-orange-600/15 blur-[90px] -mr-24 -mt-24 pointer-events-none" />
+                  <div className="absolute bottom-0 left-0 w-60 h-60 bg-blue-600/10 blur-[80px] -ml-20 -mb-20 pointer-events-none" />
+                  <div className="absolute inset-0 opacity-10 pointer-events-none">
+                    <div className="h-full w-full bg-[repeating-linear-gradient(45deg,transparent,transparent_30px,rgba(255,255,255,0.03)_30px,rgba(255,255,255,0.03)_31px)]" />
+                  </div>
+
+                  <div className="relative h-full flex flex-col justify-between z-10 space-y-6">
+                    {/* Card Header */}
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="w-11 h-11 sm:w-14 sm:h-14 bg-gradient-to-br from-orange-500 to-orange-700 rounded-2xl flex items-center justify-center font-black text-xl sm:text-2xl shadow-[0_4px_15px_rgba(255,85,0,0.4)] text-white">
+                          M
+                        </div>
+                        <div>
+                          <h2 className="text-xl sm:text-2xl font-black tracking-tighter uppercase italic leading-none flex gap-1 text-white">
+                            MOTO<span className="text-orange-500 drop-shadow-[0_0_8px_rgba(255,85,0,0.5)]">LEGADO</span>
+                          </h2>
+                          <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.25em] sm:tracking-[0.3em] text-slate-500 mt-1 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                            Official Member Card
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Dynamic Rank / Plan Badge */}
+                      <div className="px-3 py-1.5 sm:px-4 sm:py-2 border border-orange-500/30 rounded-full bg-orange-500/10 shrink-0">
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase italic tracking-wider text-orange-400">
+                          {displayPlanBadge}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Card Body with Real Pilot Info */}
+                    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 my-2">
+                      <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-2xl sm:rounded-3xl border-3 border-orange-500/80 overflow-hidden shrink-0 shadow-[0_15px_30px_rgba(0,0,0,0.6)] bg-slate-900">
+                        <img 
+                          src={profilePhoto} 
+                          alt={displayName} 
+                          className="w-full h-full object-cover"
+                        />
+                        {personalLogo && (
+                          <div className="absolute bottom-1.5 right-1.5 w-7 h-7 rounded-full border border-orange-500/80 bg-slate-950 p-0.5 overflow-hidden shadow-lg">
+                            <img src={personalLogo} alt="Logo" className="w-full h-full object-cover rounded-full" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 text-center sm:text-left flex-1 min-w-0">
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 mb-0.5">NOME DE PILOTO</p>
+                          <h3 className="text-2xl sm:text-4xl font-black italic uppercase tracking-tighter text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] truncate">
+                            {displayName}
+                          </h3>
+                          <div className="flex gap-1.5 justify-center sm:justify-start mt-1">
+                            <span className="h-1 w-10 bg-orange-500 rounded-full" />
+                            <span className="h-1 w-3 bg-slate-800 rounded-full" />
+                          </div>
+                        </div>
+
+                        {/* Pilot Specifications */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 text-left">
+                          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl px-3 py-1.5">
+                            <p className="text-[8px] font-black uppercase tracking-wider text-slate-500">MÁQUINA</p>
+                            <p className="text-[11px] font-black text-slate-200 uppercase italic truncate">{displayBike}</p>
+                            <p className="text-[8px] font-bold text-orange-400 uppercase tracking-widest">{displayYearPlate}</p>
+                          </div>
+                          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl px-3 py-1.5">
+                            <p className="text-[8px] font-black uppercase tracking-wider text-slate-500">BASE & CLUBE</p>
+                            <p className="text-[11px] font-black text-slate-200 uppercase italic truncate">{displayLocation}</p>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider truncate">{displayClub}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card Footer */}
+                    <div className="flex justify-between items-end pt-2 border-t border-slate-800/80">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-2 bg-slate-900 rounded-xl border border-slate-800 text-orange-500">
+                          <Zap size={16} />
+                        </div>
+                        <div>
+                          <p className="text-[8px] font-black uppercase tracking-wider text-slate-500">PASSAPORTE OFICIAL</p>
+                          <div className="text-[11px] sm:text-xs font-black font-mono text-white uppercase tracking-wider bg-slate-900/90 px-2.5 py-0.5 rounded-lg border border-slate-800 mt-0.5 inline-block">
+                            ID: {cleanPilotId}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-md">
+                        <ShieldCheck size={16} />
+                        <span className="text-[9px] font-black uppercase tracking-wider hidden sm:inline">ID VERIFICADO</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="relative h-full flex flex-col justify-between z-10 space-y-6">
-                  {/* Card Header */}
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3 sm:gap-4">
-                      <div className="w-10 h-10 sm:w-14 sm:h-14 bg-gradient-to-br from-orange-500 to-orange-700 rounded-2xl flex items-center justify-center font-black text-xl sm:text-3xl shadow-[0_4px_15px_rgba(255,85,0,0.4)] transform -rotate-1">M</div>
-                      <div>
-                        <h2 className="text-xl sm:text-2xl font-black tracking-tighter uppercase italic leading-none flex gap-1">
-                          MOTO<span className="text-orange-600 drop-shadow-[0_0_8px_rgba(255,85,0,0.5)]">LEGADO</span>
-                        </h2>
-                        <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.4em] text-slate-500 mt-1 flex items-center gap-1.5">
-                          <span className="w-1 h-1 bg-orange-600 rounded-full animate-pulse"></span>
-                          Official Member Card
-                        </p>
-                      </div>
-                    </div>
-                    <div className="px-3 py-1 sm:px-5 sm:py-2 border border-orange-500/20 rounded-full bg-orange-500/5 transition-colors group-hover:bg-orange-500/10">
-                      <span className="text-[9px] sm:text-[11px] font-black uppercase italic tracking-widest text-orange-500">ROLEZINHO</span>
-                    </div>
+                {/* Share Action */}
+                <button 
+                  onClick={handleShare}
+                  className="flex items-center gap-3 text-orange-500 hover:text-orange-400 transition-all group pt-1 cursor-pointer active:scale-95"
+                >
+                  <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:border-orange-500/50 group-hover:shadow-[0_0_15px_rgba(255,85,0,0.25)] transition-all">
+                    <Share2 size={16} className="group-hover:scale-110 transition-transform" />
                   </div>
+                  <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.25em] sm:tracking-[0.3em]">
+                    Compartilhar Credencial
+                  </span>
+                </button>
 
-                  {/* Card Body */}
-                  <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 my-2">
-                    <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl sm:rounded-3xl border-4 border-orange-600/80 overflow-hidden shrink-0 shadow-[0_20px_40px_rgba(0,0,0,0.4)] transform hover:scale-105 transition-transform duration-500">
-                      <img 
-                        src={profilePhoto} 
-                        alt="Member" 
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="space-y-1.5 text-center sm:text-left">
-                      <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.4em] sm:tracking-[0.5em] text-slate-500">NOME DE PILOTO</p>
-                      <h3 className="text-3xl sm:text-5xl font-black italic uppercase tracking-tighter text-white drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">Alex Rider</h3>
-                      <div className="flex gap-2 justify-center sm:justify-start">
-                        <span className="h-0.5 w-12 bg-orange-600 rounded-full"></span>
-                        <span className="h-0.5 w-4 bg-slate-800 rounded-full"></span>
-                      </div>
-                    </div>
+                {/* Synchronization Note */}
+                <div className="w-full max-w-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex items-center gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center shrink-0 text-orange-500">
+                    <Sparkles size={18} />
                   </div>
-
-                  {/* Card Footer */}
-                  <div className="flex justify-between items-end">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-slate-900 rounded-xl border border-slate-800">
-                        <Zap className="text-orange-500" size={18} />
-                      </div>
-                      <div className="text-[10px] sm:text-[11px] font-bold font-mono text-slate-400 uppercase tracking-[0.15em] sm:tracking-[0.2em] bg-slate-900/50 px-3 py-1 rounded-md border border-slate-800/50">
-                        ID: PIL-977264
-                      </div>
-                    </div>
-                    <div className="p-2.5 sm:p-3 bg-white/95 rounded-[1rem] sm:rounded-[1.2rem] shadow-xl transform group-hover:rotate-6 transition-transform">
-                      <Shield size={28} className="text-black sm:w-9 sm:h-9" />
-                    </div>
-                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Este <strong>ID Digital</strong> é sincronizado em tempo real com seu cadastro de <em>Piloto</em>, <em>Endereço</em> e <em>Motocicleta</em>. Qualquer alteração gravada atualiza este passaporte imediatamente.
+                  </p>
                 </div>
               </div>
-
-              {/* Share Action */}
-              <button className="flex items-center gap-3 text-orange-500 hover:text-orange-400 transition-all group pt-2">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:border-orange-500/50 group-hover:shadow-[0_0_15px_rgba(255,85,0,0.2)] transition-all">
-                  <Share2 size={16} className="group-hover:scale-110 transition-transform" />
-                </div>
-                <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.3em] sm:tracking-[0.4em]">Compartilhar Credencial</span>
-              </button>
-            </div>
-          )}
+            );
+          })()}
 
           {activeTab === 'endereco' && (
             <div className="md:col-span-2 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex flex-col md:flex-row items-end gap-5 max-w-md">
-                <div className="flex-1 w-full space-y-4">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">CEP</label>
-                  <input type="text" placeholder="00000-000" className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white" />
+              <div className="flex flex-col md:flex-row items-end gap-3 sm:gap-4 max-w-md">
+                <div className="flex-1 w-full space-y-3">
+                  <div className="flex items-center justify-between ml-2">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">CEP</label>
+                    {isSearchingCep && (
+                      <span className="text-[11px] text-orange-400 font-bold lowercase tracking-normal flex items-center gap-1.5 animate-pulse">
+                        <Loader2 size={12} className="animate-spin text-orange-500" />
+                        <span>Consultando base postal...</span>
+                      </span>
+                    )}
+                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="00000-000" 
+                    value={cep}
+                    maxLength={9}
+                    onChange={(e) => handleCepChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        performCepSearch();
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white font-mono" 
+                  />
                 </div>
-                <button className="p-5 bg-orange-600 text-white rounded-2xl hover:bg-orange-500 hover:scale-105 active:scale-95 transition-all shadow-[0_10px_20px_rgba(255,85,0,0.2)] active:shadow-inner flex items-center justify-center group/btn">
-                  <Search size={22} className="drop-shadow-md group-hover/btn:scale-110 transition-transform" />
+                <button 
+                  type="button"
+                  onClick={() => performCepSearch()}
+                  disabled={isSearchingCep}
+                  title="Buscar endereço pelo CEP"
+                  className={cn(
+                    "p-4 sm:p-5 bg-orange-600 text-white rounded-2xl hover:bg-orange-500 hover:scale-105 active:scale-95 transition-all shadow-[0_10px_20px_rgba(255,85,0,0.2)] active:shadow-inner flex items-center justify-center group/btn cursor-pointer shrink-0",
+                    isSearchingCep && "opacity-75 cursor-wait"
+                  )}
+                >
+                  {isSearchingCep ? (
+                    <Loader2 size={22} className="animate-spin drop-shadow-md" />
+                  ) : (
+                    <Search size={22} className="drop-shadow-md group-hover/btn:scale-110 transition-transform" />
+                  )}
                 </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                 <div className="md:col-span-9 space-y-4">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Rua / Avenida</label>
-                  <input type="text" className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" />
+                  <input 
+                    type="text" 
+                    placeholder="Ex: Av. Paulista ou Rua das Flores"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
+                  />
                 </div>
                 <div className="md:col-span-3 space-y-4">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Número</label>
-                  <input type="text" className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white md:col-span-3" />
+                  <input 
+                    ref={numberInputRef}
+                    type="text" 
+                    placeholder="Nº ou S/N"
+                    value={streetNumber}
+                    onChange={(e) => setStreetNumber(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
+                  />
                 </div>
               </div>
 
@@ -660,7 +983,9 @@ export function ProfileSettings() {
                   <input 
                     type="text" 
                     placeholder="Bairro"
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
+                    value={neighborhood}
+                    onChange={(e) => setNeighborhood(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -671,7 +996,7 @@ export function ProfileSettings() {
                       value={city} 
                       onChange={(e) => setCity(e.target.value)}
                       placeholder="Ex: São Paulo" 
-                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
+                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
                     />
                   </div>
                   <div className="space-y-4">
@@ -682,7 +1007,7 @@ export function ProfileSettings() {
                       onChange={(e) => setState(e.target.value.toUpperCase())}
                       placeholder="SP" 
                       maxLength={2}
-                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white uppercase" 
+                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white uppercase font-mono" 
                     />
                   </div>
                 </div>
@@ -690,7 +1015,13 @@ export function ProfileSettings() {
 
               <div className="flex items-center gap-4 pt-4 px-2">
                 <div className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" id="start-point" />
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    id="start-point" 
+                    checked={isDefaultStartPoint}
+                    onChange={(e) => setIsDefaultStartPoint(e.target.checked)}
+                  />
                   <div className="w-12 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-[18px] after:w-[18px] after:transition-all peer-checked:bg-orange-600 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"></div>
                 </div>
                 <label htmlFor="start-point" className="text-[11px] font-black uppercase tracking-widest text-slate-400 cursor-pointer select-none hover:text-white transition-colors">
@@ -755,7 +1086,7 @@ export function ProfileSettings() {
                     </div>
                     <div>
                       <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300">Galeria da Motocicleta (Até 3 fotos)</h3>
-                      <p className="text-[8px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">Armazenamento oficial no Supabase Storage</p>
+                      <p className="text-[8px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">Armazenamento Seguro em Nuvem</p>
                     </div>
                   </div>
                 </div>

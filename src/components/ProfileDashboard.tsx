@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, Lock, CheckCircle2, ShieldCheck, BookOpen, Sparkles, Crown } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, Lock, CheckCircle2, ShieldCheck, BookOpen, Sparkles, Crown, Camera, Maximize2, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { getPilotLiveGamification, PILOT_RANKS } from '../lib/gamification';
@@ -16,9 +16,13 @@ export function ProfileDashboard() {
   const [showRankHierarchyModal, setShowRankHierarchyModal] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [events, setEvents] = useState<MotoEvent[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; title: string; index: number; slotLabel: string } | null>(null);
 
   const pilotName = profile?.name || 'Piloto MotoLegado';
-  const pilotMotorcycle = profile?.motorcycle || 'Motocicleta Principal';
+  const pilotMotorcycle = profile?.motorcycle || localStorage.getItem('motolegado_pilot_bike') || 'Motocicleta Principal';
+  const pilotMotorcycleNickname = profile?.motorcycle_nickname || localStorage.getItem('motolegado_pilot_bike_nickname') || '';
+  const pilotMotorcycleYear = profile?.motorcycle_year || localStorage.getItem('motolegado_pilot_bike_year') || '2023';
+  const pilotMotorcyclePlate = profile?.motorcycle_plate || localStorage.getItem('motolegado_pilot_bike_plate') || '';
   const pilotClub = profile?.club_name || localStorage.getItem('motolegado_pilot_club') || 'Piloto Independente';
   const pilotAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
     ? profile.avatar_url
@@ -104,14 +108,53 @@ export function ProfileDashboard() {
     { label: 'PATENTE / NÍVEL', value: `${currentTier.icon} ${currentTier.title}`, unit: `${totalPointsEarned} PTS`, icon: Award, color: 'text-purple-400' },
   ];
 
-  // Garagem do piloto (usa a moto cadastrada no perfil)
-  const garage = [
-    { 
-      year: 'Atual', 
-      model: pilotMotorcycle, 
-      image: 'https://images.unsplash.com/photo-1558981403-c5f91cbba527?auto=format&fit=crop&q=80&w=400' 
+  // Fotos reais da moto cadastradas no perfil
+  const bikePhotos: string[] = useMemo(() => {
+    let photos: string[] = [];
+    if (profile?.motorcycle_photos && Array.isArray(profile.motorcycle_photos)) {
+      photos = profile.motorcycle_photos.filter(p => typeof p === 'string' && p.trim().length > 0);
     }
-  ];
+    if (photos.length === 0) {
+      const saved = localStorage.getItem('motolegado_pilot_bike_photos');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            photos = parsed.filter(p => typeof p === 'string' && p.trim().length > 0);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return photos;
+  }, [profile?.motorcycle_photos]);
+
+  // Garagem do piloto: mapeia cada foto enviada pelo piloto com seus dados reais
+  const garage = useMemo(() => {
+    const slotTitles = [
+      'Visão Principal',
+      'Ângulo Lateral',
+      'Detalhes / Customização'
+    ];
+
+    if (bikePhotos.length > 0) {
+      return bikePhotos.map((photoUrl, index) => ({
+        id: `bike-photo-${index}`,
+        index,
+        slotLabel: slotTitles[index] || `Foto ${index + 1}`,
+        year: pilotMotorcycleYear || 'Atual',
+        model: pilotMotorcycleNickname 
+          ? `${pilotMotorcycleNickname} • ${pilotMotorcycle}`
+          : pilotMotorcycle,
+        plate: pilotMotorcyclePlate,
+        image: photoUrl,
+        isUserPhoto: true,
+      }));
+    }
+
+    return [];
+  }, [bikePhotos, pilotMotorcycle, pilotMotorcycleNickname, pilotMotorcycleYear, pilotMotorcyclePlate]);
 
   // Histórico mensal de consumo de asfalto (baseado nos registros reais de viagens)
   const chartData = [
@@ -703,43 +746,211 @@ export function ProfileDashboard() {
         </div>
       </motion.section>
 
-      {/* 5. GARAGE SECTION */}
+      {/* 5. GARAGE SECTION - FOTOS DA MOTO DO PILOTO */}
       <motion.section 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.9 }}
         className="space-y-6 sm:space-y-8"
       >
-        <div className="flex items-center justify-between">
-           <h3 className="text-xl sm:text-2xl font-black text-white italic uppercase tracking-tighter">MINHA GARAGEM ({garage.length})</h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl sm:text-2xl font-black text-white italic uppercase tracking-tighter">
+                MINHA GARAGEM ({garage.length > 0 ? `${garage.length} ${garage.length === 1 ? 'FOTO' : 'FOTOS'}` : '0 FOTOS'})
+              </h3>
+              {garage.length > 0 && (
+                <span className="px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[9px] font-black uppercase tracking-wider">
+                  Fotos Oficiais do Piloto
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              {garage.length > 0 
+                ? `Fotos enviadas no perfil para a máquina: ${pilotMotorcycleNickname ? `${pilotMotorcycleNickname} (${pilotMotorcycle})` : pilotMotorcycle}.`
+                : 'Galeria visual e fotos da sua moto cadastradas no seu perfil.'
+              }
+            </p>
+          </div>
+
+          <button
+            onClick={() => navigate('/profile/settings?tab=motocicleta')}
+            className="self-start sm:self-auto px-4 sm:px-5 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-orange-500/50 rounded-2xl flex items-center gap-2 text-xs font-black uppercase text-slate-300 hover:text-white transition-all group cursor-pointer"
+          >
+            <Camera size={15} className="text-orange-500 group-hover:scale-110 transition-transform" />
+            <span>Gerenciar Fotos da Moto</span>
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8">
-          {garage.map((bike) => (
-            <motion.div
-              key={bike.model}
-              whileHover={{ y: -5 }}
-              className="relative aspect-[1.5/1] rounded-3xl sm:rounded-[2.5rem] overflow-hidden group cursor-pointer border border-slate-800/60 bg-slate-900/40"
+        {garage.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8">
+            {garage.map((bike) => (
+              <motion.div
+                key={bike.id}
+                whileHover={{ y: -5 }}
+                onClick={() => setSelectedPhoto({ url: bike.image, title: bike.model, index: bike.index, slotLabel: bike.slotLabel })}
+                className="relative aspect-[1.5/1] rounded-3xl sm:rounded-[2.5rem] overflow-hidden group cursor-pointer border border-slate-800/80 hover:border-orange-500/60 bg-slate-900/60 shadow-lg transition-all"
+              >
+                <img 
+                  src={bike.image} 
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                  alt={bike.model} 
+                />
+                
+                {/* Overlay degradê */}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent opacity-85 group-hover:opacity-95 transition-opacity" />
+                
+                {/* Top Badge (Slot Label & Zoom Icon) */}
+                <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+                  <span className="px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-800 text-[9px] font-black text-orange-400 uppercase tracking-widest shadow-md">
+                    {bike.slotLabel}
+                  </span>
+                  <div className="w-8 h-8 rounded-full bg-slate-950/70 backdrop-blur-md border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-white group-hover:border-orange-500 transition-all opacity-0 group-hover:opacity-100 shadow-md">
+                    <Maximize2 size={13} />
+                  </div>
+                </div>
+
+                {/* Bottom Info */}
+                <div className="absolute inset-0 p-5 sm:p-7 flex flex-col justify-end">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[9px] sm:text-[10px] font-black text-orange-500 uppercase tracking-widest">
+                      ANO {bike.year}
+                    </span>
+                    {bike.plate && (
+                      <>
+                        <span className="text-slate-600 text-xs">•</span>
+                        <span className="text-[9px] sm:text-[10px] font-black text-slate-300 uppercase tracking-wider">
+                          PLACA: {bike.plate}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <h4 className="text-base sm:text-lg font-black text-white italic uppercase tracking-tighter leading-tight drop-shadow-md">
+                    {bike.model}
+                  </h4>
+                </div>
+              </motion.div>
+            ))}
+
+            {/* Slot Disponível para completar até 3 fotos */}
+            {garage.length < 3 && (
+              <div 
+                onClick={() => navigate('/profile/settings?tab=motocicleta')}
+                className="aspect-[1.5/1] border-2 border-dashed border-slate-800/80 rounded-3xl sm:rounded-[2.5rem] flex flex-col items-center justify-center gap-3 sm:gap-4 hover:border-orange-500/50 hover:bg-slate-900/60 transition-all cursor-pointer group bg-slate-900/30 p-6 text-center"
+              >
+                <div className="w-12 h-12 rounded-full border border-slate-800 bg-slate-950 flex items-center justify-center text-slate-600 group-hover:text-orange-500 group-hover:border-orange-500/40 group-hover:scale-110 transition-all shadow-inner">
+                  <Plus size={22} />
+                </div>
+                <div>
+                  <p className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover:text-orange-400 transition-all">
+                    Adicionar Mais Fotos
+                  </p>
+                  <p className="text-[9px] text-slate-600 font-bold uppercase tracking-wider mt-0.5">
+                    {garage.length} de 3 fotos cadastradas
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Empty State quando nenhuma foto foi enviada ainda */
+          <div className="bg-slate-900/40 border-2 border-dashed border-slate-800/90 rounded-3xl sm:rounded-[2.5rem] p-8 sm:p-12 text-center space-y-6">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-slate-950 border border-slate-800 flex items-center justify-center mx-auto text-orange-500 shadow-xl shadow-orange-950/20">
+              <Camera size={32} className="sm:w-9 sm:h-9" />
+            </div>
+            
+            <div className="max-w-md mx-auto space-y-2">
+              <h4 className="text-lg sm:text-xl font-black text-white italic uppercase tracking-tight">
+                NENHUMA FOTO DA MOTO ENVIADA AINDA
+              </h4>
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                Envie até 3 fotos da sua máquina (<strong className="text-white">{pilotMotorcycleNickname || pilotMotorcycle}</strong>) na aba <em>Motocicleta</em> das Configurações para exibi-las aqui na sua Garagem Oficial e comprovar seu passaporte.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-lg mx-auto pt-2">
+              {['Foto 1 (Principal)', 'Foto 2 (Lateral)', 'Foto 3 (Detalhes)'].map((slotName, i) => (
+                <button
+                  key={i}
+                  onClick={() => navigate('/profile/settings?tab=motocicleta')}
+                  className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 hover:border-orange-500/50 hover:bg-slate-900 text-center transition-all group cursor-pointer"
+                >
+                  <Camera size={16} className="text-slate-600 group-hover:text-orange-500 mx-auto mb-1.5 transition-colors" />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 group-hover:text-white block transition-colors">
+                    {slotName}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => navigate('/profile/settings?tab=motocicleta')}
+                className="px-6 sm:px-8 py-3.5 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-600/20 hover:scale-105 active:scale-95 inline-flex items-center gap-2 cursor-pointer"
+              >
+                <Camera size={16} />
+                <span>ENVIAR FOTOS DA MOTO AGORA</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </motion.section>
+
+      {/* Lightbox Modal para Visualização em Tamanho Grande da Foto da Moto */}
+      <AnimatePresence>
+        {selectedPhoto && (
+          <div 
+            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-6"
+            onClick={() => setSelectedPhoto(null)}
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-w-4xl w-full bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl space-y-0"
             >
-              <img src={bike.image} className="w-full h-full object-cover opacity-60 transition-transform duration-1000 group-hover:scale-110 group-hover:opacity-100" alt={bike.model} />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-90 group-hover:opacity-100 transition-opacity" />
-              
-              <div className="absolute inset-0 p-5 sm:p-8 flex flex-col justify-end">
-                <p className="text-[9px] sm:text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">{bike.year}</p>
-                <h4 className="text-base sm:text-lg font-black text-white italic uppercase tracking-tighter leading-tight max-w-[200px]">{bike.model}</h4>
+              <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full bg-black flex items-center justify-center overflow-hidden">
+                <img 
+                  src={selectedPhoto.url} 
+                  alt={selectedPhoto.title} 
+                  className="w-full h-full object-contain"
+                />
+                <button
+                  onClick={() => setSelectedPhoto(null)}
+                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-900/80 border border-slate-700 text-white flex items-center justify-center hover:bg-orange-600 transition-colors shadow-lg cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-5 sm:p-6 bg-slate-900/90 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-orange-500">
+                    GARAGEM OFICIAL • {selectedPhoto.slotLabel}
+                  </span>
+                  <h3 className="text-lg font-black text-white italic uppercase tracking-tight mt-0.5">
+                    {selectedPhoto.title}
+                  </h3>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setSelectedPhoto(null);
+                      navigate('/profile/settings?tab=motocicleta');
+                    }}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <Settings size={14} />
+                    <span>Trocar / Editar Foto</span>
+                  </button>
+                </div>
               </div>
             </motion.div>
-          ))}
-
-          {/* Empty Slot */}
-          <div className="aspect-[1.5/1] border-2 border-dashed border-slate-800/60 rounded-3xl sm:rounded-[2.5rem] flex flex-col items-center justify-center gap-3 sm:gap-4 hover:border-orange-500/30 transition-all cursor-pointer group bg-slate-900/40 p-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-slate-800 flex items-center justify-center text-slate-700 group-hover:text-orange-500 transition-all">
-              <Plus size={20} className="sm:w-6 sm:h-6" />
-            </div>
-            <p className="text-[9px] sm:text-[10px] font-black text-slate-700 uppercase tracking-[0.2em] group-hover:text-orange-500 transition-all">Slot Disponível</p>
           </div>
-        </div>
-      </motion.section>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
