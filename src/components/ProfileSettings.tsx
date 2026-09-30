@@ -111,7 +111,7 @@ export function ProfileSettings() {
     profile?.motorcycle_nickname || localStorage.getItem('motolegado_pilot_bike_nickname') || ''
   );
   const [motorcycleYear, setMotorcycleYear] = useState(
-    profile?.motorcycle_year || localStorage.getItem('motolegado_pilot_bike_year') || '2023'
+    profile?.motorcycle_year || localStorage.getItem('motolegado_pilot_bike_year') || ''
   );
   const [motorcyclePlate, setMotorcyclePlate] = useState(
     profile?.motorcycle_plate || localStorage.getItem('motolegado_pilot_bike_plate') || ''

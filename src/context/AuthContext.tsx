@@ -177,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!parsed.bio) parsed.bio = localStorage.getItem('motolegado_pilot_bio') || '';
           if (!parsed.motorcycle) parsed.motorcycle = localStorage.getItem('motolegado_pilot_bike') || '';
           if (!parsed.motorcycle_nickname) parsed.motorcycle_nickname = localStorage.getItem('motolegado_pilot_bike_nickname') || '';
-          if (!parsed.motorcycle_year) parsed.motorcycle_year = localStorage.getItem('motolegado_pilot_bike_year') || '2023';
+          if (!parsed.motorcycle_year) parsed.motorcycle_year = localStorage.getItem('motolegado_pilot_bike_year') || '';
           if (!parsed.motorcycle_plate) parsed.motorcycle_plate = localStorage.getItem('motolegado_pilot_bike_plate') || '';
           if (!parsed.personal_logo_url) parsed.personal_logo_url = localStorage.getItem('motolegado_pilot_logo') || undefined;
           if (!parsed.city) parsed.city = localStorage.getItem('motolegado_pilot_city') || '';
@@ -268,7 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: storedEmail,
           motorcycle: localStorage.getItem('motolegado_pilot_bike') || '',
           motorcycle_nickname: localStorage.getItem('motolegado_pilot_bike_nickname') || '',
-          motorcycle_year: localStorage.getItem('motolegado_pilot_bike_year') || '2023',
+          motorcycle_year: localStorage.getItem('motolegado_pilot_bike_year') || '',
           motorcycle_plate: localStorage.getItem('motolegado_pilot_bike_plate') || '',
           motorcycle_photos: initialPhotos,
           points: 0,

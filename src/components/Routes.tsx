@@ -27,6 +27,13 @@ export function Routes() {
       setIsUpgradeModalOpen(true);
       return;
     }
+    setNewTitle('');
+    setNewMapsAddress('');
+    setNewImage('');
+    setNewDescription('');
+    setNewRiderTips('');
+    setNewAiTouristInfo('');
+    setAiError(null);
     setIsCreateModalOpen(true);
   };
   const [selectedRouteDetail, setSelectedRouteDetail] = useState<Route | null>(null);

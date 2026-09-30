@@ -174,8 +174,9 @@ if ($route === '/db/status' && $method === 'GET') {
             'configuredHost' => DB_HOST,
             'database' => DB_NAME,
             'user' => DB_USER,
-            'message' => 'Não foi possível conectar ao MySQL na Hostinger. Verifique se o banco e a senha foram definidos em api/config.php.',
-            'errorDetail' => function_exists('getDatabaseLastError') ? getDatabaseLastError() : null
+            'message' => 'Não foi possível conectar ao MySQL na Hostinger. Verifique se o banco e a senha foram definidos.',
+            'errorDetail' => function_exists('getDatabaseLastError') ? getDatabaseLastError() : null,
+            'diagnostic' => function_exists('getDatabaseEnvStatus') ? getDatabaseEnvStatus() : null
         ]);
         exit;
     }

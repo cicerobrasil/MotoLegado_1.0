@@ -162,13 +162,13 @@ export function CommandCenter() {
   const [newEventData, setNewEventData] = useState<Partial<MotoEvent>>({
     title: '',
     date: new Date().toISOString().split('T')[0],
-    time: '14:00',
+    time: '',
     location: '',
     category: 'Encontro',
     desc: '',
-    image: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=800',
-    price: 'Gratuito',
-    organizer: 'Administração MotoLegado',
+    image: '',
+    price: '',
+    organizer: '',
     status: 'aprovado'
   });
 
@@ -185,7 +185,7 @@ export function CommandCenter() {
     president: '',
     cityState: '',
     type: 'criacao',
-    membersCount: 10,
+    membersCount: 0,
     motto: '',
     status: 'aprovado'
   });
@@ -270,7 +270,9 @@ export function CommandCenter() {
       const res = await getDbStatus();
       if (res.data) {
         setDbInfo(res.data);
-        setDbMessage(res.data.message || (res.data.success ? 'Conexão ativa com o MySQL da Hostinger!' : 'Não foi possível conectar ao banco de dados.'));
+        const detail = (res.data as any).errorDetail || (res.data as any).diagnostic?.lastError;
+        const msg = res.data.message || (res.data.success ? 'Conexão ativa com o MySQL da Hostinger!' : 'Não foi possível conectar ao banco de dados.');
+        setDbMessage(detail ? `${msg} Detalhe: ${detail}` : msg);
       } else {
         setDbMessage(res.error || 'Erro ao consultar status do banco.');
       }

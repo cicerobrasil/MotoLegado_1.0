@@ -237,6 +237,7 @@ export function LandingPage() {
           setAuthLoading(false);
           return;
         }
+        localStorage.setItem('motolegado_is_new_signup', 'true');
         setAuthSuccess('Cadastro realizado com sucesso! Redirecionando...');
         setTimeout(() => {
           setShowLoginModal(false);
@@ -250,19 +251,33 @@ export function LandingPage() {
     }
   };
 
+  const openLoginModal = (tab: 'login' | 'register' = 'login') => {
+    setLoginTab(tab);
+    setPilotName('');
+    setPilotEmail('');
+    setPilotPassword('');
+    setBikeModel('');
+    setShowPassword(false);
+    setAuthError(null);
+    setAuthSuccess(null);
+    setIsCredentialError(false);
+    setIsAlreadyRegisteredError(false);
+    setShowLoginModal(true);
+  };
+
   const handleSwitchToRegister = () => {
     setLoginTab('register');
+    setPilotName('');
+    setPilotPassword('');
+    setBikeModel('');
     setAuthError(null);
     setIsCredentialError(false);
     setIsAlreadyRegisteredError(false);
-    if (!pilotName && pilotEmail) {
-      const suggested = pilotEmail.split('@')[0];
-      setPilotName(suggested.charAt(0).toUpperCase() + suggested.slice(1));
-    }
   };
 
   const handleSwitchToLogin = () => {
     setLoginTab('login');
+    setPilotPassword('');
     setAuthError(null);
     setIsCredentialError(false);
     setIsAlreadyRegisteredError(false);
@@ -363,9 +378,11 @@ export function LandingPage() {
     setSelectedClubPackage(pkg);
     setCheckoutClubName('');
     setCheckoutClubCity('');
-    setCheckoutLeaderName(profile?.name || pilotName || '');
-    setCheckoutLeaderEmail(profile?.email || pilotEmail || '');
-    setCheckoutLeaderPhone(profile?.phone || '');
+    setCheckoutLeaderName('');
+    setCheckoutLeaderEmail('');
+    setCheckoutLeaderPhone('');
+    setCheckoutPaymentMethod('pix');
+    setCheckoutProcessing(false);
     setCheckoutSuccess(false);
     setCopiedPixKey(false);
     setShowClubCheckoutModal(true);
@@ -439,9 +456,9 @@ export function LandingPage() {
   const handleOpenCustomQuote = () => {
     setQuoteClubName('');
     setQuoteMembersCount('');
-    setQuoteLeaderName(profile?.name || pilotName || '');
-    setQuotePhone(profile?.phone || '');
-    setQuoteEmail(profile?.email || pilotEmail || '');
+    setQuoteLeaderName('');
+    setQuotePhone('');
+    setQuoteEmail('');
     setQuoteCity('');
     setQuoteNotes('');
     setQuoteSubmitted(false);
@@ -539,7 +556,7 @@ export function LandingPage() {
 
             {/* Iniciar Sessão: botão ajustado e sem overflow */}
             <button
-              onClick={() => setShowLoginModal(true)}
+              onClick={() => openLoginModal('login')}
               className="px-2.5 py-1.5 sm:py-2 sm:px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shrink-0 shadow-md shadow-orange-600/20 active:scale-95 transition-all cursor-pointer"
             >
               <User size={13} className="shrink-0" />
@@ -626,7 +643,7 @@ export function LandingPage() {
                 type="button"
                 onClick={() => {
                   setMobileMenuOpen(false);
-                  setShowLoginModal(true);
+                  openLoginModal('login');
                 }}
                 className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-orange-600/20 active:scale-95 transition-all cursor-pointer"
               >
@@ -672,7 +689,7 @@ export function LandingPage() {
             className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-2 sm:pt-4"
           >
             <button
-              onClick={() => setShowLoginModal(true)}
+              onClick={() => openLoginModal('login')}
               className="w-full sm:w-auto btn-primary py-3 sm:py-3.5 px-6 sm:px-8 text-xs sm:text-sm"
             >
               <Zap size={16} className="fill-white text-white" />
@@ -900,7 +917,7 @@ export function LandingPage() {
               </div>
 
               <button
-                onClick={() => setShowLoginModal(true)}
+                onClick={() => openLoginModal('register')}
                 className="w-full py-3.5 sm:py-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-white font-black uppercase text-xs tracking-widest rounded-xl sm:rounded-2xl transition-all cursor-pointer"
               >
                 Acessar Gratuitamente
@@ -953,7 +970,7 @@ export function LandingPage() {
               </div>
 
               <button
-                onClick={() => setShowLoginModal(true)}
+                onClick={() => openLoginModal('register')}
                 className="w-full btn-primary py-3.5"
               >
                 Assinar Plano Legado Pro
@@ -1271,7 +1288,7 @@ export function LandingPage() {
             <a href="#recursos" className="hover:text-white transition-colors py-1">Recursos</a>
             <a href="#planos" className="hover:text-white transition-colors py-1">Planos</a>
             <a href="#planos-clubes" className="hover:text-white transition-colors py-1">Moto Clubes</a>
-            <button onClick={() => setShowLoginModal(true)} className="hover:text-orange-500 transition-colors cursor-pointer py-1">Acessar App</button>
+            <button onClick={() => openLoginModal('login')} className="hover:text-orange-500 transition-colors cursor-pointer py-1">Acessar App</button>
           </div>
         </div>
       </footer>
@@ -1353,10 +1370,7 @@ export function LandingPage() {
               <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
                 <button
                   type="button"
-                  onClick={() => {
-                    setLoginTab('login');
-                    setAuthError(null);
-                  }}
+                  onClick={handleSwitchToLogin}
                   className={cn(
                     "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
                     loginTab === 'login' ? "bg-orange-600 text-white font-black shadow-md" : "text-slate-400 hover:text-white"
@@ -1366,10 +1380,7 @@ export function LandingPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setLoginTab('register');
-                    setAuthError(null);
-                  }}
+                  onClick={handleSwitchToRegister}
                   className={cn(
                     "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
                     loginTab === 'register' ? "bg-orange-600 text-white font-black shadow-md" : "text-slate-400 hover:text-white"
@@ -1379,7 +1390,7 @@ export function LandingPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleEmailAuth} className="space-y-4">
+              <form onSubmit={handleEmailAuth} autoComplete="off" className="space-y-4">
                 {loginTab === 'register' && (
                   <div className="space-y-1">
                     <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Nome de Piloto / Apelido</label>
@@ -1388,6 +1399,7 @@ export function LandingPage() {
                       value={pilotName}
                       onChange={(e) => setPilotName(e.target.value)}
                       placeholder=""
+                      autoComplete="off"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
                       required
                     />
@@ -1401,6 +1413,7 @@ export function LandingPage() {
                     value={pilotEmail}
                     onChange={(e) => setPilotEmail(e.target.value)}
                     placeholder=""
+                    autoComplete="off"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
                     required
                   />
@@ -1415,6 +1428,7 @@ export function LandingPage() {
                       value={pilotPassword}
                       onChange={(e) => setPilotPassword(e.target.value)}
                       placeholder=""
+                      autoComplete="new-password"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 pr-10 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
                       required
                     />
@@ -1439,6 +1453,7 @@ export function LandingPage() {
                       value={bikeModel}
                       onChange={(e) => setBikeModel(e.target.value)}
                       placeholder=""
+                      autoComplete="off"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
                     />
                   </div>

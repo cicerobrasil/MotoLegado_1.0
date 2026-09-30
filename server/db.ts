@@ -1,9 +1,12 @@
 import mysql from 'mysql2/promise';
 
+const rawPort = parseInt(process.env.MYSQL_PORT || '3306', 10);
+const cleanPort = (rawPort === 306 || isNaN(rawPort) || rawPort <= 0) ? 3306 : rawPort;
+
 // Configuração da conexão MySQL na Hostinger via Variáveis de Ambiente (.env)
 export const dbConfig = {
   host: process.env.MYSQL_HOST || 'localhost',
-  port: parseInt(process.env.MYSQL_PORT || '3306', 10),
+  port: cleanPort,
   user: process.env.MYSQL_USER || 'u342198764_admsql',
   password: process.env.MYSQL_PASSWORD || '',
   database: process.env.MYSQL_DATABASE || 'u342198764_motolegado',
@@ -246,9 +249,16 @@ export async function testDbConnection(overrideHost?: string): Promise<{ success
       tables: tableNames
     };
   } catch (err: any) {
+    const msg = err?.message || 'Falha ao conectar ao banco de dados';
+    let friendlyMessage = msg;
+    if (msg.includes('Access denied for user') || msg.includes('access denied')) {
+      friendlyMessage = `Acesso negado para o host remoto. Na Hostinger (hPanel -> Bancos de Dados -> MySQL Remoto), adicione o caractere '%' para autorizar o teste do AI Studio. (No site em produção da Hostinger a conexão é local via localhost e já funciona nativamente).`;
+    } else if (msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED')) {
+      friendlyMessage = `Conexão expirou ao tentar alcançar ${overrideHost || dbConfig.host}. Verifique se a porta é 3306 e se o MySQL Remoto está ativo no painel da Hostinger.`;
+    }
     return {
       success: false,
-      message: err?.message || 'Falha ao conectar ao banco de dados',
+      message: friendlyMessage,
     };
   }
 }

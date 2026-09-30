@@ -26,6 +26,7 @@ import { AccessibilityModal } from "./components/AccessibilityModal";
 import { OnboardingTour } from "./components/OnboardingTour";
 import { PilotGuideModal } from "./components/PilotGuideModal";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { FirstAccessSetupModal } from "./components/FirstAccessSetupModal";
 import { cn } from "./lib/utils";
 import "./utils/systemReset";
 
@@ -73,6 +74,9 @@ function AppLayout() {
         </Routes>
       </main>
     </div>
+
+      {/* First Access / Profile Setup Popup for New Users */}
+      <FirstAccessSetupModal />
 
       {/* Modal for Visual & Typography Settings */}
       <AccessibilityModal />

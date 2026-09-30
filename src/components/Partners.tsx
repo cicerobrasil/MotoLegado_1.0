@@ -293,7 +293,22 @@ export function Partners() {
         </div>
 
         <button
-          onClick={() => setActiveTab(activeTab === 'register' ? 'browse' : 'register')}
+          onClick={() => {
+            if (activeTab !== 'register') {
+              setFormName('');
+              setFormLocation('');
+              setFormMapUrl('');
+              setFormDiscount('');
+              setFormNews('');
+              setFormCorporateContact('');
+              setFormPhone('');
+              setFormWhatsapp('');
+              setFormWebsite('');
+              setFormManagerName('');
+              setFormManagerPhone('');
+            }
+            setActiveTab(activeTab === 'register' ? 'browse' : 'register');
+          }}
           className="btn-primary self-start md:self-end"
         >
           <Plus size={16} className="group-hover:rotate-90 transition-transform duration-300" />

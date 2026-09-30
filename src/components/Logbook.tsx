@@ -70,6 +70,14 @@ export function Logbook() {
       setIsUpgradeModalOpen(true);
       return;
     }
+    setTitle('');
+    setOrigin('');
+    setDestination('');
+    setDate('');
+    setDistance('');
+    setDuration('');
+    setContent('');
+    setImage('');
     setIsFormOpen(true);
   };
 
