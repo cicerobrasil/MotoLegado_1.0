@@ -6,7 +6,11 @@
   RewriteCond %{HTTPS} off
   RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-  # SPA Routing (React Router)
+  # 1. API Backend Nativo na Hostinger (PHP PDO + MySQL)
+  RewriteCond %{REQUEST_URI} ^/api(/.*)?$ [NC]
+  RewriteRule ^api(/.*)?$ api/index.php [QSA,L]
+
+  # 2. SPA Routing (React Router)
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

@@ -66,3 +66,23 @@ export async function getTripsFromHostinger(pilotId?: string) {
   const result = await fetchFromApi<{ success: boolean; trips: any[] }>(url);
   return result.data;
 }
+
+// Status e Diagnóstico do Banco de Dados MySQL na Hostinger
+export async function getDbStatus() {
+  return fetchFromApi<{
+    success: boolean;
+    status: string;
+    configuredHost?: string;
+    database?: string;
+    user?: string;
+    totalPilots?: number;
+    message?: string;
+  }>('/api/db/status');
+}
+
+export async function initDbTables() {
+  return fetchFromApi<{ success: boolean; message: string }>('/api/db/init', {
+    method: 'POST'
+  });
+}
+
