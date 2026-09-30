@@ -58,9 +58,25 @@ export async function handleRegister(req: Request, res: Response) {
     // 1. Verificar se o e-mail já existe no armazenamento local ou MySQL
     const localExisting = storeGetPilotByEmail(cleanEmail);
     if (localExisting && localExisting.password_hash) {
+      // Se a senha informada conferir com a conta existente, conecta o usuário diretamente sem bloquear!
+      if (verifyPassword(password, localExisting.password_hash)) {
+        if (motorcycle && (!localExisting.motorcycle || localExisting.motorcycle !== motorcycle)) {
+          localExisting.motorcycle = motorcycle;
+        }
+        if (name && (!localExisting.name || localExisting.name !== cleanName)) {
+          localExisting.name = cleanName;
+        }
+        const updated = storeSavePilot(localExisting);
+        return res.status(200).json({
+          success: true,
+          message: 'Conta já existente identificada. Login realizado com sucesso!',
+          pilot: sanitizePilot(updated)
+        });
+      }
+
       return res.status(400).json({ 
         success: false, 
-        error: 'Este e-mail já está cadastrado no MotoLegado. Faça login ou use outro e-mail.' 
+        error: 'Este e-mail já possui cadastro no MotoLegado. Acesse a aba "Entrar com Conta" para fazer login com sua senha.' 
       });
     }
 
