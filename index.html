@@ -29,7 +29,9 @@
               str.indexOf('websocket') !== -1 || 
               str.indexOf('[vite]') !== -1 || 
               str.indexOf('vite-hmr') !== -1 ||
-              str.indexOf('vite-ping') !== -1
+              str.indexOf('vite-ping') !== -1 ||
+              str.indexOf('identity-credentials-get') !== -1 ||
+              str.indexOf('[GSI_LOGGER]') !== -1
             ) {
               return true;
             }

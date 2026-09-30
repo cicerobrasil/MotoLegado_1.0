@@ -1,22 +1,26 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, Lock, CheckCircle2, ShieldCheck, BookOpen, Sparkles, Crown, Camera, Maximize2, X, LogOut, Globe } from 'lucide-react';
+import { Calendar, Trophy, Settings, Plus, QrCode, Route, Zap, Award, Lock, CheckCircle2, ShieldCheck, BookOpen, Sparkles, Crown, Camera, Maximize2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
+import QRCode from 'qrcode';
 import { cn } from '../lib/utils';
 import { getPilotLiveGamification, PILOT_RANKS } from '../lib/gamification';
 import { LogEntry } from './Logbook';
 import { MotoEvent } from './Events';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { DigitalIdModal } from './DigitalIdModal';
 
 export function ProfileDashboard() {
   const navigate = useNavigate();
-  const { profile, user, signOut } = useAuth();
+  const { profile, user } = useAuth();
   const [achievementFilter, setAchievementFilter] = useState<'todas' | 'desbloqueadas' | 'bloqueadas'>('todas');
   const [showRankHierarchyModal, setShowRankHierarchyModal] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [events, setEvents] = useState<MotoEvent[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; title: string; index: number; slotLabel: string } | null>(null);
+  const [showDigitalIdModal, setShowDigitalIdModal] = useState(false);
+  const [badgeQrCodeUrl, setBadgeQrCodeUrl] = useState<string>('');
 
   const pilotName = profile?.name || 'Piloto MotoLegado';
   const pilotMotorcycle = profile?.motorcycle || localStorage.getItem('motolegado_pilot_bike') || 'Motocicleta Principal';
@@ -27,6 +31,22 @@ export function ProfileDashboard() {
   const pilotAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
     ? profile.avatar_url
     : `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotName)}&background=ea580c&color=ffffff&bold=true`;
+
+  // Gerar QR Code real escaneável para a miniatura do passaporte
+  useEffect(() => {
+    const passportUrl = typeof window !== 'undefined'
+      ? `${window.location.origin}/profile?pilot=${encodeURIComponent(profile?.id || user?.id || '77892-XP')}`
+      : 'https://motolegado.com/profile';
+
+    QRCode.toDataURL(passportUrl, {
+      width: 140,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+      errorCorrectionLevel: 'M',
+    })
+      .then(url => setBadgeQrCodeUrl(url))
+      .catch(err => console.error('Erro ao gerar miniatura QR Code:', err));
+  }, [profile?.id, user?.id]);
 
   useEffect(() => {
     // 1. Carregar diários de bordo reais do Supabase se logado
@@ -178,42 +198,21 @@ export function ProfileDashboard() {
              Status e Performance do Piloto em Tempo Real
            </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full md:w-auto">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 w-full md:w-auto">
           <button 
             type="button"
             onClick={() => navigate('/profile/settings')}
-            className="flex-1 md:flex-none px-4 sm:px-6 py-2.5 sm:py-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center gap-2 sm:gap-3 group hover:border-orange-500/50 transition-all active:scale-95 cursor-pointer"
+            className="px-4 sm:px-6 py-3 sm:py-3.5 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center gap-2 sm:gap-3 group hover:border-orange-500/50 transition-all active:scale-95 cursor-pointer"
           >
-            <Settings size={16} className="text-slate-500 group-hover:text-orange-500 transition-colors" />
+            <Settings size={16} className="text-slate-500 group-hover:text-orange-500 transition-colors shrink-0" />
             <span className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest group-hover:text-white transition-colors">CONFIGURAÇÕES</span>
           </button>
           <button 
             type="button"
             onClick={() => navigate('/logbook')}
-            className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-orange-600 rounded-2xl flex items-center justify-center gap-2 sm:gap-3 shadow-xl shadow-orange-600/20 hover:bg-orange-500 transition-all active:scale-95 cursor-pointer"
+            className="px-4 sm:px-8 py-3 sm:py-3.5 bg-orange-600 rounded-2xl flex items-center justify-center gap-2 sm:gap-3 shadow-xl shadow-orange-600/20 hover:bg-orange-500 transition-all active:scale-95 cursor-pointer"
           >
             <span className="text-[10px] sm:text-[11px] font-black text-white uppercase tracking-widest">DIÁRIO DE BORDO</span>
-          </button>
-          <button 
-            type="button"
-            onClick={async () => {
-              try {
-                navigate('/', { replace: true });
-                await signOut();
-              } catch (e) {
-                console.error('Erro ao sair:', e);
-                window.location.href = '/';
-              } finally {
-                if (window.location.pathname !== '/') {
-                  window.location.href = '/';
-                }
-              }
-            }}
-            className="flex-1 md:flex-none px-4 sm:px-6 py-2.5 sm:py-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center gap-2 group hover:border-red-500/50 hover:bg-red-950/20 transition-all active:scale-95 cursor-pointer text-slate-400 hover:text-red-400"
-            title="Encerrar Sessão e Retornar à Landing Page"
-          >
-            <LogOut size={16} />
-            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest">SAIR</span>
           </button>
         </div>
       </div>
@@ -527,8 +526,16 @@ export function ProfileDashboard() {
                     <p className="text-[10px] sm:text-[11px] font-black text-white italic tracking-tighter">#77892-XP</p>
                   </div>
                </div>
-               <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-lg flex items-center justify-center p-1.5 overflow-hidden shrink-0">
-                  <QrCode size={28} className="text-black" />
+               <div 
+                 onClick={() => setShowDigitalIdModal(true)}
+                 className="w-10 h-10 sm:w-11 sm:h-11 bg-white rounded-xl flex items-center justify-center p-1 overflow-hidden shrink-0 cursor-pointer shadow-md hover:scale-105 transition-transform border border-slate-700/60"
+                 title="Clique para abrir o Passaporte e QR Code completo"
+               >
+                 {badgeQrCodeUrl ? (
+                   <img src={badgeQrCodeUrl} alt="QR Code Escaneável" className="w-full h-full object-contain" />
+                 ) : (
+                   <QrCode size={26} className="text-black" />
+                 )}
                </div>
             </div>
 
@@ -590,19 +597,15 @@ export function ProfileDashboard() {
             </button>
 
             <button
-              onClick={() => {
-                if (navigator.clipboard) {
-                  navigator.clipboard.writeText(window.location.href);
-                  alert('Link do Passaporte de Piloto copiado!');
-                }
-              }}
-              className="p-3.5 sm:p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-left transition-all group flex items-center justify-between"
+              onClick={() => setShowDigitalIdModal(true)}
+              className="p-3.5 sm:p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-left transition-all group flex items-center justify-between cursor-pointer active:scale-95"
+              title="Abrir Passaporte e Compartilhar ID"
             >
               <div>
                 <p className="text-xs font-black text-amber-400 italic uppercase">COMPARTILHAR ID</p>
-                <p className="text-[9px] text-amber-500/80 font-bold uppercase tracking-wider mt-0.5">Copiar Link / QR Code</p>
+                <p className="text-[9px] text-amber-500/80 font-bold uppercase tracking-wider mt-0.5">Abrir Passaporte / QR Code</p>
               </div>
-              <QrCode size={18} className="text-amber-400" />
+              <QrCode size={18} className="text-amber-400 group-hover:scale-110 transition-transform" />
             </button>
           </div>
         </motion.div>
@@ -615,58 +618,71 @@ export function ProfileDashboard() {
         transition={{ delay: 0.85 }}
         className="space-y-6 sm:space-y-8 bg-slate-900/40 border border-slate-800/60 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8 md:p-10"
       >
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6 border-b border-slate-800 pb-6">
+        {/* Header with Title and Action Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
           <div>
-            <div className="flex items-center gap-3">
-              <Trophy size={24} className="text-amber-500 sm:w-7 sm:h-7" />
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <Trophy size={24} className="text-amber-500 sm:w-7 sm:h-7 shrink-0" />
               <h3 className="text-xl sm:text-2xl font-black text-white italic uppercase tracking-tighter">
                 CONQUISTAS E INSÍGNIAS DO PILOTO
               </h3>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
               Troféus e insígnias acumuladas em quilometragem percorrida no asfalto e presença em encontros motociclísticos.
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-            <button
-              onClick={() => navigate('/achievements')}
-              className="btn-secondary py-2 px-3 text-[10px] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1.5"
-            >
-              <Sparkles size={13} className="text-orange-400" />
-              <span>Ver Hub Completo</span>
-            </button>
+          <button
+            onClick={() => navigate('/achievements')}
+            className="btn-secondary py-2.5 px-4 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 self-start sm:self-auto shrink-0 w-full sm:w-auto"
+          >
+            <Sparkles size={14} className="text-orange-400" />
+            <span>Ver Hub Completo</span>
+          </button>
+        </div>
 
-            <div className="bg-slate-950 p-2.5 sm:p-3 px-4 sm:px-5 rounded-2xl border border-slate-800 flex items-center gap-3 sm:gap-4 w-full sm:w-auto justify-between sm:justify-start">
-              <div>
-                <p className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest">PONTUAÇÃO</p>
-                <p className="text-lg sm:text-xl font-black text-amber-400 italic">{totalPointsEarned.toLocaleString()} <span className="text-xs text-slate-500 font-normal">/ {totalPossiblePoints.toLocaleString()} PTS</span></p>
-              </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-black text-xs">
-                {Math.round((unlockedCount / achievements.length) * 100)}%
-              </div>
+        {/* Dedicated Responsive Toolbar: Filter Options & Pontuação Metric */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+          {/* Responsive Segmented Filter Tabs */}
+          <div className="grid grid-cols-3 sm:flex sm:items-center gap-1.5 p-1.5 bg-slate-950/90 rounded-2xl border border-slate-800/90 w-full lg:w-auto">
+            {[
+              { id: 'todas', label: 'Todas', shortLabel: 'Todas', count: achievements.length },
+              { id: 'desbloqueadas', label: 'Desbloqueadas', shortLabel: 'Desbloq.', count: unlockedCount },
+              { id: 'bloqueadas', label: 'Bloqueadas', shortLabel: 'Bloq.', count: achievements.length - unlockedCount },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setAchievementFilter(tab.id as any)}
+                className={cn(
+                  "px-3 py-2 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-center",
+                  achievementFilter === tab.id
+                    ? "bg-orange-600 text-white shadow-md shadow-orange-600/30"
+                    : "text-slate-400 hover:text-white hover:bg-slate-900/60"
+                )}
+              >
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.shortLabel}</span>
+                <span className={cn(
+                  "text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold",
+                  achievementFilter === tab.id ? "bg-black/30 text-white" : "bg-slate-800 text-slate-400"
+                )}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Pontuação Telemetry Box */}
+          <div className="bg-slate-950/80 p-2.5 px-4 rounded-2xl border border-slate-800/80 flex items-center justify-between sm:justify-start gap-4 w-full lg:w-auto shrink-0">
+            <div>
+              <p className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">PONTUAÇÃO</p>
+              <p className="text-base sm:text-lg font-black text-amber-400 italic leading-none">
+                {totalPointsEarned.toLocaleString()}{' '}
+                <span className="text-[10px] sm:text-xs text-slate-500 font-normal">/ {totalPossiblePoints.toLocaleString()} PTS</span>
+              </p>
             </div>
-
-            {/* Filter Tabs */}
-            <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 w-full sm:w-auto overflow-x-auto">
-              {[
-                { id: 'todas', label: `Todas (${achievements.length})` },
-                { id: 'desbloqueadas', label: `Desbloqueadas (${unlockedCount})` },
-                { id: 'bloqueadas', label: `Bloqueadas (${achievements.length - unlockedCount})` },
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setAchievementFilter(tab.id as any)}
-                  className={cn(
-                    "px-2.5 sm:px-3 py-1.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
-                    achievementFilter === tab.id
-                      ? "bg-orange-600 text-white font-black shadow-md shadow-orange-600/20"
-                      : "text-slate-400 hover:text-white"
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 font-black text-xs shrink-0">
+              {Math.round((unlockedCount / achievements.length) * 100)}%
             </div>
           </div>
         </div>
@@ -974,6 +990,18 @@ export function ProfileDashboard() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Modal Interativo do Passaporte Digital com QR Code Real */}
+      <DigitalIdModal
+        isOpen={showDigitalIdModal}
+        onClose={() => setShowDigitalIdModal(false)}
+        pilotName={pilotName}
+        pilotId={profile?.id ? `#${profile.id.slice(0, 8).toUpperCase()}` : '#77892-XP'}
+        pilotClub={pilotClub}
+        pilotMotorcycle={pilotMotorcycle}
+        pilotTier={currentTier}
+        pilotAvatar={pilotAvatar}
+      />
     </div>
   );
 }

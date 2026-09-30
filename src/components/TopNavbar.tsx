@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, ChevronRight, Globe, LogOut } from 'lucide-react';
+import { Menu, ChevronRight, LogOut } from 'lucide-react';
 import { LogoMark } from './LogoMark';
 import { TourButton } from './TourButton';
 import { AccessibilityButton } from './AccessibilityButton';
@@ -71,13 +71,13 @@ export function TopNavbar({ onOpenSidebar }: TopNavbarProps) {
         {/* Mobile Logo */}
         <div className="lg:hidden flex items-center shrink-0">
           <Link 
-            to="/"
+            to="/profile"
             onClick={() => {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             className="flex items-center"
-            aria-label="MotoLegado Landing Page"
-            title="Ir para a Landing Page"
+            aria-label="MotoLegado"
+            title="Ir para o Perfil"
           >
             <LogoMark size="sm" />
           </Link>
@@ -92,23 +92,13 @@ export function TopNavbar({ onOpenSidebar }: TopNavbarProps) {
         </div>
       </div>
 
-      {/* Right: Quick Action Controls (Guia, Tema, Landing Page, Sair & Perfil) */}
+      {/* Right: Quick Action Controls (Guia, Tema, Sair & Perfil) */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         {/* Guia do Piloto */}
         <TourButton variant="top-menu" />
 
         {/* Legibilidade & Tema */}
         <AccessibilityButton variant="top-menu" />
-
-        {/* Link direto para a Landing Page */}
-        <Link 
-          to="/"
-          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-[#ff751f]/60 hover:bg-slate-800 text-slate-300 hover:text-white transition-all text-xs font-black uppercase tracking-wider group"
-          title="Ver Landing Page Oficial"
-        >
-          <Globe size={14} className="text-[#ff751f] group-hover:rotate-12 transition-transform" />
-          <span className="hidden xl:inline">Landing Page</span>
-        </Link>
 
         {/* Pilot Avatar Profile Link */}
         <Link 
@@ -125,11 +115,11 @@ export function TopNavbar({ onOpenSidebar }: TopNavbarProps) {
           />
         </Link>
 
-        {/* Encerrar Sessão & Voltar à Landing Page */}
+        {/* Encerrar Sessão */}
         <button
           onClick={handleSignOut}
           className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 border border-slate-800 hover:border-red-500/60 hover:bg-red-950/30 text-slate-400 hover:text-red-400 flex items-center justify-center transition-all cursor-pointer"
-          title="Encerrar Sessão e Voltar à Landing Page"
+          title="Encerrar Sessão"
           aria-label="Encerrar Sessão"
         >
           <LogOut size={16} />

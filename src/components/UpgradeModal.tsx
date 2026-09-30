@@ -21,6 +21,7 @@ import { cn } from '../lib/utils';
 
 export type UpgradeFeatureTrigger = 
   | 'diario_ilimitado'
+  | 'relatorio_viagem'
   | 'criar_clube'
   | 'membro_clube'
   | 'criar_evento'
@@ -39,6 +40,10 @@ const FEATURE_MESSAGES: Record<UpgradeFeatureTrigger, { title: string; desc: str
   diario_ilimitado: {
     title: 'Limite do Diário de Bordo Atingido (5/5 no Mês)',
     desc: 'O Modo Gratuito inclui até 5 registros mensais. Desbloqueie viagens ilimitadas com o Plano Pro ou Modo Bonificado!'
+  },
+  relatorio_viagem: {
+    title: 'Exportação de Relatórios de Viagem (PDF e CSV)',
+    desc: 'A emissão de relatórios oficiais em PDF, planilhas CSV e dossiês de quilometragem é um recurso exclusivo para assinantes MotoLegado Pro ou Bonificados.'
   },
   criar_clube: {
     title: 'Fundação e Gestão Completa de Moto Clube',

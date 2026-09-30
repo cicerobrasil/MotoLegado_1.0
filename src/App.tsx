@@ -21,7 +21,6 @@ import { Partners } from "./components/Partners";
 import { CommandCenter } from "./components/CommandCenter";
 import { Achievements } from "./components/Achievements";
 import { GlobalRanking } from "./components/GlobalRanking";
-import { PWAInstallBanner } from "./components/PWAInstallBanner";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { AccessibilityModal } from "./components/AccessibilityModal";
 import { OnboardingTour } from "./components/OnboardingTour";
@@ -87,8 +86,7 @@ function AppLayout() {
       {/* Floating Scroll to Top Button & Route Scroll Reset */}
       <ScrollToTop />
 
-      {/* PWA In-App Mobile Install Banner & Offline Connectivity Indicator */}
-      <PWAInstallBanner />
+      {/* Offline Connectivity Indicator */}
       <OfflineIndicator />
     </div>
   );

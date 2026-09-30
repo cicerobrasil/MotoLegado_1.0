@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen } from 'lucide-react';
+import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { uploadImageToStorage } from '../lib/storage';
-import { UpgradeModal } from './UpgradeModal';
+import { UpgradeModal, UpgradeFeatureTrigger } from './UpgradeModal';
 import { TripChecklist } from './TripChecklist';
+import { TripReportModal } from './TripReportModal';
 
 export interface LogEntry {
   id: string;
@@ -31,6 +32,8 @@ export function Logbook() {
   const [activeTab, setActiveTab] = useState<'trips' | 'checklist'>('trips');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<UpgradeFeatureTrigger>('diario_ilimitado');
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   // Form State
@@ -63,10 +66,20 @@ export function Logbook() {
 
   const handleOpenForm = () => {
     if (isFreeLimitReached) {
+      setUpgradeFeature('diario_ilimitado');
       setIsUpgradeModalOpen(true);
       return;
     }
     setIsFormOpen(true);
+  };
+
+  const handleOpenReportModal = () => {
+    if (!isProOrBonificado) {
+      setUpgradeFeature('relatorio_viagem');
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+    setIsReportModalOpen(true);
   };
 
   const handleTripPhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -614,34 +627,49 @@ export function Logbook() {
         </div>
       </header>
 
-      {/* Sub-navigation Tabs: Diário de Bordo vs Checklist Pré-Viagem */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3 border-b border-slate-800/80 pb-4">
-        <button
-          onClick={() => setActiveTab('trips')}
-          className={cn(
-            "flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
-            activeTab === 'trips'
-              ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30"
-              : "bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800"
-          )}
-        >
-          <BookOpen size={15} />
-          <span>Histórico de Viagens</span>
-          <span className="text-[10px] bg-black/30 px-2 py-0.5 rounded-full font-mono">{logs.length}</span>
-        </button>
+      {/* Sub-navigation Tabs: Diário de Bordo vs Checklist Pré-Viagem vs Exportação de Relatórios */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => setActiveTab('trips')}
+            className={cn(
+              "flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
+              activeTab === 'trips'
+                ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30"
+                : "bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800"
+            )}
+          >
+            <BookOpen size={15} />
+            <span>Histórico de Viagens</span>
+            <span className="text-[10px] bg-black/30 px-2 py-0.5 rounded-full font-mono">{logs.length}</span>
+          </button>
 
+          <button
+            onClick={() => setActiveTab('checklist')}
+            className={cn(
+              "flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
+              activeTab === 'checklist'
+                ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30"
+                : "bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800"
+            )}
+          >
+            <ClipboardCheck size={15} />
+            <span>Checklist Pré-Viagem</span>
+            <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">Essencial</span>
+          </button>
+        </div>
+
+        {/* Action: Exportar Relatórios de Viagem */}
         <button
-          onClick={() => setActiveTab('checklist')}
-          className={cn(
-            "flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
-            activeTab === 'checklist'
-              ? "bg-orange-600 text-white shadow-lg shadow-orange-600/30"
-              : "bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800"
-          )}
+          onClick={handleOpenReportModal}
+          className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-orange-500/50 text-slate-300 hover:text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md group shrink-0 w-full sm:w-auto"
+          title="Exportar dossiê oficial e relatórios das suas viagens em PDF e planilha CSV"
         >
-          <ClipboardCheck size={15} />
-          <span>Checklist Pré-Viagem</span>
-          <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">Essencial</span>
+          <FileDown size={15} className="text-orange-500 group-hover:scale-110 transition-transform" />
+          <span>Exportar Relatório</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono font-bold">
+            PDF & CSV
+          </span>
         </button>
       </div>
 
@@ -794,7 +822,17 @@ export function Logbook() {
       <UpgradeModal 
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
-        feature="diario_ilimitado" 
+        feature={upgradeFeature} 
+      />
+
+      <TripReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        logs={logs}
+        pilotName={profile?.name || user?.user_metadata?.full_name || 'Piloto MotoLegado'}
+        pilotClub={profile?.club_name || 'Piloto Independente'}
+        pilotMotorcycle={profile?.motorcycle || 'Motocicleta Cadastrada'}
+        pilotId={profile?.id || user?.id}
       />
     </div>
   );

@@ -22,8 +22,7 @@ import {
   QrCode,
   ShieldCheck,
   Copy,
-  Sparkles,
-  Globe
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -118,12 +117,23 @@ export function ProfileSettings() {
     profile?.motorcycle_plate || localStorage.getItem('motolegado_pilot_bike_plate') || ''
   );
   const [motorcyclePhotos, setMotorcyclePhotos] = useState<string[]>(() => {
-    if (profile?.motorcycle_photos && profile.motorcycle_photos.length > 0) {
-      return profile.motorcycle_photos;
+    if (profile?.motorcycle_photos) {
+      const raw = profile.motorcycle_photos;
+      if (Array.isArray(raw) && raw.length > 0) return raw;
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {}
+      }
     }
     try {
       const saved = localStorage.getItem('motolegado_pilot_bike_photos');
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      return [];
     } catch {
       return [];
     }
@@ -168,8 +178,20 @@ export function ProfileSettings() {
       if (profile.motorcycle_nickname) setMotorcycleNickname(profile.motorcycle_nickname);
       if (profile.motorcycle_year) setMotorcycleYear(profile.motorcycle_year);
       if (profile.motorcycle_plate) setMotorcyclePlate(profile.motorcycle_plate);
-      if (profile.motorcycle_photos && profile.motorcycle_photos.length > 0) {
-        setMotorcyclePhotos(profile.motorcycle_photos);
+      if (profile.motorcycle_photos) {
+        const raw = profile.motorcycle_photos;
+        let photosList: string[] = [];
+        if (Array.isArray(raw)) {
+          photosList = raw;
+        } else if (typeof raw === 'string') {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) photosList = parsed;
+          } catch {}
+        }
+        if (photosList.length > 0) {
+          setMotorcyclePhotos(photosList);
+        }
       }
     }
   }, [profile]);
@@ -270,11 +292,10 @@ export function ProfileSettings() {
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const bikeInputRefs = [
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null)
-  ];
+  const bikeInputRef0 = useRef<HTMLInputElement>(null);
+  const bikeInputRef1 = useRef<HTMLInputElement>(null);
+  const bikeInputRef2 = useRef<HTMLInputElement>(null);
+  const bikeInputRefs = [bikeInputRef0, bikeInputRef1, bikeInputRef2];
 
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setUploadToast({ message, type });
@@ -364,27 +385,45 @@ export function ProfileSettings() {
       });
 
       if (result.success && result.url) {
-        let updatedPhotos: string[] = [];
-        setMotorcyclePhotos(prev => {
-          const next = [...prev];
-          next[slotIndex] = result.url;
-          updatedPhotos = next;
-          try {
-            localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(next));
-          } catch (e) {
-            console.error(e);
-          }
-          return next;
-        });
+        // Constrói lista atualizada de fotos de maneira síncrona preservando todos os slots
+        const currentList = Array.isArray(motorcyclePhotos) ? [...motorcyclePhotos] : [];
+        const nextPhotos: string[] = [...currentList];
 
-        // Garantir sincronização imediata no perfil
-        updateProfile({
-          motorcycle_photos: updatedPhotos.length > 0 ? updatedPhotos : [result.url],
+        // Garante que existam posições até o slotIndex
+        while (nextPhotos.length <= slotIndex) {
+          nextPhotos.push('');
+        }
+        // Atribui a foto exatamente ao slot desejado (0, 1 ou 2)
+        nextPhotos[slotIndex] = result.url;
+
+        // Sanitiza para garantir strings válidas em todas as posições
+        const sanitizedPhotos = nextPhotos.map(p => (typeof p === 'string' ? p : ''));
+
+        // Remove espaços vazios do final do array
+        while (sanitizedPhotos.length > 0 && sanitizedPhotos[sanitizedPhotos.length - 1].trim() === '') {
+          sanitizedPhotos.pop();
+        }
+
+        // 1. Atualizar estado local imediatamente
+        setMotorcyclePhotos(sanitizedPhotos);
+
+        // 2. Salvar no localStorage com tolerância a falhas
+        try {
+          localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(sanitizedPhotos));
+        } catch (storageErr) {
+          console.error('Erro ao salvar fotos localmente:', storageErr);
+        }
+
+        // 3. Persistir imediatamente no perfil com a lista completa de fotos
+        await updateProfile({
+          motorcycle_photos: sanitizedPhotos,
           motorcycle: motorcycle || profile?.motorcycle,
           motorcycle_nickname: motorcycleNickname || profile?.motorcycle_nickname,
           motorcycle_year: motorcycleYear || profile?.motorcycle_year,
           motorcycle_plate: motorcyclePlate || profile?.motorcycle_plate,
-        }).catch(() => {});
+        }).catch((err) => {
+          console.warn('Aviso sincronização perfil:', err);
+        });
 
         showToast(`Foto ${slotIndex + 1} da moto salva com sucesso!`, 'success');
       } else {
@@ -399,22 +438,29 @@ export function ProfileSettings() {
     }
   };
 
-  const handleRemoveBikePhoto = (slotIndex: number) => {
-    let updatedPhotos: string[] = [];
-    setMotorcyclePhotos(prev => {
-      const next = [...prev];
-      next.splice(slotIndex, 1);
-      updatedPhotos = next;
-      try {
-        localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(next));
-      } catch (e) {
-        console.error(e);
-      }
-      return next;
-    });
+  const handleRemoveBikePhoto = async (slotIndex: number) => {
+    const currentList = Array.isArray(motorcyclePhotos) ? [...motorcyclePhotos] : [];
+    const nextPhotos: string[] = [...currentList];
 
-    updateProfile({
-      motorcycle_photos: updatedPhotos,
+    if (slotIndex < nextPhotos.length) {
+      nextPhotos[slotIndex] = '';
+    }
+
+    // Remove vazios do final mantendo a coerência de slots
+    while (nextPhotos.length > 0 && (!nextPhotos[nextPhotos.length - 1] || nextPhotos[nextPhotos.length - 1].trim() === '')) {
+      nextPhotos.pop();
+    }
+
+    setMotorcyclePhotos(nextPhotos);
+
+    try {
+      localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(nextPhotos));
+    } catch (e) {
+      console.error(e);
+    }
+
+    await updateProfile({
+      motorcycle_photos: nextPhotos,
     }).catch(() => {});
 
     showToast(`Foto ${slotIndex + 1} removida.`, 'info');
@@ -498,13 +544,6 @@ export function ProfileSettings() {
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-6 md:space-y-10 selection:bg-orange-500 selection:text-white pb-24 md:pb-8">
       <header className="border-b border-slate-800/60 pb-6 md:pb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
         <div>
-          <button
-            onClick={() => navigate('/profile')}
-            className="mb-4 inline-flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-800 text-amber-400 text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md group"
-          >
-            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-            <span>Voltar ao Perfil do Piloto</span>
-          </button>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-white">CENTRAL DE <span className="text-orange-500">CONFIGURAÇÃO</span></h1>
           <p className="text-slate-500 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] mt-2 flex items-center gap-2">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -516,43 +555,34 @@ export function ProfileSettings() {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md group"
             title="Voltar ao Perfil do Piloto"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={16} className="text-amber-400 group-hover:-translate-x-1 transition-transform" />
             <span>Voltar ao Perfil</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-orange-500/50 text-slate-300 hover:text-orange-400 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer group"
-            title="Ir para a Landing Page (Página Inicial)"
-          >
-            <Globe size={16} className="text-orange-500 group-hover:rotate-12 transition-transform" />
-            <span>Landing Page</span>
           </button>
         </div>
       </header>
 
       {/* Tab Switcher */}
-      <div className="flex border-b border-slate-800/60 overflow-x-auto no-scrollbar">
+      <div className="flex border-b border-slate-800/60 overflow-x-auto no-scrollbar scroll-smooth">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={cn(
-              "flex-1 min-w-[100px] flex flex-col items-center justify-center gap-2 py-3 sm:py-4 px-2 transition-all relative group shrink-0",
+              "flex-1 min-w-[70px] sm:min-w-[100px] flex flex-col items-center justify-center gap-1.5 sm:gap-2 py-3 sm:py-4 px-1 sm:px-2 transition-all relative group shrink-0",
               activeTab === tab.id 
                 ? "text-orange-500" 
                 : "text-slate-500 hover:text-white"
             )}
           >
             <div className={cn(
-              "flex items-center gap-1.5 sm:gap-2 font-black italic uppercase tracking-[0.1em] sm:tracking-[0.2em] text-[9px] sm:text-[10px] transition-all whitespace-nowrap",
+              "flex items-center gap-1 sm:gap-2 font-black italic uppercase tracking-[0.05em] sm:tracking-[0.2em] text-[9px] sm:text-[10px] transition-all whitespace-nowrap",
               activeTab === tab.id ? "scale-105" : "scale-100 opacity-70 group-hover:opacity-100"
             )}>
               <tab.icon size={14} className={cn(activeTab === tab.id ? "text-orange-500" : "text-slate-400")} />
-              {tab.label}
+              <span>{tab.label}</span>
             </div>
             {activeTab === tab.id && (
               <motion.div 
@@ -1223,8 +1253,10 @@ export function ProfileSettings() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {[0, 1, 2].map((slotIdx) => {
-                    const hasPhoto = !!motorcyclePhotos[slotIdx];
+                    const currentPhoto = motorcyclePhotos[slotIdx];
+                    const hasPhoto = typeof currentPhoto === 'string' && currentPhoto.trim().length > 0;
                     const isUploading = uploadingBikeSlot === slotIdx;
+                    const slotNames = ['Foto 1 (Principal)', 'Foto 2 (Lateral)', 'Foto 3 (Detalhes)'];
 
                     return (
                       <div key={slotIdx} className="space-y-2">
@@ -1252,19 +1284,24 @@ export function ProfileSettings() {
                           {isUploading ? (
                             <div className="flex flex-col items-center gap-2">
                               <Loader2 size={28} className="text-orange-500 animate-spin" />
-                              <p className="text-[8px] font-black uppercase tracking-widest text-white">Enviando...</p>
+                              <p className="text-[8px] font-black uppercase tracking-widest text-white">Enviando {slotNames[slotIdx]}...</p>
                             </div>
                           ) : hasPhoto ? (
                             <>
                               <img 
-                                src={motorcyclePhotos[slotIdx]} 
-                                alt={`Moto Foto ${slotIdx + 1}`} 
+                                src={currentPhoto} 
+                                alt={`Moto ${slotNames[slotIdx]}`} 
                                 className="w-full h-full object-cover rounded-[1.9rem] transition-transform duration-500 group-hover:scale-105" 
                               />
-                              <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-2 backdrop-blur-xs p-4">
+                              <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-700/60 shadow-md pointer-events-none">
+                                <span className="text-[8px] font-black uppercase tracking-wider text-orange-400">
+                                  {slotNames[slotIdx]}
+                                </span>
+                              </div>
+                              <div className="absolute inset-0 bg-slate-950/75 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-2 backdrop-blur-xs p-4">
                                 <span className="text-[9px] font-black uppercase tracking-widest text-white flex items-center gap-1.5">
                                   <Camera size={14} className="text-orange-500" />
-                                  Trocar Foto
+                                  Trocar {slotNames[slotIdx]}
                                 </span>
                                 <button
                                   type="button"
@@ -1272,7 +1309,7 @@ export function ProfileSettings() {
                                     e.stopPropagation();
                                     handleRemoveBikePhoto(slotIdx);
                                   }}
-                                  className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 text-white text-[8px] font-black uppercase tracking-wider rounded-xl transition-colors flex items-center gap-1 mt-1 shadow-md"
+                                  className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 text-white text-[8px] font-black uppercase tracking-wider rounded-xl transition-colors flex items-center gap-1 mt-1 shadow-md cursor-pointer"
                                 >
                                   <Trash2 size={10} />
                                   Excluir
@@ -1284,10 +1321,10 @@ export function ProfileSettings() {
                               <div className="w-12 h-12 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-600 group-hover:text-orange-500 group-hover:scale-110 transition-all">
                                 <Camera size={20} />
                               </div>
-                              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 group-hover:text-white transition-colors mt-2">
-                                Foto {slotIdx + 1}
+                              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 group-hover:text-white transition-colors mt-2">
+                                {slotNames[slotIdx]}
                               </p>
-                              <span className="text-[7px] font-bold text-slate-600 uppercase tracking-widest">Tirar ou escolher</span>
+                              <span className="text-[7px] font-bold text-slate-600 uppercase tracking-widest">Tirar ou escolher foto</span>
                             </>
                           )}
                         </div>
