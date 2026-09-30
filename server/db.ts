@@ -5,7 +5,7 @@ export const dbConfig = {
   host: process.env.MYSQL_HOST || 'localhost',
   port: parseInt(process.env.MYSQL_PORT || '3306', 10),
   user: process.env.MYSQL_USER || 'u342198764_admsql',
-  password: process.env.MYSQL_PASSWORD || 'e+2YGyRn>sdX',
+  password: process.env.MYSQL_PASSWORD || '',
   database: process.env.MYSQL_DATABASE || 'u342198764_motolegado',
   waitForConnections: true,
   connectionLimit: 10,

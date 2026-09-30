@@ -26,3 +26,10 @@
   Header set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 
+# Bloquear acesso público direto a qualquer arquivo de ambiente (.env)
+<FilesMatch "^\.env">
+  Order allow,deny
+  Deny from all
+</FilesMatch>
+
+
