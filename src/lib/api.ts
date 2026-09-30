@@ -11,7 +11,10 @@ export async function fetchFromApi<T = any>(endpoint: string, options: RequestIn
     });
     const json = await res.json().catch(() => null);
     if (!res.ok) {
-      return { data: null, error: json?.error || `Erro HTTP ${res.status}` };
+      return { data: json, error: json?.error || json?.message || `Erro HTTP ${res.status}` };
+    }
+    if (json && (json as any).success === false) {
+      return { data: json, error: (json as any).error || (json as any).message || 'Operação não pôde ser concluída' };
     }
     return { data: json, error: null };
   } catch (err: any) {

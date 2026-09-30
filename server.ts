@@ -7,7 +7,16 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { testDbConnection, initDatabaseTables, getDbPool, safeMySqlQuery, dbConfig } from './server/db';
 import { handleRegister, handleLogin, handleGetMe } from './server/auth';
-import { storeGetPilotById, storeGetPilotByEmail, storeSavePilot, storeGetTrips, storeSaveTrip } from './server/store';
+import { 
+  storeGetPilotById, 
+  storeGetPilotByEmail, 
+  storeSavePilot, 
+  storeGetTrips, 
+  storeSaveTrip,
+  storeGetPaymentRequests,
+  storeSavePaymentRequest,
+  storeApprovePaymentRequest
+} from './server/store';
 
 async function startServer() {
   const app = express();
@@ -121,19 +130,42 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
   const MP_ACCESS_TOKEN = process.env.MERCADO_PAGO_ACCESS_TOKEN || 'TEST-6424334975348522-090410-0d461243a45ab335dec330d892e804de-76393886';
   const MP_PUBLIC_KEY = process.env.MERCADO_PAGO_PUBLIC_KEY || 'TEST-21b10ecf-53bc-4ff4-82cc-0a3e2ab1966c';
 
+  // Configuração Oficial da Chave PIX do Titular (Modelo Híbrido)
+  const OFFICIAL_PIX = {
+    keyType: 'Celular',
+    key: '+5547991362628',
+    displayKey: '(47) 99136-2628',
+    receiverName: 'Cicero Ranieri Brasil',
+    receiverCity: 'Itajaí - SC',
+    amount: 299.00,
+    payload: '00020126360014br.gov.bcb.pix0114+55479913626285204000053039865406299.005802BR5921CICERO RANIERI BRASIL6006ITAJAI62140510MOTOLEGADO6304E883',
+    whatsapp: '5547991362628'
+  };
+
   app.get('/api/payments/config', (req, res) => {
     res.json({
       publicKey: MP_PUBLIC_KEY,
-      configured: Boolean(MP_ACCESS_TOKEN)
+      configured: Boolean(MP_ACCESS_TOKEN),
+      officialPix: OFFICIAL_PIX
     });
   });
 
-  // Create PIX Payment directly with Mercado Pago API
+  app.get('/api/payments/pix-config', (req, res) => {
+    res.json(OFFICIAL_PIX);
+  });
+
+  // Create PIX Payment directly with Mercado Pago API (Apenas para o Plano Anual)
   app.post('/api/payments/create-pix', async (req, res) => {
     try {
       const { plan, email, name, userId } = req.body;
-      const amount = plan === 'yearly' ? 299.00 : 29.90;
-      const description = `MotoLegado VIP Pro - Plano ${plan === 'yearly' ? 'Anual' : 'Mensal'}`;
+      if (plan && plan !== 'yearly') {
+        return res.status(400).json({
+          error: 'O pagamento via PIX só será aceito para pagamento anual (Plano Anual - R$ 299,00).'
+        });
+      }
+
+      const amount = 299.00;
+      const description = 'MotoLegado VIP Pro - Plano Anual';
 
       // No ambiente de testes do Mercado Pago, o e-mail do pagador não pode ser igual ao do vendedor (collector)
       let payerEmail = (email || '').trim().toLowerCase();
@@ -180,10 +212,14 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
       const data: any = await mpResponse.json();
 
       if (!mpResponse.ok) {
-        console.error('Erro na API do Mercado Pago ao criar PIX:', data);
-        return res.status(mpResponse.status).json({
-          error: data.message || 'Falha ao gerar cobrança PIX no Mercado Pago',
-          details: data
+        console.warn('Mercado Pago retornou aviso. Fornecendo PIX Direto Oficial:', data?.message || data);
+        return res.json({
+          paymentId: `direct-pix-${Date.now()}`,
+          status: 'pending',
+          mode: 'direct',
+          qrCode: OFFICIAL_PIX.payload,
+          amount: 299.00,
+          officialPix: OFFICIAL_PIX
         });
       }
 
@@ -194,15 +230,24 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
       res.json({
         paymentId: data.id,
         status: data.status,
-        qrCode: qrCode,
+        mode: 'dynamic',
+        qrCode: qrCode || OFFICIAL_PIX.payload,
         qrCodeBase64: qrCodeBase64,
         ticketUrl: ticketUrl,
-        amount: data.transaction_amount,
-        expiresAt: data.date_of_expiration
+        amount: data.transaction_amount || 299.00,
+        expiresAt: data.date_of_expiration,
+        officialPix: OFFICIAL_PIX
       });
     } catch (err: any) {
-      console.error('Erro no endpoint create-pix:', err);
-      res.status(500).json({ error: 'Erro interno ao processar pagamento.', details: err?.message || String(err) });
+      console.warn('Erro ao conectar ao gateway. Ativando PIX Direto de contingência:', err?.message);
+      res.json({
+        paymentId: `direct-pix-${Date.now()}`,
+        status: 'pending',
+        mode: 'direct',
+        qrCode: OFFICIAL_PIX.payload,
+        amount: 299.00,
+        officialPix: OFFICIAL_PIX
+      });
     }
   });
 
@@ -210,6 +255,15 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
   app.get('/api/payments/status/:id', async (req, res) => {
     try {
       const { id } = req.params;
+      if (id.startsWith('direct-') || id.startsWith('mp-sim-')) {
+        return res.json({
+          id,
+          status: 'pending',
+          isApproved: false,
+          message: 'Aguardando compensação bancária'
+        });
+      }
+
       const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, {
         headers: {
           'Authorization': `Bearer ${MP_ACCESS_TOKEN}`
@@ -230,6 +284,125 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
       });
     } catch (err: any) {
       res.status(500).json({ error: 'Erro ao consultar status do pagamento', details: err?.message || String(err) });
+    }
+  });
+
+  // Verificação unificada de status de pagamento (Mercado Pago ou Chave Direta)
+  app.get('/api/payments/check-status', async (req, res) => {
+    try {
+      const paymentId = (req.query.paymentId as string || '').trim();
+      const email = (req.query.email as string || '').trim().toLowerCase();
+      const userId = (req.query.userId as string || '').trim();
+
+      // 1. Verificar se o piloto já foi aprovado como Pro pelo administrador no sistema
+      let pilot = (userId ? storeGetPilotById(userId) : null) || (email ? storeGetPilotByEmail(email) : null);
+      if (pilot && (pilot.plan === 'pago' || pilot.plan === 'bonificado' || pilot.role === 'admin')) {
+        return res.json({
+          isApproved: true,
+          status: 'approved',
+          source: 'pilot_profile',
+          message: 'Pagamento confirmado e conta liberada!'
+        });
+      }
+
+      // 2. Se for consulta via Mercado Pago com ID válido
+      if (paymentId && !paymentId.startsWith('direct-') && !paymentId.startsWith('mp-sim-')) {
+        try {
+          const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+            headers: {
+              'Authorization': `Bearer ${MP_ACCESS_TOKEN}`
+            }
+          });
+
+          if (mpResponse.ok) {
+            const data: any = await mpResponse.json();
+            const isApproved = data.status === 'approved';
+            if (isApproved && pilot) {
+              storeSavePilot({ ...pilot, plan: 'pago' });
+            }
+            return res.json({
+              isApproved,
+              status: data.status,
+              source: 'mercado_pago',
+              details: data.status_detail
+            });
+          }
+        } catch (mpErr) {
+          console.warn('[Payments] Erro ao consultar Mercado Pago:', mpErr);
+        }
+      }
+
+      // 3. Pagamento ainda pendente
+      return res.json({
+        isApproved: false,
+        status: 'pending',
+        message: 'Pagamento ainda não compensado no sistema bancário.'
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Erro ao verificar status', details: err?.message || String(err) });
+    }
+  });
+
+  // Notificar transferência via PIX Direto para o administrador
+  app.post('/api/payments/notify-direct', async (req, res) => {
+    try {
+      const { email, name, userId, amount = 299.00 } = req.body;
+      console.log(`[PIX Direto] Piloto ${name} (${email}) notificou transferência de R$ ${amount}`);
+      
+      const savedRequest = storeSavePaymentRequest({
+        pilot_id: userId,
+        email,
+        name,
+        amount,
+        method: 'pix_direct',
+        status: 'pending'
+      });
+
+      res.json({
+        success: true,
+        message: 'Transferência registrada com sucesso. Aguardando conferência no extrato pelo administrador Cícero Ranieri.',
+        request: savedRequest,
+        notifiedAt: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Falha ao registrar notificação', details: err?.message || String(err) });
+    }
+  });
+
+  // Obter solicitações de pagamento pendentes (Exclusivo para o Administrador)
+  app.get('/api/payments/requests', (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const requests = storeGetPaymentRequests(status);
+      res.json({ success: true, requests });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Erro ao buscar solicitações', details: err?.message || String(err) });
+    }
+  });
+
+  // Aprovar pagamento direto e liberar acesso VIP Pro
+  app.post('/api/payments/approve-direct', async (req, res) => {
+    try {
+      const { identifier, approverName = 'Cícero Ranieri' } = req.body;
+      if (!identifier) {
+        return res.status(400).json({ success: false, error: 'Identificador do piloto não informado' });
+      }
+
+      const result = storeApprovePaymentRequest(identifier, approverName);
+      
+      // Sincronizar também no MySQL caso disponível
+      safeMySqlQuery(
+        "UPDATE pilots SET plan = 'pago' WHERE id = ? OR LOWER(email) = ?",
+        [identifier, identifier.toLowerCase()]
+      ).catch(() => {});
+
+      res.json({
+        success: true,
+        message: 'Pagamento confirmado e acesso VIP Pro liberado com sucesso!',
+        pilot: result.pilot
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: 'Erro ao aprovar pagamento', details: err?.message || String(err) });
     }
   });
 

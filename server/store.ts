@@ -48,9 +48,23 @@ export interface StoredTrip {
   created_at?: string;
 }
 
+export interface StoredPaymentRequest {
+  id: string;
+  pilot_id: string;
+  email: string;
+  name: string;
+  amount: number;
+  method: 'pix_direct' | 'mercado_pago';
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  approved_at?: string;
+  approved_by?: string;
+}
+
 interface DataStore {
   pilots: Record<string, StoredPilot>;
   trips: StoredTrip[];
+  pending_payments?: StoredPaymentRequest[];
 }
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -225,4 +239,69 @@ export function storeSaveTrip(trip: StoredTrip): StoredTrip {
 
   saveStore(store);
   return fullTrip;
+}
+
+// Obter solicitações de pagamento
+export function storeGetPaymentRequests(status?: string): StoredPaymentRequest[] {
+  const store = loadStore();
+  const list = store.pending_payments || [];
+  if (!status) return list;
+  return list.filter(p => p.status === status);
+}
+
+// Salvar / Registrar notificação de pagamento
+export function storeSavePaymentRequest(req: Partial<StoredPaymentRequest>): StoredPaymentRequest {
+  const store = loadStore();
+  if (!store.pending_payments) store.pending_payments = [];
+
+  const id = req.id || 'payreq_' + Date.now();
+  const newReq: StoredPaymentRequest = {
+    id,
+    pilot_id: req.pilot_id || '',
+    email: (req.email || '').toLowerCase().trim(),
+    name: req.name || 'Piloto',
+    amount: req.amount || 299.00,
+    method: req.method || 'pix_direct',
+    status: req.status || 'pending',
+    created_at: req.created_at || new Date().toISOString()
+  };
+
+  const existingIdx = store.pending_payments.findIndex(p => p.id === id || (p.email === newReq.email && p.status === 'pending'));
+  if (existingIdx >= 0) {
+    store.pending_payments[existingIdx] = { ...store.pending_payments[existingIdx], ...newReq };
+  } else {
+    store.pending_payments.unshift(newReq);
+  }
+
+  saveStore(store);
+  return newReq;
+}
+
+// Aprovar solicitação de pagamento e liberar o plano VIP Pro do piloto
+export function storeApprovePaymentRequest(identifier: string, approverName = 'Cícero Ranieri'): { success: boolean; pilot?: StoredPilot } {
+  const store = loadStore();
+  if (!store.pending_payments) store.pending_payments = [];
+
+  const clean = identifier.toLowerCase().trim();
+  const req = store.pending_payments.find(p => p.id === identifier || p.pilot_id === identifier || p.email.toLowerCase() === clean);
+
+  if (req) {
+    req.status = 'approved';
+    req.approved_at = new Date().toISOString();
+    req.approved_by = approverName;
+  }
+
+  // Atualizar o piloto para VIP Pro ('pago')
+  const pilot = storeGetPilotById(identifier) || storeGetPilotByEmail(clean);
+  if (pilot) {
+    const updated = storeSavePilot({
+      ...pilot,
+      plan: 'pago'
+    });
+    saveStore(store);
+    return { success: true, pilot: updated };
+  }
+
+  saveStore(store);
+  return { success: !!req };
 }

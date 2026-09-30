@@ -643,21 +643,21 @@ export function ProfileSettings() {
               </div>
 
               {/* Main Fields Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                <div className="space-y-2 sm:space-y-3">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Nome do Piloto</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Nome do Piloto</label>
                   <input 
                     type="text" 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Seu nome de piloto"
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
                   />
                 </div>
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex items-center justify-between ml-2">
-                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">Motocicleta Principal</label>
-                    <span className="text-[9px] font-bold text-slate-400 tracking-wider uppercase flex items-center gap-1 bg-slate-900/90 px-2 py-0.5 rounded-md border border-slate-800">
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group border-l-2 border-l-orange-500">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Motocicleta Principal</label>
+                    <span className="text-[9px] font-black uppercase text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded tracking-wider flex items-center gap-1">
                       <Lock size={10} className="text-orange-400" /> Somente Leitura
                     </span>
                   </div>
@@ -667,7 +667,7 @@ export function ProfileSettings() {
                       value={motorcycle}
                       readOnly
                       placeholder="Preencha o campo Marca / Modelo na aba Motocicleta"
-                      className="w-full bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 pr-36 text-xs sm:text-sm font-bold text-slate-200 outline-none cursor-default select-none placeholder:text-slate-600 focus:border-slate-700" 
+                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 pr-36 text-sm font-bold text-slate-200 outline-none cursor-default select-none placeholder:text-slate-600 focus:border-slate-700" 
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       <button
@@ -681,12 +681,12 @@ export function ProfileSettings() {
                       </button>
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-500 ml-2 flex items-center gap-1.5">
-                    <span>💡 Preenchido automaticamente com as informações do campo <strong>Marca / Modelo</strong> da aba <em>Motocicleta</em>.</span>
+                  <p className="text-[9px] text-slate-500 ml-1">
+                    💡 Preenchido automaticamente com as informações do campo <strong>Marca / Modelo</strong> da aba <em>Motocicleta</em>.
                   </p>
                 </div>
-                <div className="space-y-2 sm:space-y-3 relative">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">E-mail de Contato</label>
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">E-mail de Contato</label>
                   <div className="relative">
                     <input 
                       type="email" 
@@ -694,7 +694,7 @@ export function ProfileSettings() {
                       disabled={!!user}
                       onChange={(e) => setEmail(e.target.value)}
                       className={cn(
-                        "w-full bg-slate-950 border rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white disabled:opacity-60",
+                        "w-full bg-slate-950 border rounded-2xl p-5 text-sm font-bold outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white disabled:opacity-60",
                         email === "" 
                           ? "border-slate-800/50 focus:border-orange-500" 
                           : isEmailValid 
@@ -713,27 +713,26 @@ export function ProfileSettings() {
                     )}
                   </div>
                 </div>
-                <div className="space-y-2 sm:space-y-3">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Telefone / WhatsApp</label>
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Telefone / WhatsApp</label>
                   <input 
                     type="text" 
                     placeholder="(00) 00000-0000" 
                     value={phone}
                     onChange={handlePhoneChange}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white" 
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2 sm:space-y-3">
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Biografia / Lema de Estrada</label>
-                <textarea
-                  rows={3}
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="Escreva um resumo sobre suas viagens e sua paixão por duas rodas..."
-                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white resize-none"
-                />
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group md:col-span-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Biografia / Lema de Estrada</label>
+                  <textarea
+                    rows={3}
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="Escreva um resumo sobre suas viagens e sua paixão por duas rodas..."
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white resize-none"
+                  />
+                </div>
               </div>
 
               {/* Visual Identity Section */}
@@ -784,10 +783,10 @@ export function ProfileSettings() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                  <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Logo / Símbolo Pessoal</label>
+                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Logo / Símbolo Pessoal</label>
                       {personalLogo && (
                         <button
                           type="button"
@@ -796,7 +795,7 @@ export function ProfileSettings() {
                             setPersonalLogo(null);
                             showToast('Logotipo removido.', 'info');
                           }}
-                          className="text-[9px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1"
+                          className="text-[9px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 cursor-pointer"
                         >
                           <Trash2 size={12} />
                           <span>Remover</span>
@@ -811,10 +810,10 @@ export function ProfileSettings() {
                       onChange={(e) => handleFileUpload(e, 'logo')}
                     />
                     <div 
-                      className="border-2 border-dashed border-slate-800/40 rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center gap-3 hover:border-orange-500/50 transition-all cursor-pointer group bg-slate-900/20 hover:bg-slate-900/40 relative overflow-hidden"
+                      className="border-2 border-dashed border-slate-800/50 rounded-2xl p-6 sm:p-7 flex flex-col items-center justify-center gap-3 hover:border-orange-500/50 transition-all cursor-pointer group/logo bg-slate-950/60 hover:bg-slate-950/90 relative overflow-hidden"
                       onClick={() => !isUploadingLogo && logoInputRef.current?.click()}
                     >
-                      <div className="w-16 h-16 rounded-2xl bg-slate-950 flex items-center justify-center text-slate-600 group-hover:text-orange-500 transition-all border border-slate-800 relative overflow-hidden shadow-inner">
+                      <div className="w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center text-slate-600 group-hover/logo:text-orange-500 transition-all border border-slate-800 relative overflow-hidden shadow-inner">
                         {isUploadingLogo ? (
                           <Loader2 size={24} className="text-orange-500 animate-spin" />
                         ) : personalLogo ? (
@@ -824,10 +823,10 @@ export function ProfileSettings() {
                         )}
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-white transition-colors">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 group-hover/logo:text-white transition-colors">
                           {isUploadingLogo ? 'Enviando ao Storage...' : personalLogo ? 'Alterar Logo' : 'Enviar Brasão / Símbolo'}
                         </p>
-                        <p className="text-[8px] text-slate-600 font-bold uppercase tracking-wider mt-0.5">JPG, PNG ou WebP</p>
+                        <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">JPG, PNG ou WebP</p>
                       </div>
                     </div>
                   </div>
@@ -835,7 +834,7 @@ export function ProfileSettings() {
                   {/* Fundar Moto Clube Call to Action */}
                   <div 
                     onClick={() => navigate('/motoclub')}
-                    className="bg-slate-900/40 border border-slate-800/60 rounded-3xl flex flex-col items-center justify-center p-6 sm:p-8 text-center relative group min-h-[160px] overflow-hidden backdrop-blur-md cursor-pointer hover:bg-orange-600/10 transition-all hover:scale-[1.02] active:scale-95 shadow-lg active:shadow-inner"
+                    className="bento-card border-slate-800/60 bg-slate-900/40 rounded-3xl flex flex-col items-center justify-center p-6 sm:p-8 text-center relative group min-h-[160px] overflow-hidden cursor-pointer hover:border-orange-500/50 transition-all hover:scale-[1.02] active:scale-95 shadow-lg active:shadow-inner"
                   >
                     <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-100 transition-opacity">
                        <Plus size={20} className="text-orange-500" />
@@ -1017,168 +1016,215 @@ export function ProfileSettings() {
 
           {activeTab === 'endereco' && (
             <div className="md:col-span-2 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex flex-col md:flex-row items-end gap-3 sm:gap-4 max-w-md">
-                <div className="flex-1 w-full space-y-3">
-                  <div className="flex items-center justify-between ml-2">
-                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em]">CEP</label>
-                    {isSearchingCep && (
-                      <span className="text-[11px] text-orange-400 font-bold lowercase tracking-normal flex items-center gap-1.5 animate-pulse">
-                        <Loader2 size={12} className="animate-spin text-orange-500" />
-                        <span>Consultando base postal...</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 1. CEP */}
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group border-l-2 border-l-orange-500">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">
+                      CEP (Código Postal)
+                    </label>
+                    {isSearchingCep ? (
+                      <span className="text-[9px] font-black uppercase text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded tracking-wider flex items-center gap-1.5 animate-pulse">
+                        <Loader2 size={11} className="animate-spin text-orange-500" />
+                        <span>Buscando...</span>
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-black uppercase text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded tracking-wider">
+                        ★ Busca Automática
                       </span>
                     )}
                   </div>
-                  <input 
-                    type="text" 
-                    placeholder="00000-000" 
-                    value={cep}
-                    maxLength={9}
-                    onChange={(e) => handleCepChange(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        performCepSearch();
-                      }
-                    }}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white font-mono" 
-                  />
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="text" 
+                      placeholder="00000-000" 
+                      value={cep}
+                      maxLength={9}
+                      onChange={(e) => handleCepChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          performCepSearch();
+                        }
+                      }}
+                      className="flex-1 bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white font-mono" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => performCepSearch()}
+                      disabled={isSearchingCep}
+                      title="Buscar endereço pelo CEP"
+                      className={cn(
+                        "p-5 bg-orange-600 text-white rounded-2xl hover:bg-orange-500 hover:scale-105 active:scale-95 transition-all shadow-[0_10px_20px_rgba(255,85,0,0.2)] active:shadow-inner flex items-center justify-center group/btn cursor-pointer shrink-0",
+                        isSearchingCep && "opacity-75 cursor-wait"
+                      )}
+                    >
+                      {isSearchingCep ? (
+                        <Loader2 size={20} className="animate-spin drop-shadow-md" />
+                      ) : (
+                        <Search size={20} className="drop-shadow-md group-hover/btn:scale-110 transition-transform" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-slate-500 ml-1">
+                    Digite o CEP para buscar rua, bairro, cidade e estado automaticamente.
+                  </p>
                 </div>
-                <button 
-                  type="button"
-                  onClick={() => performCepSearch()}
-                  disabled={isSearchingCep}
-                  title="Buscar endereço pelo CEP"
-                  className={cn(
-                    "p-4 sm:p-5 bg-orange-600 text-white rounded-2xl hover:bg-orange-500 hover:scale-105 active:scale-95 transition-all shadow-[0_10px_20px_rgba(255,85,0,0.2)] active:shadow-inner flex items-center justify-center group/btn cursor-pointer shrink-0",
-                    isSearchingCep && "opacity-75 cursor-wait"
-                  )}
-                >
-                  {isSearchingCep ? (
-                    <Loader2 size={22} className="animate-spin drop-shadow-md" />
-                  ) : (
-                    <Search size={22} className="drop-shadow-md group-hover/btn:scale-110 transition-transform" />
-                  )}
-                </button>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                <div className="md:col-span-9 space-y-4">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Rua / Avenida</label>
+                {/* 2. Ponto de Partida Padrão */}
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">
+                        Ponto de Partida Padrão
+                      </label>
+                      <span className={cn(
+                        "text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-wider border",
+                        isDefaultStartPoint 
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                          : "bg-slate-800/60 text-slate-500 border-slate-700/40"
+                      )}>
+                        {isDefaultStartPoint ? '★ Ativado' : 'Desativado'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                      Utilizar este endereço residencial como ponto de partida padrão ao planejar novas rotas no diário de bordo.
+                    </p>
+                  </div>
+                  <div 
+                    onClick={() => {
+                      setIsDefaultStartPoint(prev => {
+                        const next = !prev;
+                        try {
+                          const saved = localStorage.getItem('motolegado_pilot_address');
+                          const parsed = saved ? JSON.parse(saved) : {};
+                          localStorage.setItem('motolegado_pilot_address', JSON.stringify({
+                            ...parsed,
+                            isDefaultStartPoint: next
+                          }));
+                        } catch (e) {
+                          console.error(e);
+                        }
+                        return next;
+                      });
+                    }}
+                    className="flex items-center gap-3 pt-2 cursor-pointer select-none group/toggle w-fit"
+                  >
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isDefaultStartPoint}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsDefaultStartPoint(prev => {
+                          const next = !prev;
+                          try {
+                            const saved = localStorage.getItem('motolegado_pilot_address');
+                            const parsed = saved ? JSON.parse(saved) : {};
+                            localStorage.setItem('motolegado_pilot_address', JSON.stringify({
+                              ...parsed,
+                              isDefaultStartPoint: next
+                            }));
+                          } catch (err) {
+                            console.error(err);
+                          }
+                          return next;
+                        });
+                      }}
+                      className={cn(
+                        "relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-slate-950",
+                        isDefaultStartPoint ? "bg-orange-600 shadow-md shadow-orange-600/30" : "bg-slate-800"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                          isDefaultStartPoint ? "translate-x-5" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                    <span className={cn(
+                      "text-[11px] font-black uppercase tracking-wider transition-colors",
+                      isDefaultStartPoint ? "text-white" : "text-slate-400 group-hover/toggle:text-slate-200"
+                    )}>
+                      Definir como ponto de partida
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Rua / Avenida */}
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">
+                    Rua / Avenida
+                  </label>
                   <input 
                     type="text" 
                     placeholder="Ex: Av. Paulista ou Rua das Flores"
                     value={street}
                     onChange={(e) => setStreet(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
                   />
                 </div>
-                <div className="md:col-span-3 space-y-4">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Número</label>
+
+                {/* 4. Número */}
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">
+                    Número
+                  </label>
                   <input 
                     ref={numberInputRef}
                     type="text" 
                     placeholder="Nº ou S/N"
                     value={streetNumber}
                     onChange={(e) => setStreetNumber(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Bairro / Região</label>
+                {/* 5. Bairro / Região */}
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">
+                    Bairro / Região
+                  </label>
                   <input 
                     type="text" 
                     placeholder="Bairro"
                     value={neighborhood}
                     onChange={(e) => setNeighborhood(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Cidade</label>
-                    <input 
-                      type="text" 
-                      value={city} 
-                      onChange={(e) => setCity(e.target.value)}
-                      placeholder="Ex: São Paulo" 
-                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white" 
-                    />
-                  </div>
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Estado (UF)</label>
-                    <input 
-                      type="text" 
-                      value={state} 
-                      onChange={(e) => setState(e.target.value.toUpperCase())}
-                      placeholder="SP" 
-                      maxLength={2}
-                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 sm:p-5 text-sm font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all backdrop-blur-sm text-white uppercase font-mono" 
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div 
-                onClick={() => {
-                  setIsDefaultStartPoint(prev => {
-                    const next = !prev;
-                    try {
-                      const saved = localStorage.getItem('motolegado_pilot_address');
-                      const parsed = saved ? JSON.parse(saved) : {};
-                      localStorage.setItem('motolegado_pilot_address', JSON.stringify({
-                        ...parsed,
-                        isDefaultStartPoint: next
-                      }));
-                    } catch (e) {
-                      console.error(e);
-                    }
-                    return next;
-                  });
-                }}
-                className="flex items-center gap-3 sm:gap-4 pt-4 px-2 cursor-pointer select-none group w-fit"
-              >
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={isDefaultStartPoint}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsDefaultStartPoint(prev => {
-                      const next = !prev;
-                      try {
-                        const saved = localStorage.getItem('motolegado_pilot_address');
-                        const parsed = saved ? JSON.parse(saved) : {};
-                        localStorage.setItem('motolegado_pilot_address', JSON.stringify({
-                          ...parsed,
-                          isDefaultStartPoint: next
-                        }));
-                      } catch (err) {
-                        console.error(err);
-                      }
-                      return next;
-                    });
-                  }}
-                  className={cn(
-                    "relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-slate-950",
-                    isDefaultStartPoint ? "bg-orange-600 shadow-md shadow-orange-600/30" : "bg-slate-800"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
-                      isDefaultStartPoint ? "translate-x-5" : "translate-x-0"
-                    )}
-                  />
-                </button>
-                <span className={cn(
-                  "text-[11px] font-black uppercase tracking-widest transition-colors",
-                  isDefaultStartPoint ? "text-white" : "text-slate-400 group-hover:text-slate-200"
-                )}>
-                  Definir como ponto de partida padrão
-                </span>
+                {/* 6. Cidade e Estado (UF) */}
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                    <div className="sm:col-span-8 space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">
+                        Cidade
+                      </label>
+                      <input 
+                        type="text" 
+                        value={city} 
+                        onChange={(e) => setCity(e.target.value)}
+                        placeholder="Ex: São Paulo" 
+                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                      />
+                    </div>
+                    <div className="sm:col-span-4 space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">
+                        Estado (UF)
+                      </label>
+                      <input 
+                        type="text" 
+                        value={state} 
+                        onChange={(e) => setState(e.target.value.toUpperCase())}
+                        placeholder="SP" 
+                        maxLength={2}
+                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white uppercase font-mono placeholder:text-slate-700" 
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

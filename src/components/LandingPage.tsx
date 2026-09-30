@@ -33,6 +33,11 @@ import {
   Menu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { 
+  OFFICIAL_PIX_CONFIG, 
+  generateBacenPixPayload, 
+  getPixQrCodeUrl 
+} from '../lib/pix';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -217,7 +222,11 @@ export function LandingPage() {
         });
         if (error) {
           const rawMsg = error.message || '';
-          const isRegistered = rawMsg.toLowerCase().includes('already registered') || rawMsg.toLowerCase().includes('user already exists');
+          const isRegistered = 
+            rawMsg.toLowerCase().includes('already registered') || 
+            rawMsg.toLowerCase().includes('user already exists') ||
+            rawMsg.toLowerCase().includes('já está cadastrado') ||
+            rawMsg.toLowerCase().includes('já possui cadastro');
           setIsAlreadyRegisteredError(isRegistered);
           setAuthError(formatErrorMessage(rawMsg));
           setAuthLoading(false);
@@ -911,9 +920,12 @@ export function LandingPage() {
                 <div>
                   <div className="flex items-baseline gap-2">
                     <span className="text-3xl sm:text-5xl font-black italic text-orange-400 tracking-tight">R$ 29,90</span>
-                    <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">/ mês</span>
+                    <span className="text-slate-400 text-xs font-bold uppercase tracking-widest">/ mês no cartão</span>
                   </div>
-                  <p className="pro-subtitle text-xs text-slate-300 mt-2 font-medium">Para pilotos exigentes e administradores de Moto Clubes que desejam controle total.</p>
+                  <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-300 text-[11px] font-bold">
+                    <span>🔥 Ou R$ 299,00 no <strong>Plano Anual via PIX</strong> (16% de economia)</span>
+                  </div>
+                  <p className="pro-subtitle text-xs text-slate-300 mt-2 font-medium">Para pilotos exigentes e administradores de Moto Clubes. <em>Nota: PIX só é aceito para pagamento anual.</em></p>
                 </div>
 
                 <div className="space-y-2.5 sm:space-y-3 pt-4 border-t border-orange-500/30">
@@ -1686,31 +1698,45 @@ export function LandingPage() {
                         </button>
                       </div>
 
-                      {checkoutPaymentMethod === 'pix' ? (
-                        <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-400 text-[11px]">Chave PIX Copia e Cola:</span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText('00020126580014br.gov.bcb.pix0136motolegado-clubes@pix.com.br520400005303986540' + selectedClubPackage.priceMonthlyNumber.toFixed(2) + '5802BR5910MOTOLEGADO6008CURITIBA62070503***6304');
-                                setCopiedPixKey(true);
-                                setTimeout(() => setCopiedPixKey(false), 2000);
-                              }}
-                              className="text-orange-400 hover:text-orange-300 font-bold flex items-center gap-1 text-[11px]"
-                            >
-                              {copiedPixKey ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                              <span>{copiedPixKey ? 'Copiado!' : 'Copiar Chave'}</span>
-                            </button>
+                      {checkoutPaymentMethod === 'pix' ? (() => {
+                        const clubPixCode = generateBacenPixPayload({ 
+                          amount: selectedClubPackage.priceMonthlyNumber,
+                          txid: `CLUBE${selectedClubPackage.id.toUpperCase()}`
+                        });
+                        return (
+                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400 text-[11px]">Chave PIX (Celular):</span>
+                              <strong className="text-orange-400 font-mono text-[11px]">(47) 99136-2628</strong>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400 text-[11px]">Titular:</span>
+                              <span className="text-white font-bold text-[11px]">Cicero Ranieri Brasil</span>
+                            </div>
+                            <div className="flex items-center justify-between pt-1">
+                              <span className="text-slate-400 text-[11px]">Código Copia e Cola:</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(clubPixCode);
+                                  setCopiedPixKey(true);
+                                  setTimeout(() => setCopiedPixKey(false), 2000);
+                                }}
+                                className="text-orange-400 hover:text-orange-300 font-bold flex items-center gap-1 text-[11px] cursor-pointer"
+                              >
+                                {copiedPixKey ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                                <span>{copiedPixKey ? 'Copiado!' : 'Copiar Código'}</span>
+                              </button>
+                            </div>
+                            <div className="p-2 rounded-lg bg-slate-900 font-mono text-[10px] text-slate-300 truncate select-all">
+                              {clubPixCode}
+                            </div>
+                            <p className="text-[10px] text-slate-500 italic">
+                              Pagamento direto sem intermediários. Ativação imediata da tesouraria do clube.
+                            </p>
                           </div>
-                          <div className="p-2 rounded-lg bg-slate-900 font-mono text-[10px] text-slate-400 truncate">
-                            00020126580014br.gov.bcb.pix0136motolegado-clubes@pix.com.br520400005303986540...
-                          </div>
-                          <p className="text-[10px] text-slate-500 italic">
-                            O pacote é liberado automaticamente após a confirmação bancária.
-                          </p>
-                        </div>
-                      ) : (
+                        );
+                      })() : (
                         <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
                           <input
                             type="text"

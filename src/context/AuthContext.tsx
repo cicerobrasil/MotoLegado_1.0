@@ -390,8 +390,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Se o backend retornou erro (ex: credenciais incorretas)
+    const loginError = res.error || (res.data as any)?.error || (res.data as any)?.message;
+    if (loginError && !loginError.includes('Servidor indisponível') && !loginError.includes('Failed to fetch')) {
+      return { error: new Error(loginError) };
+    }
+
     if (res.error) {
-      // Se Supabase ainda estiver configurado como contingência
+      // Se Supabase ainda estiver configurado como contingência caso o servidor local esteja offline
       if (isSupabaseConfigured) {
         try {
           const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -406,18 +411,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: new Error(res.error) };
     }
 
-    return { error: new Error('Não foi possível autenticar. Verifique suas credenciais.') };
+    return { error: new Error(loginError || 'Não foi possível autenticar. Verifique suas credenciais.') };
   };
 
-  // Cadastrar com E-mail e Senha (Autenticação Real no MySQL da Hostinger)
+  // Cadastrar com E-mail e Senha (Autenticação Real no MySQL da Hostinger / Armazenamento Resiliente)
   const signUpWithEmail = async (
     email: string,
     password: string,
     metadata: { name: string; motorcycle?: string }
   ) => {
-    // 1. Cadastro Direto no MySQL da Hostinger
+    const cleanEmail = email.toLowerCase().trim();
+
+    // 1. Cadastro Direto no Backend do MotoLegado
     const res = await apiRegister({
-      email,
+      email: cleanEmail,
       password,
       name: metadata.name,
       motorcycle: metadata.motorcycle,
@@ -450,29 +457,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (metadata.motorcycle) {
         localStorage.setItem('motolegado_pilot_bike', metadata.motorcycle);
       }
+      try {
+        localStorage.setItem('motolegado_pilot_saved_' + cleanEmail, JSON.stringify(normalizedProfile));
+      } catch {}
 
       return { error: null };
     }
 
-    if (res.error) {
-      if (isSupabaseConfigured) {
-        try {
-          const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: { data: { name: metadata.name, motorcycle: metadata.motorcycle } }
-          });
-          if (error) throw error;
-          if (data.user) await fetchProfile(data.user.id, data.user.email);
-          return { error: null };
-        } catch (err: any) {
-          return { error: err };
-        }
-      }
-      return { error: new Error(res.error) };
+    const backendError = res.error || (res.data as any)?.error || (res.data as any)?.message;
+
+    // Se o backend retornou mensagem de erro de validação (ex: e-mail já cadastrado, senha curta), propaga diretamente
+    if (backendError && !backendError.includes('Servidor indisponível') && !backendError.includes('Failed to fetch')) {
+      return { error: new Error(backendError) };
     }
 
-    return { error: new Error('Não foi possível concluir o cadastro.') };
+    // Apenas se o backend estiver fora do ar, tenta contingência via Supabase
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password,
+          options: { data: { name: metadata.name, motorcycle: metadata.motorcycle } }
+        });
+        if (error) throw error;
+        if (data.user) await fetchProfile(data.user.id, data.user.email);
+        return { error: null };
+      } catch (err: any) {
+        return { error: err };
+      }
+    }
+
+    return { error: new Error(backendError || 'Não foi possível concluir o cadastro. Verifique os dados preenchidos.') };
   };
 
   // Login Social com o Google via Supabase OAuth (com suporte a Popup para iFrames)
