@@ -291,3 +291,173 @@ export async function handleGetMe(req: Request, res: Response) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }
+
+// Mapa temporário para códigos de recuperação de senha (validade 15 minutos)
+const resetCodes = new Map<string, { code: string; expiresAt: number; pilotId: string }>();
+
+// 4. Solicitação de Redefinição de Senha (Esqueci a Senha)
+export async function handleForgotPassword(req: Request, res: Response) {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'E-mail é obrigatório.' });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+
+    // Buscar piloto no MySQL ou Local Store
+    let pilot: any = null;
+    const mysqlRes: any = await safeMySqlQuery('SELECT * FROM pilots WHERE LOWER(email) = ?', [cleanEmail]);
+    if (mysqlRes && mysqlRes[0] && mysqlRes[0].length > 0) {
+      pilot = mysqlRes[0][0];
+    }
+    if (!pilot) {
+      pilot = storeGetPilotByEmail(cleanEmail);
+    }
+
+    if (!pilot) {
+      return res.status(404).json({
+        success: false,
+        error: 'E-mail não localizado na base de pilotos do MotoLegado.'
+      });
+    }
+
+    // Gerar código de 6 dígitos
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutos
+
+    resetCodes.set(cleanEmail, { code, expiresAt, pilotId: pilot.id });
+
+    // Dica de segurança (modelo da moto cadastrada, se houver)
+    const securityHint = pilot.motorcycle ? `Moto cadastrada: ${pilot.motorcycle}` : null;
+
+    return res.json({
+      success: true,
+      message: 'Código de recuperação gerado com sucesso! Verifique seu e-mail ou utilize o código de segurança.',
+      code: code,
+      securityHint,
+      pilotName: pilot.name
+    });
+  } catch (err: any) {
+    console.error('[AUTH FORGOT PASSWORD ERROR]:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// 5. Redefinir Senha com Código de Segurança
+export async function handleResetPassword(req: Request, res: Response) {
+  try {
+    const { email, code, new_password, security_answer } = req.body;
+
+    if (!email || !new_password) {
+      return res.status(400).json({ success: false, error: 'E-mail e nova senha são obrigatórios.' });
+    }
+
+    if (new_password.length < 6) {
+      return res.status(400).json({ success: false, error: 'A nova senha deve ter no mínimo 6 caracteres.' });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+
+    // Buscar piloto
+    let pilot: any = null;
+    const mysqlRes: any = await safeMySqlQuery('SELECT * FROM pilots WHERE LOWER(email) = ?', [cleanEmail]);
+    if (mysqlRes && mysqlRes[0] && mysqlRes[0].length > 0) {
+      pilot = mysqlRes[0][0];
+    }
+    if (!pilot) {
+      pilot = storeGetPilotByEmail(cleanEmail);
+    }
+
+    if (!pilot) {
+      return res.status(404).json({ success: false, error: 'Piloto não encontrado.' });
+    }
+
+    // Validar código ou resposta de segurança
+    const stored = resetCodes.get(cleanEmail);
+    const isCodeValid = stored && stored.code === String(code || '').trim() && Date.now() <= stored.expiresAt;
+    
+    // Validação alternativa por moto cadastrada caso não tenha o código
+    const isSecurityValid = security_answer && pilot.motorcycle && 
+      pilot.motorcycle.toLowerCase().includes(String(security_answer).trim().toLowerCase());
+
+    if (!isCodeValid && !isSecurityValid) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Código de recuperação inválido ou expirado. Verifique os dígitos informados.' 
+      });
+    }
+
+    // Gerar novo hash PBKDF2
+    const newHash = hashPassword(new_password);
+    pilot.password_hash = newHash;
+    pilot.updated_at = new Date().toISOString();
+
+    // Salvar local e MySQL
+    storeSavePilot(pilot);
+    safeMySqlQuery('UPDATE pilots SET password_hash = ?, updated_at = NOW() WHERE LOWER(email) = ?', [newHash, cleanEmail]).catch(() => {});
+
+    resetCodes.delete(cleanEmail);
+
+    return res.json({
+      success: true,
+      message: 'Senha redefinida com sucesso! Você já pode entrar com sua nova senha.',
+      pilot: sanitizePilot(pilot)
+    });
+  } catch (err: any) {
+    console.error('[AUTH RESET PASSWORD ERROR]:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// 6. Alterar Senha de Piloto Autenticado
+export async function handleChangePassword(req: Request, res: Response) {
+  try {
+    const { pilot_id, current_password, new_password } = req.body;
+
+    if (!pilot_id || !current_password || !new_password) {
+      return res.status(400).json({ success: false, error: 'Todos os campos são obrigatórios.' });
+    }
+
+    if (new_password.length < 6) {
+      return res.status(400).json({ success: false, error: 'A nova senha deve ter no mínimo 6 caracteres.' });
+    }
+
+    let pilot: any = null;
+    const mysqlRes: any = await safeMySqlQuery('SELECT * FROM pilots WHERE id = ? OR LOWER(email) = ?', [pilot_id, pilot_id.toLowerCase()]);
+    if (mysqlRes && mysqlRes[0] && mysqlRes[0].length > 0) {
+      pilot = mysqlRes[0][0];
+    }
+    if (!pilot) {
+      pilot = storeGetPilotById(pilot_id) || storeGetPilotByEmail(pilot_id);
+    }
+
+    if (!pilot) {
+      return res.status(404).json({ success: false, error: 'Piloto não encontrado.' });
+    }
+
+    // Validar senha atual
+    if (pilot.password_hash) {
+      const isMatch = verifyPassword(current_password, pilot.password_hash);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, error: 'Senha atual incorreta.' });
+      }
+    }
+
+    // Atualizar nova senha
+    const newHash = hashPassword(new_password);
+    pilot.password_hash = newHash;
+    pilot.updated_at = new Date().toISOString();
+
+    storeSavePilot(pilot);
+    safeMySqlQuery('UPDATE pilots SET password_hash = ?, updated_at = NOW() WHERE id = ?', [newHash, pilot.id]).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: 'Senha atualizada com sucesso!'
+    });
+  } catch (err: any) {
+    console.error('[AUTH CHANGE PASSWORD ERROR]:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}

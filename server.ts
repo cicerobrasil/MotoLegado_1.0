@@ -6,7 +6,14 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { testDbConnection, initDatabaseTables, getDbPool, safeMySqlQuery, dbConfig } from './server/db';
-import { handleRegister, handleLogin, handleGetMe } from './server/auth';
+import { 
+  handleRegister, 
+  handleLogin, 
+  handleGetMe,
+  handleForgotPassword,
+  handleResetPassword,
+  handleChangePassword
+} from './server/auth';
 import { 
   storeGetPilotById, 
   storeGetPilotByEmail, 
@@ -471,6 +478,9 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
   app.post('/api/auth/register', handleRegister);
   app.post('/api/auth/login', handleLogin);
   app.get('/api/auth/me/:id', handleGetMe);
+  app.post('/api/auth/forgot-password', handleForgotPassword);
+  app.post('/api/auth/reset-password', handleResetPassword);
+  app.post('/api/auth/change-password', handleChangePassword);
 
   // Pilots API - Obter perfil por ID ou E-mail
   app.get('/api/pilots/:id', async (req, res) => {

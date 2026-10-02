@@ -30,7 +30,9 @@ import {
   QrCode,
   Copy,
   Check,
-  Menu
+  Menu,
+  KeyRound,
+  ArrowLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -40,6 +42,7 @@ import {
 } from '../lib/pix';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
+import { apiForgotPassword, apiResetPassword } from '../lib/api';
 import { PWAInstallButton } from './PWAInstallButton';
 import { LogoMark } from './LogoMark';
 import { AccessibilityButton } from './AccessibilityButton';
@@ -127,12 +130,26 @@ export function LandingPage() {
   } = useAuth();
 
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [loginTab, setLoginTab] = useState<'login' | 'register'>('login');
+  const [loginTab, setLoginTab] = useState<'login' | 'register' | 'forgot'>('login');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isCredentialError, setIsCredentialError] = useState(false);
   const [isAlreadyRegisteredError, setIsAlreadyRegisteredError] = useState(false);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
+
+  // Recovery Password State
+  const [forgotStep, setForgotStep] = useState<'request' | 'reset'>('request');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotCode, setForgotCode] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [forgotSecurityAnswer, setForgotSecurityAnswer] = useState('');
+  const [forgotSecurityHint, setForgotSecurityHint] = useState<string | null>(null);
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+  const [forgotError, setForgotError] = useState<string | null>(null);
   
   // Mobile UI & Navigation States
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -281,6 +298,109 @@ export function LandingPage() {
     setAuthError(null);
     setIsCredentialError(false);
     setIsAlreadyRegisteredError(false);
+    setForgotError(null);
+    setForgotMessage(null);
+  };
+
+  const handleOpenForgotPassword = () => {
+    setLoginTab('forgot');
+    setForgotStep('request');
+    setForgotEmail(pilotEmail || '');
+    setForgotCode('');
+    setForgotNewPassword('');
+    setForgotConfirmPassword('');
+    setForgotSecurityAnswer('');
+    setForgotSecurityHint(null);
+    setForgotMessage(null);
+    setForgotError(null);
+    setAuthError(null);
+    setAuthSuccess(null);
+  };
+
+  const handleRequestForgotCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = forgotEmail.trim();
+    if (!clean) {
+      setForgotError('Por favor, informe seu e-mail cadastrado.');
+      return;
+    }
+
+    setForgotLoading(true);
+    setForgotError(null);
+    setForgotMessage(null);
+
+    try {
+      const res = await apiForgotPassword(clean);
+      if (res.data?.success) {
+        setForgotStep('reset');
+        setForgotMessage('Código de recuperação gerado! Verifique sua caixa de entrada.');
+        if (res.data.securityHint) {
+          setForgotSecurityHint(res.data.securityHint);
+        }
+        if (res.data.code) {
+          setForgotCode(res.data.code);
+        }
+      } else {
+        setForgotError(res.error || res.data?.error || 'Não foi possível localizar este e-mail.');
+      }
+    } catch (err: any) {
+      setForgotError(err?.message || 'Erro ao solicitar recuperação de senha.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotNewPassword) {
+      setForgotError('Informe a nova senha.');
+      return;
+    }
+    if (forgotNewPassword.length < 6) {
+      setForgotError('A nova senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError('As senhas digitadas não coincidem.');
+      return;
+    }
+
+    setForgotLoading(true);
+    setForgotError(null);
+
+    try {
+      const res = await apiResetPassword({
+        email: forgotEmail,
+        code: forgotCode,
+        new_password: forgotNewPassword,
+        security_answer: forgotSecurityAnswer,
+      });
+
+      if (res.data?.success) {
+        setForgotMessage('Senha redefinida com sucesso! Conectando à sua conta...');
+        
+        // Conectar automaticamente com a nova senha
+        setTimeout(async () => {
+          const loginRes = await signInWithEmail(forgotEmail, forgotNewPassword);
+          if (!loginRes.error) {
+            setShowLoginModal(false);
+            navigate('/dashboard');
+          } else {
+            // Se login automático falhar, volta para a tela de login preenchido
+            setLoginTab('login');
+            setPilotEmail(forgotEmail);
+            setPilotPassword('');
+            setAuthSuccess('Senha alterada com sucesso! Digite sua nova senha para entrar.');
+          }
+        }, 1200);
+      } else {
+        setForgotError(res.error || res.data?.error || 'Código inválido ou expirado.');
+      }
+    } catch (err: any) {
+      setForgotError(err?.message || 'Erro ao redefinir a senha.');
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   // Suporte a Google Identity Services oficial
@@ -1366,154 +1486,350 @@ export function LandingPage() {
                 )}
               </AnimatePresence>
 
-              {/* Login / Register Tab Toggle */}
-              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
-                <button
-                  type="button"
-                  onClick={handleSwitchToLogin}
-                  className={cn(
-                    "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-                    loginTab === 'login' ? "bg-orange-600 text-white font-black shadow-md" : "text-slate-400 hover:text-white"
-                  )}
-                >
-                  Entrar com Conta
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSwitchToRegister}
-                  className={cn(
-                    "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-                    loginTab === 'register' ? "bg-orange-600 text-white font-black shadow-md" : "text-slate-400 hover:text-white"
-                  )}
-                >
-                  Criar Cadastro
-                </button>
-              </div>
-
-              <form onSubmit={handleEmailAuth} autoComplete="off" className="space-y-4">
-                {loginTab === 'register' && (
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Nome de Piloto / Apelido</label>
-                    <input
-                      type="text"
-                      value={pilotName}
-                      onChange={(e) => setPilotName(e.target.value)}
-                      placeholder=""
-                      autoComplete="off"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
-                      required
-                    />
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">E-mail do Piloto</label>
-                  <input
-                    type="email"
-                    value={pilotEmail}
-                    onChange={(e) => setPilotEmail(e.target.value)}
-                    placeholder=""
-                    autoComplete="off"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Senha de Acesso</label>
-                  <div className="relative">
-                    <input
-                      id="pilot-password-input"
-                      type={showPassword ? "text" : "password"}
-                      value={pilotPassword}
-                      onChange={(e) => setPilotPassword(e.target.value)}
-                      placeholder=""
-                      autoComplete="new-password"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 pr-10 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
-                      required
-                    />
+              {/* Forgot Password Flow */}
+              {loginTab === 'forgot' ? (
+                <div className="space-y-4 animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <KeyRound size={16} className="text-orange-500" />
+                      <h4 className="text-xs font-black uppercase text-white tracking-wider">Recuperar Acesso</h4>
+                    </div>
                     <button
                       type="button"
-                      id="toggle-password-visibility-btn"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? "Ocultar senha" : "Ver senha"}
-                      title={showPassword ? "Ocultar senha" : "Ver senha"}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-400 transition-colors p-1 cursor-pointer"
+                      onClick={handleSwitchToLogin}
+                      className="text-[10px] font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
                     >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      <ArrowLeft size={12} />
+                      <span>Voltar ao Login</span>
                     </button>
                   </div>
-                </div>
 
-                {loginTab === 'register' && (
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Modelo da Motocicleta Principal</label>
-                    <input
-                      type="text"
-                      value={bikeModel}
-                      onChange={(e) => setBikeModel(e.target.value)}
-                      placeholder=""
-                      autoComplete="off"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
-                    />
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full btn-primary py-3.5 mt-2 disabled:opacity-50"
-                >
-                  {authLoading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Conectando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{loginTab === 'login' ? 'Entrar no Sistema' : 'Concluir Cadastro & Entrar'}</span>
-                      <ArrowRight size={14} />
-                    </>
+                  {forgotError && (
+                    <div className="p-3 bg-red-950/60 border border-red-800/80 rounded-xl flex items-start gap-2 text-xs text-red-300">
+                      <AlertCircle size={15} className="text-red-400 shrink-0 mt-0.5" />
+                      <span>{forgotError}</span>
+                    </div>
                   )}
-                </button>
-              </form>
 
-              {/* Divider between Form and Google */}
-              <div className="relative flex items-center justify-center my-1 pt-1">
-                <div className="flex-1 border-t border-slate-800"></div>
-                <span className="shrink-0 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap select-none">
-                  ou continue com
-                </span>
-                <div className="flex-1 border-t border-slate-800"></div>
-              </div>
+                  {forgotMessage && (
+                    <div className="p-3 bg-emerald-950/60 border border-emerald-800/80 rounded-xl flex items-start gap-2 text-xs text-emerald-300">
+                      <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <span>{forgotMessage}</span>
+                    </div>
+                  )}
 
-              {/* Google Social Login Button */}
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={authLoading}
-                className="w-full py-3 px-4 bg-slate-950 hover:bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-xl text-xs font-black uppercase tracking-wider text-white flex items-center justify-center gap-3 transition-all cursor-pointer shadow-md disabled:opacity-50 group"
-              >
-                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-                <span>Continuar com o Google</span>
-              </button>
+                  {forgotStep === 'request' ? (
+                    <form onSubmit={handleRequestForgotCode} className="space-y-4">
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Digite seu e-mail cadastrado. Enviaremos um código de 6 dígitos para redefinir sua senha com segurança.
+                      </p>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">E-mail do Piloto</label>
+                        <input
+                          type="email"
+                          value={forgotEmail}
+                          onChange={(e) => setForgotEmail(e.target.value)}
+                          placeholder="seu.email@exemplo.com"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                          required
+                          autoFocus
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={forgotLoading}
+                        className="w-full btn-primary py-3.5 mt-2 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                      >
+                        {forgotLoading ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            <span>Verificando e-mail...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Enviar Código de Recuperação</span>
+                            <ArrowRight size={14} />
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+                      <div className="p-3 bg-orange-950/40 border border-orange-800/60 rounded-xl text-xs text-orange-200 flex items-start gap-2">
+                        <Info size={16} className="text-orange-400 shrink-0 mt-0.5" />
+                        <div className="text-[11px] leading-relaxed">
+                          Código gerado para <strong className="text-white">{forgotEmail}</strong>. Digite o código e crie sua nova senha de acesso.
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Código de 6 Dígitos</label>
+                          <span className="text-[9px] font-bold text-slate-500">Válido por 15 min</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={forgotCode}
+                          onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="000000"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-center text-lg tracking-[0.4em] font-mono font-black text-orange-400 outline-none focus:border-orange-500 transition-colors"
+                          required
+                          autoFocus
+                        />
+                      </div>
+
+                      {forgotSecurityHint && (
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                            Ou confirme a moto cadastrada (opcional)
+                          </label>
+                          <input
+                            type="text"
+                            value={forgotSecurityAnswer}
+                            onChange={(e) => setForgotSecurityAnswer(e.target.value)}
+                            placeholder="Ex: Fat Boy, BMW GS, etc."
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                          />
+                        </div>
+                      )}
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Nova Senha (mínimo 6 caracteres)</label>
+                        <div className="relative">
+                          <input
+                            type={showForgotNewPassword ? "text" : "password"}
+                            value={forgotNewPassword}
+                            onChange={(e) => setForgotNewPassword(e.target.value)}
+                            placeholder="Mínimo 6 caracteres"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 pr-10 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                            aria-label={showForgotNewPassword ? "Ocultar senha" : "Ver senha"}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-400 transition-colors p-1 cursor-pointer"
+                          >
+                            {showForgotNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Confirmar Nova Senha</label>
+                        <div className="relative">
+                          <input
+                            type={showForgotConfirmPassword ? "text" : "password"}
+                            value={forgotConfirmPassword}
+                            onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                            placeholder="Repita a nova senha"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 pr-10 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowForgotConfirmPassword(!showForgotConfirmPassword)}
+                            aria-label={showForgotConfirmPassword ? "Ocultar senha" : "Ver senha"}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-400 transition-colors p-1 cursor-pointer"
+                          >
+                            {showForgotConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={forgotLoading}
+                        className="w-full btn-primary py-3.5 mt-2 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                      >
+                        {forgotLoading ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            <span>Redefinindo senha...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Salvar Nova Senha & Entrar</span>
+                            <Check size={16} />
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setForgotStep('request')}
+                        className="w-full py-1 text-[10px] font-bold text-slate-400 hover:text-slate-200 transition-colors cursor-pointer text-center"
+                      >
+                        Não recebeu o código? Clique para gerar outro
+                      </button>
+                    </form>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Login / Register Tab Toggle */}
+                  <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={handleSwitchToLogin}
+                      className={cn(
+                        "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                        loginTab === 'login' ? "bg-orange-600 text-white font-black shadow-md" : "text-slate-400 hover:text-white"
+                      )}
+                    >
+                      Entrar com Conta
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSwitchToRegister}
+                      className={cn(
+                        "flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                        loginTab === 'register' ? "bg-orange-600 text-white font-black shadow-md" : "text-slate-400 hover:text-white"
+                      )}
+                    >
+                      Criar Cadastro
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleEmailAuth} autoComplete="off" className="space-y-4">
+                    {loginTab === 'register' && (
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Nome de Piloto / Apelido</label>
+                        <input
+                          type="text"
+                          value={pilotName}
+                          onChange={(e) => setPilotName(e.target.value)}
+                          placeholder=""
+                          autoComplete="off"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                          required
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">E-mail do Piloto</label>
+                      <input
+                        type="email"
+                        value={pilotEmail}
+                        onChange={(e) => setPilotEmail(e.target.value)}
+                        placeholder=""
+                        autoComplete="off"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Senha de Acesso</label>
+                        {loginTab === 'login' && (
+                          <button
+                            type="button"
+                            onClick={handleOpenForgotPassword}
+                            className="text-[9px] font-bold text-orange-400 hover:text-orange-300 transition-colors cursor-pointer hover:underline"
+                          >
+                            Esqueci minha senha
+                          </button>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          id="pilot-password-input"
+                          type={showPassword ? "text" : "password"}
+                          value={pilotPassword}
+                          onChange={(e) => setPilotPassword(e.target.value)}
+                          placeholder=""
+                          autoComplete="new-password"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 pr-10 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                          required
+                        />
+                        <button
+                          type="button"
+                          id="toggle-password-visibility-btn"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? "Ocultar senha" : "Ver senha"}
+                          title={showPassword ? "Ocultar senha" : "Ver senha"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-400 transition-colors p-1 cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {loginTab === 'register' && (
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Modelo da Motocicleta Principal</label>
+                        <input
+                          type="text"
+                          value={bikeModel}
+                          onChange={(e) => setBikeModel(e.target.value)}
+                          placeholder=""
+                          autoComplete="off"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                        />
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={authLoading}
+                      className="w-full btn-primary py-3.5 mt-2 disabled:opacity-50 cursor-pointer shadow-md"
+                    >
+                      {authLoading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Conectando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{loginTab === 'login' ? 'Entrar no Sistema' : 'Concluir Cadastro & Entrar'}</span>
+                          <ArrowRight size={14} />
+                        </>
+                      )}
+                    </button>
+                  </form>
+
+                  {/* Divider between Form and Google */}
+                  <div className="relative flex items-center justify-center my-1 pt-1">
+                    <div className="flex-1 border-t border-slate-800"></div>
+                    <span className="shrink-0 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap select-none">
+                      ou continue com
+                    </span>
+                    <div className="flex-1 border-t border-slate-800"></div>
+                  </div>
+
+                  {/* Google Social Login Button */}
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={authLoading}
+                    className="w-full py-3 px-4 bg-slate-950 hover:bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-xl text-xs font-black uppercase tracking-wider text-white flex items-center justify-center gap-3 transition-all cursor-pointer shadow-md disabled:opacity-50 group"
+                  >
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>Entrar com Google</span>
+                  </button>
+                </>
+              )}
             </motion.div>
           </div>
         )}

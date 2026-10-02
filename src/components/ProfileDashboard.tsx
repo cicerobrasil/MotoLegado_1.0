@@ -134,19 +134,6 @@ export function ProfileDashboard() {
     if (profile?.motorcycle_photos && Array.isArray(profile.motorcycle_photos)) {
       photos = profile.motorcycle_photos.filter(p => typeof p === 'string' && p.trim().length > 0);
     }
-    if (photos.length === 0) {
-      const saved = localStorage.getItem('motolegado_pilot_bike_photos');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            photos = parsed.filter(p => typeof p === 'string' && p.trim().length > 0);
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
     return photos;
   }, [profile?.motorcycle_photos]);
 

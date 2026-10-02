@@ -1,7 +1,15 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { apiLogin, apiRegister, apiGetMe, syncPilotToHostinger } from '../lib/api';
+import { 
+  apiLogin, 
+  apiRegister, 
+  apiGetMe, 
+  syncPilotToHostinger,
+  apiForgotPassword,
+  apiResetPassword,
+  apiChangePassword
+} from '../lib/api';
 
 export interface PilotProfile {
   id: string;
@@ -47,7 +55,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<PilotProfile>) => Promise<{ error: Error | null }>;
   updateUserPlan: (userId: string, newPlan: 'gratuito' | 'pago' | 'bonificado') => Promise<{ error: Error | null }>;
-  resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  resetPassword: (email: string) => Promise<{ error: Error | null; message?: string }>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -898,18 +907,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Recuperação / Redefinição de Senha
   const resetPassword = async (email: string) => {
-    if (!isSupabaseConfigured) {
-      return { error: null };
+    try {
+      const res = await apiForgotPassword(email);
+      if (res.data?.success) {
+        return { error: null, message: res.data.message || 'Código enviado com sucesso!' };
+      }
+      if (res.error || res.data?.error) {
+        return { error: new Error(res.error || res.data?.error || 'E-mail não encontrado.') };
+      }
+    } catch (e: any) {
+      console.warn('Erro na API de recuperação:', e);
+    }
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/`,
+        });
+        if (error) throw error;
+        return { error: null };
+      } catch (err: any) {
+        return { error: err };
+      }
+    }
+
+    return { error: null };
+  };
+
+  // Alteração de Senha para Piloto Conectado
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    const pilotId = profile?.id || user?.id || profile?.email;
+    if (!pilotId) {
+      return { error: new Error('Nenhum piloto autenticado.') };
     }
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/`,
+      const res = await apiChangePassword({
+        pilot_id: pilotId,
+        current_password: currentPassword,
+        new_password: newPassword,
       });
-      if (error) throw error;
-      return { error: null };
+
+      if (res.data?.success) {
+        return { error: null };
+      }
+      return { error: new Error(res.error || res.data?.error || 'Não foi possível alterar a senha.') };
     } catch (err: any) {
-      return { error: err };
+      return { error: new Error(err?.message || 'Erro inesperado ao alterar senha.') };
     }
   };
 
@@ -936,6 +980,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updateProfile,
         updateUserPlan,
         resetPassword,
+        changePassword,
         refreshProfile,
       }}
     >

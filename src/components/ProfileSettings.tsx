@@ -22,7 +22,10 @@ import {
   QrCode,
   ShieldCheck,
   Copy,
-  Sparkles
+  Sparkles,
+  KeyRound,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -33,7 +36,7 @@ import { uploadImageToStorage } from '../lib/storage';
 export function ProfileSettings() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { profile, user, updateProfile } = useAuth();
+  const { profile, user, updateProfile, changePassword } = useAuth();
 
   const tabParam = searchParams.get('tab');
   const initialTab = (tabParam && ['piloto', 'identidade', 'endereco', 'motocicleta'].includes(tabParam)) 
@@ -95,6 +98,17 @@ export function ProfileSettings() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [uploadingBikeSlot, setUploadingBikeSlot] = useState<number | null>(null);
+
+  // Alteração de Senha State
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordChangeError, setPasswordChangeError] = useState<string | null>(null);
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState<string | null>(null);
 
   const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || 'Piloto')}&background=ea580c&color=ffffff&bold=true`;
   const [personalLogo, setPersonalLogo] = useState<string | null>(profile?.personal_logo_url || null);
@@ -466,6 +480,44 @@ export function ProfileSettings() {
 
   const isEmailValid = validateEmail(email);
 
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordChangeError(null);
+    setPasswordChangeSuccess(null);
+
+    if (!currentPassword) {
+      setPasswordChangeError('Informe sua senha atual.');
+      return;
+    }
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordChangeError('A nova senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordChangeError('As novas senhas não coincidem.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await changePassword(currentPassword, newPassword);
+      if (res?.error) {
+        setPasswordChangeError(res.error.message || 'Erro ao alterar senha.');
+      } else {
+        setPasswordChangeSuccess('Senha alterada com sucesso!');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmNewPassword('');
+        showToast('Senha de acesso atualizada com sucesso no banco de dados!', 'success');
+        setTimeout(() => setPasswordChangeSuccess(null), 4000);
+      }
+    } catch (err: any) {
+      setPasswordChangeError(err?.message || 'Erro ao alterar senha.');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-6 md:space-y-10 selection:bg-orange-500 selection:text-white pb-24 md:pb-8">
       <header className="border-b border-slate-800/60 pb-6 md:pb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
@@ -790,6 +842,121 @@ export function ProfileSettings() {
                     </div>
                   </div>
                 </div>
+
+                {/* Alterar Senha de Acesso */}
+                <div className="bento-card border-slate-800/60 bg-slate-900/40 p-6 sm:p-8 space-y-6">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+                    <div className="flex items-center gap-2.5">
+                      <KeyRound size={20} className="text-orange-500" />
+                      <div>
+                        <h3 className="text-sm font-black uppercase text-white tracking-wider">Segurança & Alteração de Senha</h3>
+                        <p className="text-[9px] font-bold text-slate-500 tracking-wider">Altere a sua senha de acesso à conta do MotoLegado</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {passwordChangeError && (
+                    <div className="p-3 bg-red-950/60 border border-red-800/80 rounded-xl flex items-start gap-2 text-xs text-red-300">
+                      <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                      <span>{passwordChangeError}</span>
+                    </div>
+                  )}
+
+                  {passwordChangeSuccess && (
+                    <div className="p-3 bg-emerald-950/60 border border-emerald-800/80 rounded-xl flex items-start gap-2 text-xs text-emerald-300">
+                      <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <span>{passwordChangeSuccess}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleChangePasswordSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Senha Atual</label>
+                      <div className="relative">
+                        <input
+                          type={showCurrentPassword ? "text" : "password"}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Senha atual"
+                          className="w-full bg-slate-950 border border-slate-800/50 rounded-xl p-3.5 pr-10 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          aria-label={showCurrentPassword ? "Ocultar senha" : "Ver senha"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-400 transition-colors p-1"
+                        >
+                          {showCurrentPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Nova Senha (min. 6)</label>
+                      <div className="relative">
+                        <input
+                          type={showNewPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Mínimo 6 caracteres"
+                          className="w-full bg-slate-950 border border-slate-800/50 rounded-xl p-3.5 pr-10 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          aria-label={showNewPassword ? "Ocultar senha" : "Ver senha"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-400 transition-colors p-1"
+                        >
+                          {showNewPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Confirmar Nova Senha</label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmNewPassword ? "text" : "password"}
+                          value={confirmNewPassword}
+                          onChange={(e) => setConfirmNewPassword(e.target.value)}
+                          placeholder="Repita a nova senha"
+                          className="w-full bg-slate-950 border border-slate-800/50 rounded-xl p-3.5 pr-10 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
+                          aria-label={showConfirmNewPassword ? "Ocultar senha" : "Ver senha"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-400 transition-colors p-1"
+                        >
+                          {showConfirmNewPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-3 flex justify-end pt-2">
+                      <button
+                        type="submit"
+                        disabled={isChangingPassword}
+                        className="w-full sm:w-auto px-6 py-3 bg-slate-800 hover:bg-orange-600 border border-slate-700 hover:border-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+                      >
+                        {isChangingPassword ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            <span>Atualizando senha...</span>
+                          </>
+                        ) : (
+                          <>
+                            <KeyRound size={14} />
+                            <span>Atualizar Senha de Acesso</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
             </div>
           )}
@@ -803,7 +970,7 @@ export function ProfileSettings() {
             const displayLocation = (city && state) 
               ? `${city}/${state}` 
               : (city || state || profile?.city || profile?.state || 'Brasil');
-            const displayClub = profile?.club_name || localStorage.getItem('motolegado_pilot_club') || 'Piloto Independente';
+            const displayClub = profile?.club_name || (isMemberOfClub ? 'Membro de Moto Clube' : 'Piloto Independente');
             const displayTier = profile?.tier || 'Bronze';
             const displayPlanBadge = profile?.plan_type === 'bonificado'
               ? '⭐ MODO BONIFICADO'

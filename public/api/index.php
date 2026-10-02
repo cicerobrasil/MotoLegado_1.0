@@ -506,6 +506,209 @@ if ($route === '/auth/login' && $method === 'POST') {
     exit;
 }
 
+// 4.1 Solicitação de Código para Redefinição de Senha: POST /auth/forgot-password
+if ($route === '/auth/forgot-password' && $method === 'POST') {
+    $email = strtolower(trim($body['email'] ?? ''));
+    if (empty($email)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'E-mail é obrigatório.']);
+        exit;
+    }
+
+    $pilot = null;
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM pilots WHERE LOWER(email) = ? LIMIT 1");
+            $stmt->execute([$email]);
+            $pilot = $stmt->fetch();
+        } catch (Exception $e) {}
+    }
+
+    if (!$pilot) {
+        $store = loadLocalStore();
+        $pilot = $store['pilots'][$email] ?? null;
+    }
+
+    if (!$pilot) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'E-mail não localizado na base de pilotos do MotoLegado.']);
+        exit;
+    }
+
+    $code = strval(rand(100000, 999999));
+    $expiresAt = time() + 900; // 15 min
+
+    $store = loadLocalStore();
+    if (!isset($store['reset_codes'])) $store['reset_codes'] = [];
+    $store['reset_codes'][$email] = [
+        'code' => $code,
+        'expires_at' => $expiresAt,
+        'pilot_id' => $pilot['id']
+    ];
+    saveLocalStore($store);
+
+    // Tentar envio de e-mail via PHP mail()
+    $name = $pilot['name'] ?? 'Piloto';
+    $subject = "MotoLegado - Codigo para Redefinicao de Senha";
+    $message = "Ola, {$name}!\n\nVoce solicitou a redefinicao de sua senha no MotoLegado.\n\nSeu codigo de seguranca e: {$code}\n\nEste codigo expira em 15 minutos.\n\nSe nao foi voce que solicitou, ignore esta mensagem.";
+    $headers = "From: suporte@motolegado.com.br\r\nReply-To: suporte@motolegado.com.br\r\nX-Mailer: PHP/" . phpversion();
+    @mail($email, $subject, $message, $headers);
+
+    $securityHint = !empty($pilot['motorcycle']) ? "Moto cadastrada: {$pilot['motorcycle']}" : null;
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Código de verificação gerado com sucesso!',
+        'code' => $code,
+        'securityHint' => $securityHint,
+        'pilotName' => $pilot['name']
+    ]);
+    exit;
+}
+
+// 4.2 Redefinir Senha com Código ou Resposta de Segurança: POST /auth/reset-password
+if ($route === '/auth/reset-password' && $method === 'POST') {
+    $email = strtolower(trim($body['email'] ?? ''));
+    $code = trim($body['code'] ?? '');
+    $newPassword = $body['new_password'] ?? '';
+    $securityAnswer = trim($body['security_answer'] ?? '');
+
+    if (empty($email) || empty($newPassword)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'E-mail e nova senha são obrigatórios.']);
+        exit;
+    }
+
+    if (strlen($newPassword) < 6) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'A nova senha deve ter no mínimo 6 caracteres.']);
+        exit;
+    }
+
+    $pilot = null;
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM pilots WHERE LOWER(email) = ? LIMIT 1");
+            $stmt->execute([$email]);
+            $pilot = $stmt->fetch();
+        } catch (Exception $e) {}
+    }
+
+    $store = loadLocalStore();
+    if (!$pilot) {
+        $pilot = $store['pilots'][$email] ?? null;
+    }
+
+    if (!$pilot) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Piloto não encontrado.']);
+        exit;
+    }
+
+    // Validar código
+    $stored = $store['reset_codes'][$email] ?? null;
+    $isCodeValid = ($stored && $stored['code'] === $code && time() <= $stored['expires_at']);
+    
+    // Validação alternativa por moto cadastrada
+    $isSecurityValid = (!empty($securityAnswer) && !empty($pilot['motorcycle']) && stripos($pilot['motorcycle'], $securityAnswer) !== false);
+
+    if (!$isCodeValid && !isSecurityValid) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Código de recuperação inválido ou expirado. Verifique os dígitos informados.']);
+        exit;
+    }
+
+    $newHash = hashPassword($newPassword);
+
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("UPDATE pilots SET password_hash = ?, updated_at = NOW() WHERE LOWER(email) = ?");
+            $stmt->execute([$newHash, $email]);
+        } catch (Exception $e) {}
+    }
+
+    $pilot['password_hash'] = $newHash;
+    $pilot['updated_at'] = date('c');
+    $store['pilots'][$pilot['id']] = $pilot;
+    $store['pilots'][$email] = $pilot;
+    unset($store['reset_codes'][$email]);
+    saveLocalStore($store);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Senha redefinida com sucesso! Você já pode entrar com sua nova senha.',
+        'pilot' => sanitizePilot($pilot)
+    ]);
+    exit;
+}
+
+// 4.3 Alterar Senha de Piloto Autenticado: POST /auth/change-password
+if ($route === '/auth/change-password' && $method === 'POST') {
+    $pilotId = $body['pilot_id'] ?? '';
+    $currentPassword = $body['current_password'] ?? '';
+    $newPassword = $body['new_password'] ?? '';
+
+    if (empty($pilotId) || empty($currentPassword) || empty($newPassword)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Todos os campos são obrigatórios.']);
+        exit;
+    }
+
+    if (strlen($newPassword) < 6) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'A nova senha deve ter no mínimo 6 caracteres.']);
+        exit;
+    }
+
+    $pilot = null;
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM pilots WHERE id = ? OR LOWER(email) = ? LIMIT 1");
+            $stmt->execute([$pilotId, strtolower($pilotId)]);
+            $pilot = $stmt->fetch();
+        } catch (Exception $e) {}
+    }
+
+    $store = loadLocalStore();
+    if (!$pilot) {
+        $pilot = $store['pilots'][$pilotId] ?? $store['pilots'][strtolower($pilotId)] ?? null;
+    }
+
+    if (!$pilot) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Piloto não encontrado.']);
+        exit;
+    }
+
+    // Validar senha atual
+    $storedHash = $pilot['password_hash'] ?? '';
+    if (!empty($storedHash) && !verifyPassword($currentPassword, $storedHash)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Senha atual incorreta.']);
+        exit;
+    }
+
+    $newHash = hashPassword($newPassword);
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("UPDATE pilots SET password_hash = ?, updated_at = NOW() WHERE id = ?");
+            $stmt->execute([$newHash, $pilot['id']]);
+        } catch (Exception $e) {}
+    }
+
+    $pilot['password_hash'] = $newHash;
+    $pilot['updated_at'] = date('c');
+    $store['pilots'][$pilot['id']] = $pilot;
+    if (!empty($pilot['email'])) $store['pilots'][strtolower($pilot['email'])] = $pilot;
+    saveLocalStore($store);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Senha atualizada com sucesso!'
+    ]);
+    exit;
+}
+
 // 5. Obter Dados do Piloto por ID: GET /auth/me/{id} ou GET /pilots/{id}
 if (preg_match('#^/(auth/me|pilots)/([^/]+)$#', $route, $matches) && $method === 'GET') {
     $searchId = urldecode($matches[2]);

@@ -42,6 +42,44 @@ export async function apiGetMe(pilotId: string) {
   return fetchFromApi<{ success: boolean; pilot: any }>(`/api/auth/me/${encodeURIComponent(pilotId)}`);
 }
 
+// Recuperação e Redefinição de Senha
+export async function apiForgotPassword(email: string) {
+  return fetchFromApi<{ 
+    success: boolean; 
+    message?: string; 
+    error?: string; 
+    code?: string; 
+    securityHint?: string; 
+    pilotName?: string;
+  }>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  });
+}
+
+export async function apiResetPassword(payload: { 
+  email: string; 
+  code?: string; 
+  new_password: string; 
+  security_answer?: string; 
+}) {
+  return fetchFromApi<{ success: boolean; message?: string; error?: string; pilot?: any }>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function apiChangePassword(payload: { 
+  pilot_id: string; 
+  current_password: string; 
+  new_password: string; 
+}) {
+  return fetchFromApi<{ success: boolean; message?: string; error?: string }>('/api/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
 // Sincronizar dados do piloto com o MySQL da Hostinger
 export async function syncPilotToHostinger(pilotData: any) {
   const result = await fetchFromApi('/api/pilots', {
