@@ -104,8 +104,11 @@ export function ProfileSettings() {
       : defaultAvatar
   );
 
+  const lastLoadedIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (profile) {
+    if (profile && lastLoadedIdRef.current !== profile.id) {
+      lastLoadedIdRef.current = profile.id;
       setName(profile.name || '');
       setEmail(profile.email || '');
       setPhone(profile.phone || '');
@@ -131,7 +134,7 @@ export function ProfileSettings() {
         profile.club_name !== 'Independente'
       );
       setIsMemberOfClub(isClubMember);
-      setPersonalLogo(isClubMember ? (profile.personal_logo_url || null) : null);
+      setPersonalLogo(profile.personal_logo_url || null);
 
       const raw = profile.motorcycle_photos;
       let photosList: string[] = [];
@@ -448,7 +451,7 @@ export function ProfileSettings() {
       }
 
       setSaveSuccess(true);
-      showToast('Configurações gravadas com sucesso no banco de dados!', 'success');
+      showToast('Todas as abas (Piloto, Identidade, Endereço e Motocicleta) foram gravadas com sucesso!', 'success');
       // Permanece na mesma tela e aba atual com status de GRAVADO (sem redirecionar)
       setTimeout(() => {
         setSaveSuccess(false);
@@ -1369,17 +1372,20 @@ export function ProfileSettings() {
           {isSaving ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              <span>GRAVANDO...</span>
+              <span>GRAVANDO TODAS AS ABAS...</span>
             </>
           ) : saveSuccess ? (
             <>
               <CheckCircle2 size={18} className="text-white animate-pulse" />
-              <span className="tracking-widest">GRAVADO COM SUCESSO!</span>
+              <span className="tracking-widest">TODAS AS ABAS GRAVADAS COM SUCESSO!</span>
             </>
           ) : (
             <>
               <Check size={20} className="group-hover:rotate-12 transition-transform" />
-              <span className="relative drop-shadow-md">GRAVAR REGISTRO</span>
+              <div className="flex flex-col text-left">
+                <span className="relative drop-shadow-md leading-tight">GRAVAR TODAS AS ABAS</span>
+                <span className="text-[8px] font-bold text-orange-200/90 tracking-normal lowercase opacity-90">salva piloto, identidade, endereço e moto</span>
+              </div>
             </>
           )}
         </button>

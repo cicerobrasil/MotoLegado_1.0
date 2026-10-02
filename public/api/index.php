@@ -566,40 +566,68 @@ if ($route === '/pilots' && $method === 'POST') {
     $email = strtolower(trim($body['email'] ?? ''));
     $name = trim($body['name'] ?? 'Piloto');
     $motorcycle = $body['motorcycle'] ?? null;
+    $motorcycleNickname = $body['motorcycle_nickname'] ?? null;
+    $motorcycleYear = $body['motorcycle_year'] ?? null;
+    $motorcyclePlate = $body['motorcycle_plate'] ?? null;
+    $motorcyclePhotos = isset($body['motorcycle_photos']) ? (is_string($body['motorcycle_photos']) ? $body['motorcycle_photos'] : json_encode($body['motorcycle_photos'])) : null;
     $phone = $body['phone'] ?? null;
+    $bio = $body['bio'] ?? null;
+    $avatarUrl = $body['avatar_url'] ?? null;
+    $personalLogoUrl = $body['personal_logo_url'] ?? null;
+    $city = $body['city'] ?? null;
+    $state = $body['state'] ?? null;
+    $cep = $body['cep'] ?? null;
+    $street = $body['street'] ?? null;
+    $streetNumber = $body['street_number'] ?? null;
+    $neighborhood = $body['neighborhood'] ?? null;
+    $defaultStartPoint = isset($body['default_start_point']) ? ($body['default_start_point'] ? 1 : 0) : 1;
+    $clubName = $body['club_name'] ?? null;
     $bloodType = $body['blood_type'] ?? null;
     $emergencyContact = $body['emergency_contact'] ?? null;
     $emergencyPhone = $body['emergency_phone'] ?? null;
     $role = $body['role'] ?? 'pilot';
     $plan = $body['plan'] ?? 'gratuito';
-    $city = $body['city'] ?? null;
-    $state = $body['state'] ?? null;
-    $clubName = $body['club_name'] ?? null;
 
     if ($pdo) {
         try {
             $stmt = $pdo->prepare("
                 INSERT INTO pilots (
-                    id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone,
-                    role, plan, city, state, club_name
+                    id, email, name, phone, bio, avatar_url, personal_logo_url,
+                    motorcycle, motorcycle_nickname, motorcycle_year, motorcycle_plate, motorcycle_photos,
+                    city, state, cep, street, street_number, neighborhood, default_start_point,
+                    club_name, blood_type, emergency_contact, emergency_phone, role, plan
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     name = VALUES(name),
-                    motorcycle = VALUES(motorcycle),
                     phone = VALUES(phone),
+                    bio = VALUES(bio),
+                    avatar_url = VALUES(avatar_url),
+                    personal_logo_url = VALUES(personal_logo_url),
+                    motorcycle = VALUES(motorcycle),
+                    motorcycle_nickname = VALUES(motorcycle_nickname),
+                    motorcycle_year = VALUES(motorcycle_year),
+                    motorcycle_plate = VALUES(motorcycle_plate),
+                    motorcycle_photos = VALUES(motorcycle_photos),
+                    city = VALUES(city),
+                    state = VALUES(state),
+                    cep = VALUES(cep),
+                    street = VALUES(street),
+                    street_number = VALUES(street_number),
+                    neighborhood = VALUES(neighborhood),
+                    default_start_point = VALUES(default_start_point),
+                    club_name = VALUES(club_name),
                     blood_type = VALUES(blood_type),
                     emergency_contact = VALUES(emergency_contact),
                     emergency_phone = VALUES(emergency_phone),
                     role = VALUES(role),
-                    plan = VALUES(plan),
-                    city = VALUES(city),
-                    state = VALUES(state),
-                    club_name = VALUES(club_name)
+                    plan = VALUES(plan)
             ");
             $stmt->execute([
-                $id, $email, $name, $motorcycle, $phone, $bloodType, $emergencyContact, $emergencyPhone,
-                $role, $plan, $city, $state, $clubName
+                $id, $email, $name, $phone, $bio, $avatarUrl, $personalLogoUrl,
+                $motorcycle, $motorcycleNickname, $motorcycleYear, $motorcyclePlate, $motorcyclePhotos,
+                $city, $state, $cep, $street, $streetNumber, $neighborhood, $defaultStartPoint,
+                $clubName, $bloodType, $emergencyContact, $emergencyPhone, $role, $plan
             ]);
         } catch (Exception $e) {
             error_log("[MySQL Save Pilot] " . $e->getMessage());
