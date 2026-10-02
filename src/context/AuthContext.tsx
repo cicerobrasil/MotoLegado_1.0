@@ -355,10 +355,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (savedStr) savedPermanent = JSON.parse(savedStr);
       } catch {}
 
-      const motorcycleVal = pilot.motorcycle || savedPermanent?.motorcycle || localStorage.getItem('motolegado_pilot_bike') || '';
-      const motorcycleNicknameVal = pilot.motorcycle_nickname || savedPermanent?.motorcycle_nickname || localStorage.getItem('motolegado_pilot_bike_nickname') || '';
-      const motorcycleYearVal = pilot.motorcycle_year || savedPermanent?.motorcycle_year || localStorage.getItem('motolegado_pilot_bike_year') || '2023';
-      const motorcyclePlateVal = pilot.motorcycle_plate || savedPermanent?.motorcycle_plate || localStorage.getItem('motolegado_pilot_bike_plate') || '';
+      const motorcycleVal = pilot.motorcycle || savedPermanent?.motorcycle || '';
+      const motorcycleNicknameVal = pilot.motorcycle_nickname || savedPermanent?.motorcycle_nickname || '';
+      const motorcycleYearVal = pilot.motorcycle_year || savedPermanent?.motorcycle_year || '';
+      const motorcyclePlateVal = pilot.motorcycle_plate || savedPermanent?.motorcycle_plate || '';
       const motorcyclePhotosVal = (pilot.motorcycle_photos && pilot.motorcycle_photos.length > 0)
         ? (typeof pilot.motorcycle_photos === 'string' ? JSON.parse(pilot.motorcycle_photos) : pilot.motorcycle_photos)
         : (savedPermanent?.motorcycle_photos || []);
@@ -370,6 +370,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         motorcycle_year: motorcycleYearVal,
         motorcycle_plate: motorcyclePlateVal,
         motorcycle_photos: motorcyclePhotosVal,
+        city: pilot.city || savedPermanent?.city || '',
+        state: pilot.state || savedPermanent?.state || '',
+        phone: pilot.phone || savedPermanent?.phone || '',
+        bio: pilot.bio || savedPermanent?.bio || '',
         plan_type: pilot.plan || 'gratuito',
         is_pro: pilot.role === 'admin' || pilot.plan === 'pago' || pilot.plan === 'bonificado',
         avatar_url: pilot.avatar_url || getCleanAvatar(pilot.name || email),
@@ -445,6 +449,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const pilot = res.data.pilot;
       const normalizedProfile: PilotProfile = {
         ...pilot,
+        motorcycle: pilot.motorcycle || metadata.motorcycle || '',
+        motorcycle_nickname: '',
+        motorcycle_year: '',
+        motorcycle_plate: '',
+        motorcycle_photos: [],
+        city: '',
+        state: '',
+        phone: '',
+        bio: '',
+        cep: '',
+        street: '',
+        street_number: '',
+        neighborhood: '',
+        club_name: '',
+        points: 0,
+        tier: 'Bronze',
         plan_type: pilot.plan || 'gratuito',
         is_pro: pilot.role === 'admin' || pilot.plan === 'pago' || pilot.plan === 'bonificado',
         avatar_url: pilot.avatar_url || getCleanAvatar(pilot.name || email),
@@ -472,7 +492,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         'motolegado_pilot_bike_year',
         'motolegado_pilot_bike_plate',
         'motolegado_pilot_bike_photos',
-        'motolegado_pilot_logo'
+        'motolegado_pilot_logo',
+        'motolegado_pilot_saved_' + cleanEmail
       ];
       dirtyKeys.forEach(k => localStorage.removeItem(k));
 
@@ -481,9 +502,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('motolegado_pilot_name', normalizedProfile.name);
       localStorage.setItem('motolegado_pilot_email', normalizedProfile.email);
       localStorage.setItem('motolegado_pilot_plan', normalizedProfile.plan_type);
-      try {
-        localStorage.setItem('motolegado_pilot_saved_' + cleanEmail, JSON.stringify(normalizedProfile));
-      } catch {}
+      localStorage.setItem('motolegado_is_new_signup', 'true');
+      localStorage.removeItem(`motolegado_first_access_popup_seen_${normalizedProfile.id}`);
+      localStorage.removeItem(`motolegado_first_access_popup_seen_${normalizedProfile.email}`);
 
       return { error: null };
     }
@@ -731,11 +752,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
-  // Encerrar Sessão (Mantém dados do piloto guardados no dispositivo sem apagá-los)
+  // Encerrar Sessão (Limpeza completa para evitar vazamento de dados entre pilotos)
   const signOut = async () => {
-    // 1. Limpeza apenas dos tokens de sessão ativa atual (preserva o perfil da moto e histórico do piloto no dispositivo)
-    localStorage.removeItem('motolegado_pilot_session');
-    localStorage.removeItem('motolegado_pilot_id');
+    const dirtyKeys = [
+      'motolegado_pilot_session',
+      'motolegado_pilot_id',
+      'motolegado_pilot_name',
+      'motolegado_pilot_email',
+      'motolegado_pilot_plan',
+      'motolegado_pilot_phone',
+      'motolegado_pilot_bio',
+      'motolegado_pilot_address',
+      'motolegado_pilot_city',
+      'motolegado_pilot_state',
+      'motolegado_pilot_bike',
+      'motolegado_pilot_bike_nickname',
+      'motolegado_pilot_bike_year',
+      'motolegado_pilot_bike_plate',
+      'motolegado_pilot_bike_photos',
+      'motolegado_pilot_club',
+      'motolegado_pilot_logo',
+      'motolegado_pilot_avatar',
+      'motolegado_is_new_signup'
+    ];
+    dirtyKeys.forEach(k => localStorage.removeItem(k));
 
     // Limpa tokens do Supabase no localStorage para garantir deslogue instantâneo
     try {

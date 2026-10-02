@@ -36,12 +36,12 @@ function loadEnvConfig() {
 
 $env = loadEnvConfig();
 
-// Suporte para chaves MYSQL_* e DB_*
+// Suporte para chaves MYSQL_* e DB_* com fallback seguro para credenciais oficiais da Hostinger
 define('DB_HOST', $env['MYSQL_HOST'] ?? $env['DB_HOST'] ?? 'localhost');
 define('DB_PORT', $env['MYSQL_PORT'] ?? $env['DB_PORT'] ?? '3306');
 define('DB_NAME', $env['MYSQL_DATABASE'] ?? $env['DB_NAME'] ?? 'u342198764_motolegado');
 define('DB_USER', $env['MYSQL_USER'] ?? $env['DB_USER'] ?? 'u342198764_admsql');
-define('DB_PASS', $env['MYSQL_PASSWORD'] ?? $env['DB_PASS'] ?? '');
+define('DB_PASS', !empty($env['MYSQL_PASSWORD']) ? $env['MYSQL_PASSWORD'] : (!empty($env['DB_PASS']) ? $env['DB_PASS'] : 'e+2YGyRn>sdX'));
 
 $lastError = null;
 

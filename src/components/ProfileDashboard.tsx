@@ -23,11 +23,11 @@ export function ProfileDashboard() {
   const [badgeQrCodeUrl, setBadgeQrCodeUrl] = useState<string>('');
 
   const pilotName = profile?.name || 'Piloto MotoLegado';
-  const pilotMotorcycle = profile?.motorcycle || localStorage.getItem('motolegado_pilot_bike') || 'Motocicleta Principal';
-  const pilotMotorcycleNickname = profile?.motorcycle_nickname || localStorage.getItem('motolegado_pilot_bike_nickname') || '';
-  const pilotMotorcycleYear = profile?.motorcycle_year || localStorage.getItem('motolegado_pilot_bike_year') || '2023';
-  const pilotMotorcyclePlate = profile?.motorcycle_plate || localStorage.getItem('motolegado_pilot_bike_plate') || '';
-  const pilotClub = profile?.club_name || localStorage.getItem('motolegado_pilot_club') || 'Piloto Independente';
+  const pilotMotorcycle = profile?.motorcycle || 'Motocicleta Principal';
+  const pilotMotorcycleNickname = profile?.motorcycle_nickname || '';
+  const pilotMotorcycleYear = profile?.motorcycle_year || '';
+  const pilotMotorcyclePlate = profile?.motorcycle_plate || '';
+  const pilotClub = profile?.club_name || 'Piloto Independente';
   const pilotAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
     ? profile.avatar_url
     : `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotName)}&background=ea580c&color=ffffff&bold=true`;
