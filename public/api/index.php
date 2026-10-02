@@ -109,6 +109,51 @@ function ensureDatabaseSchema($pdo) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
+        // Auto-migração: Garantir todas as colunas essenciais na tabela pilots
+        $columnsToEnsure = [
+            "password_hash" => "VARCHAR(255) NULL",
+            "phone" => "VARCHAR(30) NULL",
+            "blood_type" => "VARCHAR(10) NULL",
+            "emergency_contact" => "VARCHAR(150) NULL",
+            "emergency_phone" => "VARCHAR(30) NULL",
+            "motorcycle" => "VARCHAR(150) NULL",
+            "motorcycle_year" => "VARCHAR(10) NULL",
+            "motorcycle_plate" => "VARCHAR(20) NULL",
+            "motorcycle_nickname" => "VARCHAR(100) NULL",
+            "motorcycle_photos" => "JSON NULL",
+            "bio" => "TEXT NULL",
+            "avatar_url" => "TEXT NULL",
+            "personal_logo_url" => "TEXT NULL",
+            "city" => "VARCHAR(100) NULL",
+            "state" => "VARCHAR(10) NULL",
+            "cep" => "VARCHAR(20) NULL",
+            "street" => "VARCHAR(200) NULL",
+            "street_number" => "VARCHAR(50) NULL",
+            "neighborhood" => "VARCHAR(100) NULL",
+            "default_start_point" => "TINYINT(1) DEFAULT 1",
+            "club_name" => "VARCHAR(150) NULL",
+            "role" => "ENUM('admin', 'pilot', 'partner', 'organizer') DEFAULT 'pilot'",
+            "plan" => "ENUM('gratuito', 'pago', 'bonificado') DEFAULT 'gratuito'",
+            "points" => "INT DEFAULT 0",
+            "tier" => "VARCHAR(50) DEFAULT 'Bronze'"
+        ];
+
+        $existingCols = [];
+        try {
+            $colStmt = $pdo->query("SHOW COLUMNS FROM pilots");
+            while ($row = $colStmt->fetch()) {
+                $existingCols[] = strtolower($row['Field']);
+            }
+        } catch (Exception $ce) {}
+
+        foreach ($columnsToEnsure as $colName => $colDef) {
+            if (!in_array(strtolower($colName), $existingCols)) {
+                try {
+                    $pdo->exec("ALTER TABLE pilots ADD COLUMN {$colName} {$colDef}");
+                } catch (Exception $ae) {}
+            }
+        }
+
         // Garantir Administrador Principal
         $stmt = $pdo->prepare("
             INSERT INTO pilots (id, email, name, role, plan, tier, points)
@@ -301,6 +346,27 @@ if ($route === '/auth/register' && $method === 'POST') {
             exit;
         } catch (Exception $e) {
             error_log("[MySQL Register Error] " . $e->getMessage());
+            // Tenta re-executar schema e tentar novamente uma vez
+            try {
+                ensureDatabaseSchema($pdo);
+                $insertStmt->execute([
+                    $pilotId, $email, $passwordHash, $name, $motorcycle ?: null, $phone ?: null,
+                    $role, $plan, $tier, $points, $avatarUrl
+                ]);
+                $fetchStmt = $pdo->prepare("SELECT * FROM pilots WHERE id = ?");
+                $fetchStmt->execute([$pilotId]);
+                $saved = $fetchStmt->fetch();
+
+                http_response_code(201);
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Cadastro realizado com sucesso no MySQL!',
+                    'pilot' => sanitizePilot($saved)
+                ]);
+                exit;
+            } catch (Exception $retryErr) {
+                error_log("[MySQL Retry Error] " . $retryErr->getMessage());
+            }
         }
     }
 

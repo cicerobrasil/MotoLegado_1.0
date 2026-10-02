@@ -29,6 +29,7 @@ interface DigitalIdModalProps {
     icon: string;
   };
   pilotAvatar?: string;
+  pilotLogo?: string;
 }
 
 export function DigitalIdModal({
@@ -40,6 +41,7 @@ export function DigitalIdModal({
   pilotMotorcycle,
   pilotTier,
   pilotAvatar,
+  pilotLogo,
 }: DigitalIdModalProps) {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [copiedLink, setCopiedLink] = useState(false);
@@ -262,8 +264,12 @@ export function DigitalIdModal({
                   {pilotName}
                 </h3>
                 <div className="flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-400 pt-1">
-                  <span className="flex items-center gap-1 text-slate-300 font-bold">
-                    <ShieldCheck size={13} className="text-amber-500" />
+                  <span className="flex items-center gap-1.5 text-slate-300 font-bold">
+                    {pilotLogo ? (
+                      <img src={pilotLogo} alt="Brasão" className="w-4 h-4 rounded-full object-cover border border-amber-500/80 shrink-0 shadow-sm" />
+                    ) : (
+                      <ShieldCheck size={13} className="text-amber-500 shrink-0" />
+                    )}
                     {pilotClub}
                   </span>
                   <span className="text-slate-600">·</span>

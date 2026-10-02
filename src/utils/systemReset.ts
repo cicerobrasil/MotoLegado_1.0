@@ -101,6 +101,76 @@ if (typeof window !== 'undefined') {
       localStorage.setItem('motolegado_clubs', JSON.stringify([]));
       localStorage.setItem('motolegado_system_cleaned_v8', 'true');
     }
+
+    // V9: Limpeza obrigatória de resíduos de testes ("Rodrigo Trovão", "88301-001", "Tempestade Alemã", fotos mockadas)
+    const dirtyGlobalKeys = [
+      'motolegado_pilot_phone',
+      'motolegado_pilot_bio',
+      'motolegado_pilot_address',
+      'motolegado_pilot_city',
+      'motolegado_pilot_state',
+      'motolegado_pilot_bike_nickname',
+      'motolegado_pilot_bike_plate',
+      'motolegado_pilot_bike_photos',
+      'motolegado_pilot_bike_year',
+      'motolegado_pilot_logo'
+    ];
+    dirtyGlobalKeys.forEach(k => localStorage.removeItem(k));
+
+    // Sanitiza a sessão salva atual caso tenha herdado os dados de simulação
+    const currentSession = localStorage.getItem('motolegado_pilot_session');
+    if (currentSession) {
+      try {
+        const parsed = JSON.parse(currentSession);
+        let changed = false;
+        if (parsed.bio && (parsed.bio.includes('Trovão') || parsed.bio.includes('Silveira'))) {
+          parsed.bio = '';
+          changed = true;
+        }
+        if (parsed.phone && parsed.phone.includes('98841-3210')) {
+          parsed.phone = '';
+          changed = true;
+        }
+        if (parsed.motorcycle_nickname && (parsed.motorcycle_nickname.includes('Tempestade') || parsed.motorcycle_nickname.includes('Alemã'))) {
+          parsed.motorcycle_nickname = '';
+          changed = true;
+        }
+        if (parsed.motorcycle_plate && (parsed.motorcycle_plate.includes('PLACA: R') || parsed.motorcycle_plate === 'PLACA: R')) {
+          parsed.motorcycle_plate = '';
+          changed = true;
+        }
+        if (parsed.motorcycle_year === '2022' || parsed.motorcycle_year === 2022 || parsed.motorcycle_year === '2023') {
+          parsed.motorcycle_year = '';
+          changed = true;
+        }
+        if (parsed.cep && parsed.cep.includes('88301')) {
+          parsed.cep = '';
+          parsed.street = '';
+          parsed.street_number = '';
+          parsed.neighborhood = '';
+          changed = true;
+        }
+        if (parsed.street && parsed.street.includes('Hercílio Luz')) {
+          parsed.street = '';
+          parsed.street_number = '';
+          parsed.neighborhood = '';
+          changed = true;
+        }
+        if (Array.isArray(parsed.motorcycle_photos)) {
+          const cleanedPhotos = parsed.motorcycle_photos.filter((p: string) => !p.includes('1558981403') && !p.includes('1558981806'));
+          if (cleanedPhotos.length !== parsed.motorcycle_photos.length) {
+            parsed.motorcycle_photos = cleanedPhotos;
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem('motolegado_pilot_session', JSON.stringify(parsed));
+          if (parsed.email) {
+            localStorage.setItem('motolegado_pilot_saved_' + parsed.email.toLowerCase().trim(), JSON.stringify(parsed));
+          }
+        }
+      } catch (e) {}
+    }
   } catch (err) {
     console.warn('[systemReset] Local storage unavailable or restricted:', err);
   }

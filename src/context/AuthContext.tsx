@@ -173,15 +173,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               } catch (e) {}
             }
           }
-          if (!parsed.phone) parsed.phone = localStorage.getItem('motolegado_pilot_phone') || '';
-          if (!parsed.bio) parsed.bio = localStorage.getItem('motolegado_pilot_bio') || '';
-          if (!parsed.motorcycle) parsed.motorcycle = localStorage.getItem('motolegado_pilot_bike') || '';
-          if (!parsed.motorcycle_nickname) parsed.motorcycle_nickname = localStorage.getItem('motolegado_pilot_bike_nickname') || '';
-          if (!parsed.motorcycle_year) parsed.motorcycle_year = localStorage.getItem('motolegado_pilot_bike_year') || '';
-          if (!parsed.motorcycle_plate) parsed.motorcycle_plate = localStorage.getItem('motolegado_pilot_bike_plate') || '';
-          if (!parsed.personal_logo_url) parsed.personal_logo_url = localStorage.getItem('motolegado_pilot_logo') || undefined;
-          if (!parsed.city) parsed.city = localStorage.getItem('motolegado_pilot_city') || '';
-          if (!parsed.state) parsed.state = localStorage.getItem('motolegado_pilot_state') || '';
+          // Sanitizar resíduos de testes caso existam na sessão
+          if (parsed.bio && (parsed.bio.includes('Trovão') || parsed.bio.includes('Silveira'))) parsed.bio = '';
+          if (parsed.phone && parsed.phone.includes('98841-3210')) parsed.phone = '';
+          if (parsed.motorcycle_nickname && (parsed.motorcycle_nickname.includes('Tempestade') || parsed.motorcycle_nickname.includes('Alemã'))) parsed.motorcycle_nickname = '';
+          if (parsed.motorcycle_plate && (parsed.motorcycle_plate.includes('PLACA: R') || parsed.motorcycle_plate === 'PLACA: R')) parsed.motorcycle_plate = '';
+          if (parsed.motorcycle_year === '2022' || parsed.motorcycle_year === 2022 || parsed.motorcycle_year === '2023') parsed.motorcycle_year = '';
+          if (parsed.cep && parsed.cep.includes('88301')) {
+            parsed.cep = '';
+            parsed.street = '';
+            parsed.street_number = '';
+            parsed.neighborhood = '';
+          }
+          if (parsed.street && parsed.street.includes('Hercílio Luz')) {
+            parsed.street = '';
+            parsed.street_number = '';
+            parsed.neighborhood = '';
+          }
+          if (Array.isArray(parsed.motorcycle_photos)) {
+            parsed.motorcycle_photos = parsed.motorcycle_photos.filter((p: string) => typeof p === 'string' && !p.includes('1558981403') && !p.includes('1558981806'));
+          }
 
           // Verificar registro persistente permanente por email
           if (parsed.email) {
@@ -449,14 +460,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         created_at: new Date().toISOString(),
       } as any);
 
+      // Limpar chaves legadas e globais para garantir cadastro 100% limpo
+      const dirtyKeys = [
+        'motolegado_pilot_phone',
+        'motolegado_pilot_bio',
+        'motolegado_pilot_address',
+        'motolegado_pilot_city',
+        'motolegado_pilot_state',
+        'motolegado_pilot_bike',
+        'motolegado_pilot_bike_nickname',
+        'motolegado_pilot_bike_year',
+        'motolegado_pilot_bike_plate',
+        'motolegado_pilot_bike_photos',
+        'motolegado_pilot_logo'
+      ];
+      dirtyKeys.forEach(k => localStorage.removeItem(k));
+
       localStorage.setItem('motolegado_pilot_session', JSON.stringify(normalizedProfile));
       localStorage.setItem('motolegado_pilot_id', normalizedProfile.id);
       localStorage.setItem('motolegado_pilot_name', normalizedProfile.name);
       localStorage.setItem('motolegado_pilot_email', normalizedProfile.email);
       localStorage.setItem('motolegado_pilot_plan', normalizedProfile.plan_type);
-      if (metadata.motorcycle) {
-        localStorage.setItem('motolegado_pilot_bike', metadata.motorcycle);
-      }
       try {
         localStorage.setItem('motolegado_pilot_saved_' + cleanEmail, JSON.stringify(normalizedProfile));
       } catch {}
@@ -617,20 +641,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (savedStr) savedPermanent = JSON.parse(savedStr);
     } catch {}
 
-    const motorcycleVal = savedPermanent?.motorcycle || localStorage.getItem('motolegado_pilot_bike') || '';
-    const motorcycleNicknameVal = savedPermanent?.motorcycle_nickname || localStorage.getItem('motolegado_pilot_bike_nickname') || '';
-    const motorcycleYearVal = savedPermanent?.motorcycle_year || localStorage.getItem('motolegado_pilot_bike_year') || '2023';
-    const motorcyclePlateVal = savedPermanent?.motorcycle_plate || localStorage.getItem('motolegado_pilot_bike_plate') || '';
-    const motorcyclePhotosVal = savedPermanent?.motorcycle_photos || [];
+    const motorcycleVal = savedPermanent?.motorcycle || '';
+    const motorcycleNicknameVal = savedPermanent?.motorcycle_nickname || '';
+    const motorcycleYearVal = savedPermanent?.motorcycle_year || '';
+    const motorcyclePlateVal = savedPermanent?.motorcycle_plate || '';
+    const motorcyclePhotosVal = Array.isArray(savedPermanent?.motorcycle_photos) ? savedPermanent.motorcycle_photos : [];
 
     const customProfile: PilotProfile = {
       id: savedPermanent?.id || ('google-pilot-' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')),
       name: savedPermanent?.name || name,
       email: cleanEmail,
-      phone: savedPermanent?.phone || localStorage.getItem('motolegado_pilot_phone') || '',
-      bio: savedPermanent?.bio || localStorage.getItem('motolegado_pilot_bio') || '',
-      city: savedPermanent?.city || localStorage.getItem('motolegado_pilot_city') || '',
-      state: savedPermanent?.state || localStorage.getItem('motolegado_pilot_state') || '',
+      phone: savedPermanent?.phone || '',
+      bio: savedPermanent?.bio || '',
+      city: savedPermanent?.city || '',
+      state: savedPermanent?.state || '',
       cep: savedPermanent?.cep || '',
       street: savedPermanent?.street || '',
       street_number: savedPermanent?.street_number || '',
@@ -641,7 +665,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       motorcycle_year: motorcycleYearVal,
       motorcycle_plate: motorcyclePlateVal,
       motorcycle_photos: motorcyclePhotosVal,
-      personal_logo_url: savedPermanent?.personal_logo_url || localStorage.getItem('motolegado_pilot_logo') || undefined,
+      personal_logo_url: savedPermanent?.personal_logo_url || undefined,
       points: savedPermanent?.points ?? (assignedRole === 'admin' ? 1000 : 0),
       tier: savedPermanent?.tier || (assignedRole === 'admin' ? 'Diamante' : 'Bronze'),
       is_pro: isPro,
@@ -767,19 +791,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (updates.name !== undefined) localStorage.setItem('motolegado_pilot_name', updates.name);
       if (updates.email !== undefined) localStorage.setItem('motolegado_pilot_email', updates.email);
-      if (updates.phone !== undefined) localStorage.setItem('motolegado_pilot_phone', updates.phone);
-      if (updates.bio !== undefined) localStorage.setItem('motolegado_pilot_bio', updates.bio);
-      if (updates.motorcycle !== undefined) localStorage.setItem('motolegado_pilot_bike', updates.motorcycle);
-      if (updates.motorcycle_nickname !== undefined) localStorage.setItem('motolegado_pilot_bike_nickname', updates.motorcycle_nickname);
-      if (updates.motorcycle_year !== undefined) localStorage.setItem('motolegado_pilot_bike_year', updates.motorcycle_year);
-      if (updates.motorcycle_plate !== undefined) localStorage.setItem('motolegado_pilot_bike_plate', updates.motorcycle_plate);
-      if (updates.motorcycle_photos !== undefined) localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(updates.motorcycle_photos));
-      if (updates.city !== undefined) localStorage.setItem('motolegado_pilot_city', updates.city);
-      if (updates.state !== undefined) localStorage.setItem('motolegado_pilot_state', updates.state);
-      if (updates.personal_logo_url !== undefined) localStorage.setItem('motolegado_pilot_logo', updates.personal_logo_url || '');
-      if (updates.avatar_url !== undefined) localStorage.setItem('motolegado_pilot_avatar', updates.avatar_url);
     } catch (storageErr) {
-      console.warn('Armazenamento local cheio, dados mantidos no estado e servidor:', storageErr);
+      console.warn('Armazenamento local restrito:', storageErr);
     }
 
     // Sincroniza atualização com o backend com tratamento seguro

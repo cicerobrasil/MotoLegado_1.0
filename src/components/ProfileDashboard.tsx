@@ -518,8 +518,16 @@ export function ProfileDashboard() {
           <div className="relative h-full flex flex-col justify-between space-y-6">
             <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-orange-500 p-0.5 shrink-0 overflow-hidden bg-slate-900">
+                  <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-orange-500 p-0.5 shrink-0 overflow-hidden bg-slate-900 shadow-md">
                     <img src={pilotAvatar} className="w-full h-full object-cover rounded-full" alt="Profile" />
+                    {profile?.personal_logo_url && (
+                      <div 
+                        className="absolute bottom-0 right-0 w-4 h-4 rounded-full border border-orange-500 bg-slate-950 p-0.5 overflow-hidden shadow-lg"
+                        title={pilotClub !== 'Piloto Independente' ? "Brasão do Moto Clube" : "Brasão Pessoal do Piloto"}
+                      >
+                        <img src={profile.personal_logo_url} alt="Brasão" className="w-full h-full object-cover rounded-full" />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] sm:tracking-[0.3em] mb-0.5">ID DIGITAL V.1</p>
@@ -1001,6 +1009,7 @@ export function ProfileDashboard() {
         pilotMotorcycle={pilotMotorcycle}
         pilotTier={currentTier}
         pilotAvatar={pilotAvatar}
+        pilotLogo={profile?.personal_logo_url}
       />
     </div>
   );

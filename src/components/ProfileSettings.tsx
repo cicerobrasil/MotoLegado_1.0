@@ -49,94 +49,41 @@ export function ProfileSettings() {
     }
   }, [searchParams]);
   
-  // Form States vinculados ao perfil real com fallback seguro ao armazenamento local
-  const [name, setName] = useState(profile?.name || localStorage.getItem('motolegado_pilot_name') || '');
-  const [email, setEmail] = useState(profile?.email || localStorage.getItem('motolegado_pilot_email') || '');
-  const [phone, setPhone] = useState(profile?.phone || localStorage.getItem('motolegado_pilot_phone') || '');
-  const [bio, setBio] = useState(profile?.bio || localStorage.getItem('motolegado_pilot_bio') || '');
-  const [city, setCity] = useState(profile?.city || localStorage.getItem('motolegado_pilot_city') || '');
-  const [state, setState] = useState(profile?.state || localStorage.getItem('motolegado_pilot_state') || '');
-  const [cep, setCep] = useState(() => {
-    if (profile?.cep) return profile.cep;
-    try {
-      const saved = localStorage.getItem('motolegado_pilot_address');
-      return saved ? JSON.parse(saved).cep || '' : '';
-    } catch {
-      return '';
-    }
-  });
-  const [street, setStreet] = useState(() => {
-    if (profile?.street) return profile.street;
-    try {
-      const saved = localStorage.getItem('motolegado_pilot_address');
-      return saved ? JSON.parse(saved).street || '' : '';
-    } catch {
-      return '';
-    }
-  });
-  const [streetNumber, setStreetNumber] = useState(() => {
-    if (profile?.street_number) return profile.street_number;
-    try {
-      const saved = localStorage.getItem('motolegado_pilot_address');
-      return saved ? JSON.parse(saved).streetNumber || '' : '';
-    } catch {
-      return '';
-    }
-  });
-  const [neighborhood, setNeighborhood] = useState(() => {
-    if (profile?.neighborhood) return profile.neighborhood;
-    try {
-      const saved = localStorage.getItem('motolegado_pilot_address');
-      return saved ? JSON.parse(saved).neighborhood || '' : '';
-    } catch {
-      return '';
-    }
-  });
-  const [isDefaultStartPoint, setIsDefaultStartPoint] = useState(() => {
-    if (profile?.default_start_point !== undefined) return Boolean(profile.default_start_point);
-    try {
-      const saved = localStorage.getItem('motolegado_pilot_address');
-      return saved ? Boolean(JSON.parse(saved).isDefaultStartPoint) : true;
-    } catch {
-      return true;
-    }
-  });
+  // Form States vinculados estritamente ao perfil autenticado (sem dados herdados de simulação)
+  const [name, setName] = useState(profile?.name || '');
+  const [email, setEmail] = useState(profile?.email || '');
+  const [phone, setPhone] = useState(profile?.phone || '');
+  const [bio, setBio] = useState(profile?.bio || '');
+  const [city, setCity] = useState(profile?.city || '');
+  const [state, setState] = useState(profile?.state || '');
+  const [cep, setCep] = useState(profile?.cep || '');
+  const [street, setStreet] = useState(profile?.street || '');
+  const [streetNumber, setStreetNumber] = useState(profile?.street_number || '');
+  const [neighborhood, setNeighborhood] = useState(profile?.neighborhood || '');
+  const [isDefaultStartPoint, setIsDefaultStartPoint] = useState(
+    profile?.default_start_point !== undefined ? Boolean(profile.default_start_point) : true
+  );
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const numberInputRef = useRef<HTMLInputElement>(null);
 
-  const [motorcycle, setMotorcycle] = useState(
-    profile?.motorcycle || localStorage.getItem('motolegado_pilot_bike') || ''
-  );
-  const [motorcycleNickname, setMotorcycleNickname] = useState(
-    profile?.motorcycle_nickname || localStorage.getItem('motolegado_pilot_bike_nickname') || ''
-  );
-  const [motorcycleYear, setMotorcycleYear] = useState(
-    profile?.motorcycle_year || localStorage.getItem('motolegado_pilot_bike_year') || ''
-  );
-  const [motorcyclePlate, setMotorcyclePlate] = useState(
-    profile?.motorcycle_plate || localStorage.getItem('motolegado_pilot_bike_plate') || ''
-  );
+  const [motorcycle, setMotorcycle] = useState(profile?.motorcycle || '');
+  const [motorcycleNickname, setMotorcycleNickname] = useState(profile?.motorcycle_nickname || '');
+  const [motorcycleYear, setMotorcycleYear] = useState(profile?.motorcycle_year || '');
+  const [motorcyclePlate, setMotorcyclePlate] = useState(profile?.motorcycle_plate || '');
   const [motorcyclePhotos, setMotorcyclePhotos] = useState<string[]>(() => {
     if (profile?.motorcycle_photos) {
       const raw = profile.motorcycle_photos;
-      if (Array.isArray(raw) && raw.length > 0) return raw;
-      if (typeof raw === 'string') {
+      let list: string[] = [];
+      if (Array.isArray(raw)) list = raw;
+      else if (typeof raw === 'string') {
         try {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed)) list = parsed;
         } catch {}
       }
+      return list.filter((p: string) => typeof p === 'string' && !p.includes('1558981403') && !p.includes('1558981806'));
     }
-    try {
-      const saved = localStorage.getItem('motolegado_pilot_bike_photos');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-      return [];
-    } catch {
-      return [];
-    }
+    return [];
   });
 
   const [isMemberOfClub, setIsMemberOfClub] = useState(false);
@@ -150,49 +97,54 @@ export function ProfileSettings() {
   const [uploadingBikeSlot, setUploadingBikeSlot] = useState<number | null>(null);
 
   const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || 'Piloto')}&background=ea580c&color=ffffff&bold=true`;
-  const [personalLogo, setPersonalLogo] = useState<string | null>(
-    profile?.personal_logo_url || localStorage.getItem('motolegado_pilot_logo') || null
-  );
+  const [personalLogo, setPersonalLogo] = useState<string | null>(profile?.personal_logo_url || null);
   const [profilePhoto, setProfilePhoto] = useState(
     (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61')) 
       ? profile.avatar_url 
-      : (localStorage.getItem('motolegado_pilot_avatar') || defaultAvatar)
+      : defaultAvatar
   );
 
   useEffect(() => {
     if (profile) {
-      if (profile.name) setName(profile.name);
-      if (profile.email) setEmail(profile.email);
-      if (profile.phone) setPhone(profile.phone);
-      if (profile.bio) setBio(profile.bio);
-      if (profile.city) setCity(profile.city);
-      if (profile.state) setState(profile.state);
-      if (profile.cep) setCep(profile.cep);
-      if (profile.street) setStreet(profile.street);
-      if (profile.street_number) setStreetNumber(profile.street_number);
-      if (profile.neighborhood) setNeighborhood(profile.neighborhood);
-      if (profile.default_start_point !== undefined) setIsDefaultStartPoint(Boolean(profile.default_start_point));
-      if (profile.motorcycle) setMotorcycle(profile.motorcycle);
-      if (profile.avatar_url) setProfilePhoto(profile.avatar_url);
-      if (profile.personal_logo_url) setPersonalLogo(profile.personal_logo_url);
-      if (profile.motorcycle_nickname) setMotorcycleNickname(profile.motorcycle_nickname);
-      if (profile.motorcycle_year) setMotorcycleYear(profile.motorcycle_year);
-      if (profile.motorcycle_plate) setMotorcyclePlate(profile.motorcycle_plate);
-      if (profile.motorcycle_photos) {
-        const raw = profile.motorcycle_photos;
-        let photosList: string[] = [];
-        if (Array.isArray(raw)) {
-          photosList = raw;
-        } else if (typeof raw === 'string') {
-          try {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) photosList = parsed;
-          } catch {}
-        }
-        if (photosList.length > 0) {
-          setMotorcyclePhotos(photosList);
-        }
+      setName(profile.name || '');
+      setEmail(profile.email || '');
+      setPhone(profile.phone || '');
+      setBio(profile.bio || '');
+      setCity(profile.city || '');
+      setState(profile.state || '');
+      setCep(profile.cep || '');
+      setStreet(profile.street || '');
+      setStreetNumber(profile.street_number || '');
+      setNeighborhood(profile.neighborhood || '');
+      if (profile.default_start_point !== undefined) {
+        setIsDefaultStartPoint(Boolean(profile.default_start_point));
       }
+      setMotorcycle(profile.motorcycle || '');
+      setMotorcycleNickname(profile.motorcycle_nickname || '');
+      setMotorcycleYear(profile.motorcycle_year || '');
+      setMotorcyclePlate(profile.motorcycle_plate || '');
+      setProfilePhoto(profile.avatar_url || defaultAvatar);
+      
+      const isClubMember = Boolean(
+        profile.club_name && 
+        profile.club_name !== 'Piloto Independente' && 
+        profile.club_name !== 'Independente'
+      );
+      setIsMemberOfClub(isClubMember);
+      setPersonalLogo(isClubMember ? (profile.personal_logo_url || null) : null);
+
+      const raw = profile.motorcycle_photos;
+      let photosList: string[] = [];
+      if (Array.isArray(raw)) {
+        photosList = raw;
+      } else if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) photosList = parsed;
+        } catch {}
+      }
+      photosList = photosList.filter((p: string) => typeof p === 'string' && !p.includes('1558981403') && !p.includes('1558981806'));
+      setMotorcyclePhotos(photosList);
     }
   }, [profile]);
 
@@ -349,12 +301,10 @@ export function ProfileSettings() {
       if (result.success && result.url) {
         if (type === 'logo') {
           setPersonalLogo(result.url);
-          localStorage.setItem('motolegado_pilot_logo', result.url);
           updateProfile({ personal_logo_url: result.url });
-          showToast('Brasão / Símbolo pessoal enviado e salvo com sucesso!', 'success');
+          showToast('Brasão oficial enviado e salvo com sucesso!', 'success');
         } else {
           setProfilePhoto(result.url);
-          localStorage.setItem('motolegado_pilot_avatar', result.url);
           updateProfile({ avatar_url: result.url });
           showToast('Foto de perfil atualizada e salva com sucesso!', 'success');
         }
@@ -471,34 +421,6 @@ export function ProfileSettings() {
     setSaveSuccess(false);
 
     try {
-      // Salvar metadados localmente como garantia imediata com proteção contra cota
-      try {
-        localStorage.setItem('motolegado_pilot_name', name);
-        localStorage.setItem('motolegado_pilot_email', email);
-        localStorage.setItem('motolegado_pilot_phone', phone);
-        localStorage.setItem('motolegado_pilot_bio', bio);
-        localStorage.setItem('motolegado_pilot_city', city);
-        localStorage.setItem('motolegado_pilot_state', state);
-        if (personalLogo) localStorage.setItem('motolegado_pilot_logo', personalLogo);
-        if (profilePhoto) localStorage.setItem('motolegado_pilot_avatar', profilePhoto);
-        localStorage.setItem('motolegado_pilot_bike', motorcycle);
-        localStorage.setItem('motolegado_pilot_bike_nickname', motorcycleNickname);
-        localStorage.setItem('motolegado_pilot_bike_year', motorcycleYear);
-        localStorage.setItem('motolegado_pilot_bike_plate', motorcyclePlate);
-        localStorage.setItem('motolegado_pilot_bike_photos', JSON.stringify(motorcyclePhotos));
-        localStorage.setItem('motolegado_pilot_address', JSON.stringify({
-          cep,
-          street,
-          streetNumber,
-          neighborhood,
-          city,
-          state,
-          isDefaultStartPoint
-        }));
-      } catch (storageErr) {
-        console.warn('Aviso armazenamento local:', storageErr);
-      }
-
       const res = await updateProfile({
         name,
         email,
@@ -514,6 +436,7 @@ export function ProfileSettings() {
         motorcycle,
         avatar_url: profilePhoto,
         personal_logo_url: personalLogo || undefined,
+        club_name: isMemberOfClub ? (profile?.club_name || '') : 'Piloto Independente',
         motorcycle_nickname: motorcycleNickname,
         motorcycle_year: motorcycleYear,
         motorcycle_plate: motorcyclePlate,
@@ -767,7 +690,11 @@ export function ProfileSettings() {
                     aria-checked={isMemberOfClub}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setIsMemberOfClub(!isMemberOfClub);
+                      const nextVal = !isMemberOfClub;
+                      setIsMemberOfClub(nextVal);
+                      updateProfile({ 
+                        club_name: nextVal ? (profile?.club_name || '') : 'Piloto Independente' 
+                      });
                     }}
                     className={cn(
                       "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
@@ -786,14 +713,17 @@ export function ProfileSettings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">Logo / Símbolo Pessoal</label>
+                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1 group-hover:text-orange-500 transition-colors">
+                        {isMemberOfClub ? "Brasão Oficial do Moto Clube" : "Brasão / Símbolo do Piloto Independente"}
+                      </label>
                       {personalLogo && (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setPersonalLogo(null);
-                            showToast('Logotipo removido.', 'info');
+                            updateProfile({ personal_logo_url: undefined });
+                            showToast('Brasão removido.', 'info');
                           }}
                           className="text-[9px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 cursor-pointer"
                         >
@@ -817,16 +747,22 @@ export function ProfileSettings() {
                         {isUploadingLogo ? (
                           <Loader2 size={24} className="text-orange-500 animate-spin" />
                         ) : personalLogo ? (
-                          <img src={personalLogo} className="w-full h-full object-cover" alt="Personal Logo" />
+                          <img src={personalLogo} className="w-full h-full object-cover" alt="Brasão" />
                         ) : (
-                          <Camera size={24} />
+                          <Shield size={26} />
                         )}
                       </div>
                       <div className="text-center">
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 group-hover/logo:text-white transition-colors">
-                          {isUploadingLogo ? 'Enviando ao Storage...' : personalLogo ? 'Alterar Logo' : 'Enviar Brasão / Símbolo'}
+                          {isUploadingLogo 
+                            ? 'Enviando ao Storage...' 
+                            : personalLogo 
+                            ? (isMemberOfClub ? 'Alterar Brasão do Clube' : 'Alterar Brasão Pessoal') 
+                            : (isMemberOfClub ? 'Enviar Brasão do Clube' : 'Enviar Brasão Pessoal')}
                         </p>
-                        <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">JPG, PNG ou WebP</p>
+                        <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
+                          {isMemberOfClub ? 'Brasão / Escudo oficial do Moto Clube' : 'Seu brasão, patch ou símbolo de estrada'}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -932,8 +868,11 @@ export function ProfileSettings() {
                           className="w-full h-full object-cover"
                         />
                         {personalLogo && (
-                          <div className="absolute bottom-1.5 right-1.5 w-7 h-7 rounded-full border border-orange-500/80 bg-slate-950 p-0.5 overflow-hidden shadow-lg">
-                            <img src={personalLogo} alt="Logo" className="w-full h-full object-cover rounded-full" />
+                          <div 
+                            className="absolute bottom-1.5 right-1.5 w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-orange-500 bg-slate-950 p-0.5 overflow-hidden shadow-xl" 
+                            title={isMemberOfClub ? "Brasão Oficial do Moto Clube" : "Brasão Pessoal do Piloto Independente"}
+                          >
+                            <img src={personalLogo} alt="Brasão" className="w-full h-full object-cover rounded-full" />
                           </div>
                         )}
                       </div>
