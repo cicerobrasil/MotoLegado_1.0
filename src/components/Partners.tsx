@@ -410,7 +410,7 @@ export function Partners() {
                   placeholder="Buscar descontos, cidades ou nomes..." 
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-12 pr-6 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-700"
+                  className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-12 pr-6 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400"
                 />
               </div>
             </div>
@@ -625,7 +625,7 @@ export function Partners() {
                   placeholder="Ex: Moto point Brothers & Beer"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                 />
               </div>
 
@@ -643,7 +643,7 @@ export function Partners() {
                       placeholder="Ex: Carlos 'Trovoada' Silva"
                       value={formManagerName}
                       onChange={(e) => setFormManagerName(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                     />
                   </div>
                   <div className="space-y-2">
@@ -653,7 +653,7 @@ export function Partners() {
                       placeholder="Ex: (41) 98877-6655"
                       value={formManagerPhone}
                       onChange={(e) => setFormManagerPhone(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                     />
                   </div>
                 </div>
@@ -668,7 +668,7 @@ export function Partners() {
                     placeholder="Ex: Rodovia PR-410, KM 22 - Graciosa"
                     value={formLocation}
                     onChange={(e) => setFormLocation(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                   />
                 </div>
 
@@ -698,7 +698,7 @@ export function Partners() {
                     placeholder="Ex: https://maps.google.com/?q=... ou https://goo.gl/maps/..."
                     value={formMapUrl}
                     onChange={(e) => setFormMapUrl(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 pl-12 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 pl-12 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                   />
                 </div>
               </div>
@@ -717,7 +717,7 @@ export function Partners() {
                     placeholder="Ex: Central de Vendas & Reservas"
                     value={formCorporateContact}
                     onChange={(e) => setFormCorporateContact(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                   />
                 </div>
 
@@ -730,7 +730,7 @@ export function Partners() {
                       placeholder="Ex: (41) 3333-5544"
                       value={formPhone}
                       onChange={(e) => setFormPhone(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                     />
                   </div>
 
@@ -742,7 +742,7 @@ export function Partners() {
                       placeholder="Ex: (41) 98877-6655"
                       value={formWhatsapp}
                       onChange={(e) => setFormWhatsapp(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                     />
                   </div>
                 </div>
@@ -756,7 +756,7 @@ export function Partners() {
                     placeholder="Ex: https://www.seuestabelecimento.com.br"
                     value={formWebsite}
                     onChange={(e) => setFormWebsite(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                   />
                 </div>
               </div>
@@ -769,7 +769,7 @@ export function Partners() {
                   placeholder="Ex: 15% de Desconto para motos clássicas e lavagem cortesia após retorno"
                   value={formDiscount}
                   onChange={(e) => setFormDiscount(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white border-orange-500/20" 
+                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white border-orange-500/20" 
                 />
               </div>
 
@@ -779,7 +779,7 @@ export function Partners() {
                   placeholder="Ex: Show de Rock todas as quintas, Happy Hour com bife de alcatra no disco de arado..."
                   value={formNews}
                   onChange={(e) => setFormNews(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 min-h-[140px] resize-none text-white leading-relaxed" 
+                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 min-h-[140px] resize-none text-white leading-relaxed" 
                 />
               </div>
 

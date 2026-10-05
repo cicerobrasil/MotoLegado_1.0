@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown } from 'lucide-react';
+import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown, Navigation, ExternalLink, Share2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -9,6 +9,8 @@ import { uploadImageToStorage } from '../lib/storage';
 import { UpgradeModal, UpgradeFeatureTrigger } from './UpgradeModal';
 import { TripChecklist } from './TripChecklist';
 import { TripReportModal } from './TripReportModal';
+import { DateInput } from './DateInput';
+import { TripStagesManager, TripStage, STAGE_TYPE_CONFIG } from './TripStagesManager';
 
 export interface LogEntry {
   id: string;
@@ -24,6 +26,91 @@ export interface LogEntry {
   rating: number;
   content: string;
   image: string;
+  stages?: TripStage[];
+  mapsUrl?: string;
+}
+
+/**
+ * Obtém o endereço formatado de ponto de partida padrão do piloto
+ * se a opção default_start_point estiver ativada
+ */
+export function getDefaultStartPoint(profile?: any): string {
+  // Verifica se o ponto de partida padrão está ativado (padrão é true se não configurado)
+  let isEnabled = true;
+  if (profile && profile.default_start_point !== undefined) {
+    isEnabled = Boolean(profile.default_start_point);
+  } else {
+    try {
+      const savedAddr = localStorage.getItem('motolegado_pilot_address');
+      if (savedAddr) {
+        const parsed = JSON.parse(savedAddr);
+        if (parsed.isDefaultStartPoint !== undefined) {
+          isEnabled = Boolean(parsed.isDefaultStartPoint);
+        }
+      }
+    } catch {}
+  }
+
+  if (!isEnabled) return '';
+
+  let street = profile?.street || '';
+  let streetNumber = profile?.street_number || '';
+  let neighborhood = profile?.neighborhood || '';
+  let city = profile?.city || '';
+  let state = profile?.state || '';
+
+  // Fallback 1: localStorage 'motolegado_pilot_address'
+  if (!street && !city) {
+    try {
+      const savedAddr = localStorage.getItem('motolegado_pilot_address');
+      if (savedAddr) {
+        const parsed = JSON.parse(savedAddr);
+        street = street || parsed.street || '';
+        streetNumber = streetNumber || parsed.streetNumber || parsed.street_number || '';
+        neighborhood = neighborhood || parsed.neighborhood || '';
+        city = city || parsed.city || '';
+        state = state || parsed.state || '';
+      }
+    } catch {}
+  }
+
+  // Fallback 2: localStorage 'motolegado_pilot_session'
+  if (!street && !city) {
+    try {
+      const savedSession = localStorage.getItem('motolegado_pilot_session');
+      if (savedSession) {
+        const parsed = JSON.parse(savedSession);
+        street = street || parsed.street || '';
+        streetNumber = streetNumber || parsed.street_number || '';
+        neighborhood = neighborhood || parsed.neighborhood || '';
+        city = city || parsed.city || '';
+        state = state || parsed.state || '';
+      }
+    } catch {}
+  }
+
+  let streetPart = '';
+  if (street) {
+    streetPart = street;
+    if (streetNumber) {
+      streetPart += `, ${streetNumber}`;
+    }
+    if (neighborhood) {
+      streetPart += ` - ${neighborhood}`;
+    }
+  }
+
+  const cityState = [city, state].filter(Boolean).join(' - ');
+
+  if (streetPart && cityState) {
+    return `${streetPart}, ${cityState}`;
+  } else if (streetPart) {
+    return streetPart;
+  } else if (cityState) {
+    return cityState;
+  }
+
+  return '';
 }
 
 export function Logbook() {
@@ -36,10 +123,14 @@ export function Logbook() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
+  const defaultStartPoint = getDefaultStartPoint(profile);
+
   // Form State
   const [title, setTitle] = useState('');
-  const [origin, setOrigin] = useState('');
+  const [origin, setOrigin] = useState(() => defaultStartPoint);
   const [destination, setDestination] = useState('');
+  const [stages, setStages] = useState<TripStage[]>([]);
+  const [mapsUrl, setMapsUrl] = useState<string>('');
   const [date, setDate] = useState('');
   const [bike, setBike] = useState(profile?.motorcycle || '');
   const [distance, setDistance] = useState('');
@@ -51,6 +142,27 @@ export function Logbook() {
   const [image, setImage] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const tripPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  // Sincroniza dinamicamente ponto de partida e moto quando o perfil for atualizado ou carregado
+  useEffect(() => {
+    const syncDefaults = () => {
+      const def = getDefaultStartPoint(profile);
+      if (def && (!origin || origin === '')) {
+        setOrigin(def);
+      }
+      if (profile?.motorcycle && (!bike || bike === '')) {
+        setBike(profile.motorcycle);
+      }
+    };
+    syncDefaults();
+
+    window.addEventListener('motolegado_profile_updated', syncDefaults);
+    window.addEventListener('storage', syncDefaults);
+    return () => {
+      window.removeEventListener('motolegado_profile_updated', syncDefaults);
+      window.removeEventListener('storage', syncDefaults);
+    };
+  }, [profile]);
 
   const isProOrBonificado = Boolean(
     profile?.is_pro ||
@@ -70,10 +182,14 @@ export function Logbook() {
       setIsUpgradeModalOpen(true);
       return;
     }
+    const def = getDefaultStartPoint(profile);
     setTitle('');
-    setOrigin('');
+    setOrigin(def);
     setDestination('');
-    setDate('');
+    setStages([]);
+    setMapsUrl('');
+    setDate(new Date().toLocaleDateString('pt-BR'));
+    setBike(profile?.motorcycle || '');
     setDistance('');
     setDuration('');
     setContent('');
@@ -138,7 +254,9 @@ export function Logbook() {
               road: 'Tapete (Perfeita)',
               rating: t.rating || 5,
               content: t.notes || '',
-              image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
+              image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800',
+              stages: Array.isArray(t.stages) ? t.stages : (Array.isArray(t.checklist_data?.stages) ? t.checklist_data.stages : []),
+              mapsUrl: t.maps_url || t.checklist_data?.mapsUrl || undefined
             }));
             setLogs(mappedLogs);
           } else {
@@ -175,7 +293,11 @@ export function Logbook() {
           rating: newEntry.rating,
           notes: newEntry.content,
           date: new Date().toISOString().split('T')[0],
-          photos: [newEntry.image]
+          photos: [newEntry.image],
+          checklist_data: { 
+            stages: newEntry.stages, 
+            mapsUrl: newEntry.mapsUrl 
+          }
         });
       } catch (err) {
         console.error('Erro ao gravar logbook no Supabase:', err);
@@ -194,10 +316,21 @@ export function Logbook() {
       return;
     }
 
+    let formattedDate = date;
+    if (date && date.includes('-')) {
+      const parts = date.split('-');
+      if (parts.length === 3) {
+        const [y, m, d] = parts;
+        formattedDate = `${d}/${m}/${y}`;
+      }
+    }
+
+    const validStages = stages.filter(s => s.name && s.name.trim().length > 0);
+
     const newEntry: LogEntry = {
       id: Date.now().toString(),
       title: title.toUpperCase(),
-      date: date || new Date().toLocaleDateString('pt-BR'),
+      date: formattedDate || new Date().toLocaleDateString('pt-BR'),
       origin: origin || 'Cidade de Origem',
       destination: destination || 'Cidade de Destino',
       distance: distance ? distance.replace(/\D/g, '') || '100' : '100',
@@ -207,7 +340,9 @@ export function Logbook() {
       road,
       rating,
       content: content || 'Viagem concluída com sucesso e registrada no diário de bordo.',
-      image: image || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
+      image: image || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800',
+      stages: validStages,
+      mapsUrl: mapsUrl || undefined
     };
 
     await saveLogsToStorage(newEntry);
@@ -216,6 +351,8 @@ export function Logbook() {
     setTitle('');
     setOrigin('');
     setDestination('');
+    setStages([]);
+    setMapsUrl('');
     setDistance('');
     setDuration('');
     setContent('');
@@ -308,7 +445,7 @@ export function Logbook() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Dê um nome para sua aventura (ex: Tour das Serras)"
-                  className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl py-5 pl-16 pr-8 text-sm font-bold text-white placeholder:text-slate-700 focus:outline-none focus:border-orange-500 transition-all"
+                  className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl py-5 pl-16 pr-8 text-sm font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500 transition-all"
                 />
               </div>
             </div>
@@ -316,30 +453,48 @@ export function Logbook() {
             {/* Technical Data Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="space-y-3">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">LOCAL DE PARTIDA</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">LOCAL DE PARTIDA</label>
+                  {defaultStartPoint && (
+                    <button
+                      type="button"
+                      onClick={() => setOrigin(defaultStartPoint)}
+                      className="text-[9px] font-black uppercase text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1 cursor-pointer bg-orange-500/10 hover:bg-orange-500/20 px-2 py-0.5 rounded-md border border-orange-500/20"
+                      title="Usar endereço padrão cadastrado no perfil"
+                    >
+                      <MapPin size={10} className="text-orange-400" />
+                      <span>Endereço Padrão</span>
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-orange-500/50" size={16} />
                   <input 
                     type="text" 
                     value={origin}
                     onChange={(e) => setOrigin(e.target.value)}
-                    placeholder="De onde partiu?" 
-                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50" 
+                    placeholder={defaultStartPoint || "De onde partiu?"} 
+                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50" 
                   />
                 </div>
+                {origin && defaultStartPoint && origin === defaultStartPoint ? (
+                  <p className="text-[10px] text-emerald-400 font-bold ml-1 flex items-center gap-1">
+                    ✓ Ponto de partida padrão carregado do cadastro
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-slate-500 font-medium ml-1">
+                    {defaultStartPoint ? 'Você pode alterar o local de partida se necessário.' : 'Defina seu ponto de partida padrão nas Configurações de Perfil.'}
+                  </p>
+                )}
               </div>
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">DATA DO ROTEIRO</label>
-                <div className="relative">
-                  <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 text-orange-500/50" size={16} />
-                  <input 
-                    type="text" 
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    placeholder="15/05/2026" 
-                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50" 
-                  />
-                </div>
+                <DateInput 
+                  value={date}
+                  onChange={(newDate) => setDate(newDate)}
+                  placeholder="Selecione a data"
+                  className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-5 pr-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50" 
+                />
               </div>
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">MOTO UTILIZADA</label>
@@ -350,7 +505,7 @@ export function Logbook() {
                     value={bike}
                     onChange={(e) => setBike(e.target.value)}
                     placeholder="Iron 883" 
-                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50" 
+                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50" 
                   />
                 </div>
               </div>
@@ -364,7 +519,7 @@ export function Logbook() {
                     value={destination}
                     onChange={(e) => setDestination(e.target.value)}
                     placeholder="Aonde chegou?" 
-                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50" 
+                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50" 
                   />
                 </div>
               </div>
@@ -377,7 +532,7 @@ export function Logbook() {
                     value={distance}
                     onChange={(e) => setDistance(e.target.value)}
                     placeholder="Ex: 340km" 
-                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50" 
+                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50" 
                   />
                 </div>
               </div>
@@ -390,10 +545,27 @@ export function Logbook() {
                     value={duration}
                     onChange={(e) => setDuration(e.target.value)}
                     placeholder="Ex: 5h 30min" 
-                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50" 
+                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50" 
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Gerenciador de Etapas e Paradas da Rota (com importação do Google Maps) */}
+            <div className="p-5 sm:p-7 rounded-2xl sm:rounded-3xl bg-slate-950/60 border border-slate-800/80 shadow-inner">
+              <TripStagesManager
+                origin={origin}
+                setOrigin={setOrigin}
+                destination={destination}
+                setDestination={setDestination}
+                stages={stages}
+                setStages={setStages}
+                setTitle={setTitle}
+                currentTitle={title}
+                onMapsUrlGenerated={(url) => setMapsUrl(url)}
+                setDistance={setDistance}
+                setDuration={setDuration}
+              />
             </div>
 
             {/* Condition Row */}
@@ -528,7 +700,7 @@ export function Logbook() {
                     value={image}
                     onChange={(e) => setImage(e.target.value)}
                     placeholder="Ou cole uma URL externa se preferir..." 
-                    className="w-full bg-slate-950/30 border border-slate-800 rounded-xl py-2.5 px-4 text-xs font-bold text-white placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50" 
+                    className="w-full bg-slate-950/30 border border-slate-800 rounded-xl py-2.5 px-4 text-xs font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50" 
                   />
                 </div>
               </div>
@@ -549,7 +721,7 @@ export function Logbook() {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Conte os detalhes da aventura, os obstáculos e a emoção de cada curva..."
-                  className="w-full min-h-[160px] sm:min-h-[200px] bg-slate-950/30 border border-slate-800 rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 lg:p-8 text-sm font-medium text-slate-300 placeholder:text-slate-700 focus:outline-none focus:border-orange-500/50 resize-y leading-relaxed"
+                  className="w-full min-h-[160px] sm:min-h-[200px] bg-slate-950/30 border border-slate-800 rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 lg:p-8 text-sm font-medium text-slate-300 placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50 resize-y leading-relaxed"
                 />
               </div>
             </div>
@@ -788,6 +960,56 @@ export function Logbook() {
                           <p className="text-xs sm:text-sm font-medium text-slate-400 leading-relaxed italic">
                             "{log.content}"
                           </p>
+
+                          {/* Se houver etapas cadastradas, exibe a timeline de paradas */}
+                          {log.stages && log.stages.length > 0 && (
+                            <div className="pt-3 pb-1 border-t border-slate-800/50 space-y-2.5">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+                                  <Navigation size={13} className="text-orange-500" />
+                                  Etapas & Paradas do Roteiro ({log.stages.length})
+                                </span>
+                                <a
+                                  href={log.mapsUrl || `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(log.origin)}&destination=${encodeURIComponent(log.destination)}&waypoints=${log.stages.map(s => encodeURIComponent(s.name)).join('|')}&travelmode=driving`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] font-bold text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors bg-sky-500/10 hover:bg-sky-500/20 px-2 py-0.5 rounded-lg border border-sky-500/30"
+                                >
+                                  <ExternalLink size={11} />
+                                  <span>Abrir no Google Maps</span>
+                                </a>
+                              </div>
+
+                              <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin">
+                                <span className="text-[10px] font-bold text-slate-300 px-2.5 py-1 rounded-lg bg-slate-800/90 border border-slate-700/60 shrink-0">
+                                  🏁 {log.origin.split('/')[0]}
+                                </span>
+                                {log.stages.map((st, sidx) => {
+                                  const conf = STAGE_TYPE_CONFIG[st.type] || STAGE_TYPE_CONFIG.scenic;
+                                  const Icon = conf.icon;
+                                  return (
+                                    <div key={st.id || sidx} className="flex items-center gap-1.5 shrink-0">
+                                      <span className="text-orange-500 font-bold text-xs">➔</span>
+                                      <span 
+                                        title={st.notes ? `${st.name} (${st.notes})` : st.name}
+                                        className={cn(
+                                          "text-[10px] font-bold px-2 py-1 rounded-lg border flex items-center gap-1.5 transition-all shadow-sm",
+                                          conf.bg, conf.color, conf.border
+                                        )}
+                                      >
+                                        <Icon size={12} />
+                                        <span>{st.name}</span>
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                                <span className="text-orange-500 font-bold text-xs shrink-0">➔</span>
+                                <span className="text-[10px] font-bold text-slate-300 px-2.5 py-1 rounded-lg bg-slate-800/90 border border-slate-700/60 shrink-0">
+                                  🚩 {log.destination.split('/')[0]}
+                                </span>
+                              </div>
+                            </div>
+                          )}
                        </div>
 
                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 sm:pt-4">

@@ -522,7 +522,7 @@ export function GlobalRanking() {
               placeholder="Digite o nome (ex: Carlos Trovão) ou @nickname (ex: @carlos_trovao, @sombra_sc, @renata_valquiria)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-24 py-3 sm:py-3.5 bg-slate-950 border-2 border-slate-800 group-focus-within:border-orange-500 rounded-2xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none transition-all shadow-inner"
+              className="w-full pl-11 pr-24 py-3 sm:py-3.5 bg-slate-950 border-2 border-slate-800 group-focus-within:border-orange-500 rounded-2xl text-xs sm:text-sm text-white placeholder:text-slate-400 focus:outline-none transition-all shadow-inner"
             />
             {searchQuery && (
               <button 

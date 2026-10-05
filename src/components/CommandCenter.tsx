@@ -54,6 +54,7 @@ import { Partner } from './Partners';
 import { CommunityPost, Route } from '../types';
 import { supabase } from '../lib/supabase';
 import { getDbStatus, initDbTables } from '../lib/api';
+import { DateInput } from './DateInput';
 
 // Helper to format date cleanly
 function formatDisplayDate(dateStr?: string) {
@@ -1484,7 +1485,7 @@ export function CommandCenter() {
                   placeholder="Buscar evento por título, local ou autor..."
                   value={eventSearch}
                   onChange={(e) => setEventSearch(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-[#ff751f] transition-all placeholder:text-slate-600"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-[#ff751f] transition-all placeholder:text-slate-400"
                 />
               </div>
 
@@ -1694,7 +1695,7 @@ export function CommandCenter() {
                   placeholder="Buscar clube por nome, presidente ou cidade..."
                   value={clubSearchText}
                   onChange={(e) => setClubSearchText(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-600"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-400"
                 />
               </div>
 
@@ -1934,7 +1935,7 @@ export function CommandCenter() {
                   placeholder="Buscar por autor, conteúdo ou categoria..."
                   value={postSearchText}
                   onChange={(e) => setPostSearchText(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-600"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-400"
                 />
               </div>
 
@@ -2169,7 +2170,7 @@ export function CommandCenter() {
                   placeholder="Buscar por autor, denunciante ou motivo..."
                   value={reportSearchText}
                   onChange={(e) => setReportSearchText(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-600"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-400"
                 />
               </div>
 
@@ -2380,7 +2381,7 @@ export function CommandCenter() {
                   placeholder="Buscar por nome, cidade ou benefício..."
                   value={partnerSearchText}
                   onChange={(e) => setPartnerSearchText(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-600"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-400"
                 />
               </div>
 
@@ -2937,7 +2938,7 @@ export function CommandCenter() {
                   placeholder="Buscar por nome, e-mail, moto, cidade ou clube..."
                   value={pilotSearchText}
                   onChange={(e) => setPilotSearchText(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-500 transition-colors"
                 />
               </div>
 
@@ -3486,7 +3487,7 @@ export function CommandCenter() {
                   placeholder="Buscar roteiro por nome, cidade ou atração..."
                   value={routeSearch}
                   onChange={(e) => setRouteSearch(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-600"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-400"
                 />
               </div>
 
@@ -3834,11 +3835,10 @@ export function CommandCenter() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data do Evento</label>
-                    <input
-                      type="date"
+                    <DateInput
                       value={editingEvent.date}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
+                      onChange={(newDate) => setEditingEvent({ ...editingEvent, date: newDate })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 pl-12 pr-12 text-sm font-bold text-white focus:border-amber-500 outline-none"
                       required
                     />
                   </div>
@@ -4699,7 +4699,12 @@ export function CommandCenter() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] font-black uppercase text-slate-400">Data:</label>
-                    <input type="date" required value={newEventData.date || ''} onChange={e => setNewEventData({ ...newEventData, date: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-bold" />
+                    <DateInput 
+                      required 
+                      value={newEventData.date || ''} 
+                      onChange={(newDate) => setNewEventData({ ...newEventData, date: newDate })} 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 pl-10 pr-10 text-xs text-white font-bold" 
+                    />
                   </div>
                   <div>
                     <label className="text-[10px] font-black uppercase text-slate-400">Horário:</label>

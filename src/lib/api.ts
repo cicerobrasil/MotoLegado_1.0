@@ -124,3 +124,39 @@ export async function initDbTables() {
   });
 }
 
+// Decodificar e importar rota e paradas do Google Maps com cálculo de distância e duração
+export async function apiParseGoogleMapsRoute(input: string) {
+  return fetchFromApi<{
+    success: boolean;
+    origin: string;
+    destination: string;
+    waypoints: string[];
+    title: string;
+    fullRouteUrl?: string;
+    estimatedDistanceKm?: number;
+    estimatedDuration?: string;
+    suggestedStages?: Array<{
+      name: string;
+      type: 'fuel' | 'food' | 'scenic' | 'sleep' | 'meet' | 'service' | 'custom';
+      notes?: string;
+    }>;
+    error?: string;
+  }>('/api/routes/parse-maps', {
+    method: 'POST',
+    body: JSON.stringify({ url: input, text: input })
+  });
+}
+
+// Calcular distância e duração rodoviária para paradas
+export async function apiCalculateRouteMetrics(origin: string, destination: string, waypoints: string[] = []) {
+  return fetchFromApi<{
+    success: boolean;
+    distanceKm: number;
+    duration: string;
+    error?: string;
+  }>('/api/routes/calculate-metrics', {
+    method: 'POST',
+    body: JSON.stringify({ origin, destination, waypoints })
+  });
+}
+

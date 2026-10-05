@@ -884,6 +884,7 @@ if ($route === '/trips' && $method === 'POST') {
     $tripId = $body['id'] ?? ('trip_' . round(microtime(true) * 1000));
     $pilotId = $body['pilot_id'] ?? '';
     $title = $body['title'] ?? 'Viagem';
+    $startLocation = $body['origin'] ?? ($body['start_location'] ?? null);
     $destination = $body['destination'] ?? 'Destino';
     $startDate = $body['start_date'] ?? date('Y-m-d');
     $distance = $body['distance_km'] ?? 0;
@@ -891,11 +892,15 @@ if ($route === '/trips' && $method === 'POST') {
     if ($pdo) {
         try {
             $stmt = $pdo->prepare("
-                INSERT INTO trips (id, pilot_id, title, destination, start_date, distance_km)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE title = VALUES(title), destination = VALUES(destination), distance_km = VALUES(distance_km)
+                INSERT INTO trips (id, pilot_id, title, start_location, destination, start_date, distance_km)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE 
+                    title = VALUES(title), 
+                    start_location = VALUES(start_location), 
+                    destination = VALUES(destination), 
+                    distance_km = VALUES(distance_km)
             ");
-            $stmt->execute([$tripId, $pilotId, $title, $destination, $startDate, $distance]);
+            $stmt->execute([$tripId, $pilotId, $title, $startLocation, $destination, $startDate, $distance]);
         } catch (Exception $e) {}
     }
 

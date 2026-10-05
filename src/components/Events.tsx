@@ -29,6 +29,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
+import { DateInput } from './DateInput';
 
 // Helper to format date cleanly
 function formatDisplayDate(dateStr?: string) {
@@ -579,11 +580,10 @@ export function Events() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data do Evento</label>
-                    <input
-                      type="date"
+                    <DateInput
                       value={editingEvent.date}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
+                      onChange={(newDate) => setEditingEvent({ ...editingEvent, date: newDate })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 pl-4 pr-12 text-sm font-bold text-white focus:border-amber-500 outline-none"
                       required
                     />
                   </div>
@@ -779,7 +779,7 @@ export function Events() {
               placeholder="Buscar título, local, etc..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-12 pr-6 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-700"
+              className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-12 pr-6 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400"
             />
           </div>
         </div>
@@ -1097,7 +1097,7 @@ export function Events() {
                   placeholder="Ex: 1º MotoFest Rock & Beer ou Bate-Volta Serra do Mar"
                   value={formData.title}
                   onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                 />
               </div>
 
@@ -1135,7 +1135,7 @@ export function Events() {
                   placeholder="Ex: Sede MC Lendas - Curitiba, PR ou Parque de Eventos"
                   value={formData.location}
                   onChange={(e) => setFormData({...formData, location: e.target.value})}
-                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                 />
               </div>
 
@@ -1145,12 +1145,11 @@ export function Events() {
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2 flex items-center gap-1">
                     Data Inicial <span className="text-orange-500 font-bold">*</span>
                   </label>
-                  <input 
-                    type="date" 
+                  <DateInput 
                     required
                     value={formData.startDate}
-                    onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all text-white" 
+                    onChange={(newDate) => setFormData({...formData, startDate: newDate})}
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 pl-5 pr-14 text-sm font-bold focus:border-orange-500 outline-none transition-all text-white" 
                   />
                 </div>
 
@@ -1158,11 +1157,10 @@ export function Events() {
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">
                     Data Final <span className="text-slate-600 font-normal">(Opcional)</span>
                   </label>
-                  <input 
-                    type="date" 
+                  <DateInput 
                     value={formData.endDate}
-                    onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all text-white" 
+                    onChange={(newDate) => setFormData({...formData, endDate: newDate})}
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 pl-5 pr-14 text-sm font-bold focus:border-orange-500 outline-none transition-all text-white" 
                   />
                 </div>
               </div>
@@ -1205,7 +1203,7 @@ export function Events() {
                   placeholder="Ex: 0 (evento estático) ou 140 (passeio/comboio)"
                   value={formData.distance}
                   onChange={(e) => setFormData({...formData, distance: e.target.value})}
-                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                 />
               </div>
 
@@ -1218,7 +1216,7 @@ export function Events() {
                   placeholder="Detalhamento do evento: bandas ao vivo, food trucks, chopp artesanal, churrasco, área de camping, troféus para MCs, pontos de encontro ou regras."
                   value={formData.desc}
                   onChange={(e) => setFormData({...formData, desc: e.target.value})}
-                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 min-h-[140px] resize-none text-white leading-relaxed" 
+                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 min-h-[140px] resize-none text-white leading-relaxed" 
                 />
               </div>
 
@@ -1402,7 +1400,7 @@ export function Events() {
                           placeholder="https://exemplo.com/minha-foto.jpg"
                           value={customUrlInput}
                           onChange={(e) => setCustomUrlInput(e.target.value)}
-                          className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold focus:border-orange-500 outline-none text-white placeholder:text-slate-700"
+                          className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold focus:border-orange-500 outline-none text-white placeholder:text-slate-400"
                         />
                         <button
                           type="button"

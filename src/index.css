@@ -57,6 +57,38 @@
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
   }
+
+  /* Padronização Universal de Sugestão de Preenchimento (Placeholder) em todo o site */
+  input::placeholder,
+  textarea::placeholder,
+  select::placeholder,
+  input::-webkit-input-placeholder,
+  textarea::-webkit-input-placeholder {
+    color: #94a3b8 !important; /* Cor idêntica à palavra 'Roteiro' (text-slate-400), nítida e legível */
+    opacity: 1 !important;
+  }
+
+  /* Padronização e Estilização Universal de Campos de Data */
+  input[type="date"] {
+    color-scheme: dark;
+  }
+
+  /* Oculta o indicador nativo do navegador para eliminar o botão apagado duplicado */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    display: none !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    pointer-events: none !important;
+  }
+
+  input[type="date"]::-webkit-inner-spin-button,
+  input[type="date"]::-webkit-clear-button {
+    display: none !important;
+    -webkit-appearance: none !important;
+  }
 }
 
 /* =========================================================

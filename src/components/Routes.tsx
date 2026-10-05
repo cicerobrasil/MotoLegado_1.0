@@ -415,7 +415,7 @@ export function Routes() {
             placeholder="Buscar por nome do roteiro, cidade ou atrações..." 
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-2.5 pl-11 pr-4 text-xs font-bold text-white outline-none focus:border-orange-500 transition-all placeholder:text-slate-600"
+            className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-2.5 pl-11 pr-4 text-xs font-bold text-white outline-none focus:border-orange-500 transition-all placeholder:text-slate-400"
           />
         </div>
 

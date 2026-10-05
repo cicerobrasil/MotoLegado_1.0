@@ -31,6 +31,7 @@ import { uploadImageToStorage } from '../lib/storage';
 import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
+import { DateInput } from './DateInput';
 
 export interface ClubItem {
   id: string | number;
@@ -443,7 +444,7 @@ export function MotoClubsList() {
                         type="text" 
                         value={clubRegistry.name}
                         onChange={(e) => setClubRegistry(prev => ({ ...prev, name: e.target.value }))}
-                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                       />
                     </div>
                     <div className="space-y-3">
@@ -452,7 +453,7 @@ export function MotoClubsList() {
                         type="text" 
                         value={clubRegistry.city}
                         onChange={(e) => setClubRegistry(prev => ({ ...prev, city: e.target.value }))}
-                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 text-white" 
+                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
                       />
                     </div>
 
@@ -465,15 +466,11 @@ export function MotoClubsList() {
                       </div>
                       <div className="space-y-3">
                         <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">Data de Fundação</label>
-                        <div className="relative">
-                          <Calendar size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-600" />
-                          <input 
-                            type="date" 
-                            value={clubRegistry.foundationDate}
-                            onChange={(e) => setClubRegistry(prev => ({ ...prev, foundationDate: e.target.value }))}
-                            className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 pl-12 text-sm font-bold focus:border-orange-500 outline-none transition-all text-white" 
-                          />
-                        </div>
+                        <DateInput 
+                          value={clubRegistry.foundationDate}
+                          onChange={(newDate) => setClubRegistry(prev => ({ ...prev, foundationDate: newDate }))}
+                          className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 pl-5 pr-14 text-sm font-bold focus:border-orange-500 outline-none transition-all text-white" 
+                        />
                       </div>
                     </div>
 
@@ -502,7 +499,7 @@ export function MotoClubsList() {
                         value={clubRegistry.about}
                         onChange={(e) => setClubRegistry(prev => ({ ...prev, about: e.target.value }))}
                         placeholder="Breve descrição do moto clube..."
-                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 min-h-[120px] resize-none text-white leading-relaxed" 
+                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 min-h-[120px] resize-none text-white leading-relaxed" 
                       />
                     </div>
                   </div>
@@ -852,7 +849,7 @@ export function MotoClubsList() {
                     required
                     value={newMember.name}
                     onChange={(e) => setNewMember(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none text-white placeholder:text-slate-700" 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none text-white placeholder:text-slate-400" 
                     placeholder="Ex: Carlos 'Mão de Ferro'"
                   />
                 </div>

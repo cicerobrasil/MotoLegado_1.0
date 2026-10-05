@@ -447,7 +447,7 @@ export function PilotGuideModal() {
                 placeholder="Buscar assunto no guia (ex: ranking, fotos, odômetro, parceiros, colete)..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500/70 transition-colors"
+                className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/70 transition-colors"
               />
               {searchQuery && (
                 <button

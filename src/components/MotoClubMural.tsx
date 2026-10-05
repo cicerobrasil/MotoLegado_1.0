@@ -140,7 +140,7 @@ export function MotoClubMural() {
                 value={newPostContent}
                 onChange={(e) => setNewPostContent(e.target.value)}
                 placeholder="O que está acontecendo na estrada, irmão?"
-                className="w-full bg-transparent border-none text-lg font-medium placeholder:text-slate-700 outline-none resize-none h-24"
+                className="w-full bg-transparent border-none text-lg font-medium placeholder:text-slate-400 outline-none resize-none h-24"
               />
               
               <div className="flex flex-wrap items-center gap-3">

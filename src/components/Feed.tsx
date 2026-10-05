@@ -418,7 +418,7 @@ export function Feed() {
                 onChange={(e) => setPostContent(e.target.value)}
                 placeholder="Fale com a estrada... Compartilhe dicas de rotas, fotos de viagens, mecânica ou encontros!" 
                 rows={3}
-                className="w-full bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 text-sm font-medium text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500 transition-all resize-none"
+                className="w-full bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 text-sm font-medium text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-500 transition-all resize-none"
               />
 
               {/* SELEÇÃO DO FILTRO / CATEGORIA DA PUBLICAÇÃO */}
@@ -578,7 +578,7 @@ export function Feed() {
               placeholder="Buscar publicações por palavra-chave, autor ou filtro..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-600"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-amber-500 transition-all placeholder:text-slate-400"
             />
             {searchText && (
               <button 

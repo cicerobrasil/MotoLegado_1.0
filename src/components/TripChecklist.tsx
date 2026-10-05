@@ -36,21 +36,21 @@ const DEFAULT_CHECKLIST_ITEMS: Omit<TripChecklistItem, 'completed'>[] = [
     category: 'documents',
     label: 'CNH Original ou CNH Digital atualizada',
     description: 'Verifique a validade da habilitação na carteira digital.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'doc-crlv',
     category: 'documents',
     label: 'Documento da Moto (CRLV-e quitado)',
     description: 'Comprovante de licenciamento do ano corrente baixado em PDF.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'doc-insurance',
     category: 'documents',
     label: 'Telefone do Seguro / Assistência 24h (Guincho)',
     description: 'Salve o número com DDD e o cartão da apólice no celular.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'doc-cash',
@@ -66,21 +66,21 @@ const DEFAULT_CHECKLIST_ITEMS: Omit<TripChecklistItem, 'completed'>[] = [
     category: 'parts',
     label: 'Kit Reparo de Pneu (Macarrão ou Câmara Reserva)',
     description: 'Inclui aplicador, lixa, cola e tubos ou cápsulas de CO2.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'part-chain-link',
     category: 'parts',
     label: 'Emenda de Corrente de Transmissão (Master Link)',
     description: 'Tenha o elo compatível com o passo da sua corrente (ex: 520 ou 525).',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'part-fuse-bulb',
     category: 'parts',
     label: 'Fusíveis reserva (10A, 15A, 30A) e Lâmpadas',
     description: 'Verifique a caixa de fusíveis da moto antes de sair.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'part-cables',
@@ -94,7 +94,7 @@ const DEFAULT_CHECKLIST_ITEMS: Omit<TripChecklistItem, 'completed'>[] = [
     category: 'parts',
     label: 'Spray Lubrificante de Corrente portátil',
     description: 'Lubrifique a cada 400-500 km rodados ou após chuva forte.',
-    isRequired: true,
+    isRequired: false,
   },
 
   // Ferramentas Mecânicas
@@ -103,28 +103,28 @@ const DEFAULT_CHECKLIST_ITEMS: Omit<TripChecklistItem, 'completed'>[] = [
     category: 'tools',
     label: 'Jogo de Chaves Allen (Hex) / Torx da moto',
     description: 'Medidas mais comuns do chassi e carenagens da sua motocicleta.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'tool-wrenches',
     category: 'tools',
     label: 'Chaves combinadas (8, 10, 12, 14, 17mm)',
     description: 'Essenciais para ajuste de espelho, pedais, roda e esticador de corrente.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'tool-pliers-wire',
     category: 'tools',
     label: 'Alicate multiuso ou de pressão + Fita Isolante',
     description: 'Permite desentortar pedais e fixar componentes soltos no asfalto.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'tool-zip-ties',
     category: 'tools',
     label: 'Abraçadeiras de Nylon (Enforca-Gato / Silver Tape)',
     description: 'Salva carenagens, retrovisores e bagageiros em qualquer emergência.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'tool-inflator',
@@ -140,35 +140,35 @@ const DEFAULT_CHECKLIST_ITEMS: Omit<TripChecklistItem, 'completed'>[] = [
     category: 'safety',
     label: 'Capacete com viseira limpa (sem riscos) + Viseira Cristal',
     description: 'Se usar viseira fumê de dia, leve a transparente para pilotagem noturna.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'safe-jacket-pants',
     category: 'safety',
     label: 'Jaqueta e Calça com proteções CE (ombro, cotovelo, joelho)',
     description: 'Equipamento técnico de cordura ou couro ajustado ao corpo.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'safe-gloves-boots',
     category: 'safety',
     label: 'Luvas de cano longo e Botas de pilotagem com proteção de tornozelo',
     description: 'Protege contra detritos na rodovia e quedas em baixa velocidade.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'safe-rain-suit',
     category: 'safety',
     label: 'Capa de Chuva e Polainas impermeáveis',
     description: 'Acondicione na parte mais acessível do baú ou alforje.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'safe-first-aid',
     category: 'safety',
     label: 'Kit Primeiros Socorros básico (Gaze, antisséptico, analgésico)',
     description: 'Inclua seus medicamentos de uso contínuo para a duração da viagem.',
-    isRequired: true,
+    isRequired: false,
   },
 
   // Logística, Eletrônicos & Conforto
@@ -177,21 +177,21 @@ const DEFAULT_CHECKLIST_ITEMS: Omit<TripChecklistItem, 'completed'>[] = [
     category: 'logistics',
     label: 'Powerbank de alta capacidade + Cabo de celular reserva',
     description: 'Garanta energia para o GPS caso a tomada 12V/USB da moto falhe.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'log-offline-maps',
     category: 'logistics',
     label: 'Mapas baixados Offline (Google Maps / Organic Maps)',
     description: 'Faça o download das regiões sem sinal de celular no trajeto.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'log-spare-key',
     category: 'logistics',
     label: 'Chave reserva da moto guardada com o garupa ou em bolso seguro',
     description: 'Nunca deixe a chave reserva trancada dentro do baú da própria moto.',
-    isRequired: true,
+    isRequired: false,
   },
   {
     id: 'log-straps',
@@ -244,13 +244,14 @@ export function TripChecklist({ onTripStartReady, onClose, compact = false }: Tr
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          // Assegura que nenhum item fique marcado como obrigatório
+          return parsed.map((item: any) => ({ ...item, isRequired: false }));
         }
       }
     } catch (e) {
       console.error('Erro ao carregar checklist do localStorage', e);
     }
-    return DEFAULT_CHECKLIST_ITEMS.map(it => ({ ...it, completed: false }));
+    return DEFAULT_CHECKLIST_ITEMS.map(it => ({ ...it, isRequired: false, completed: false }));
   });
 
   const [activeCategory, setActiveCategory] = useState<ChecklistCategory | 'all'>('all');
@@ -259,7 +260,6 @@ export function TripChecklist({ onTripStartReady, onClose, compact = false }: Tr
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newCategory, setNewCategory] = useState<ChecklistCategory>('tools');
-  const [newIsRequired, setNewIsRequired] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [isDesktopFullScreen, setIsDesktopFullScreen] = useState(false);
 
@@ -301,7 +301,7 @@ export function TripChecklist({ onTripStartReady, onClose, compact = false }: Tr
       id: `custom-${Date.now()}`,
       label: newLabel.trim(),
       category: newCategory,
-      isRequired: newIsRequired,
+      isRequired: false,
       completed: false,
       isCustom: true
     };
@@ -333,18 +333,16 @@ export function TripChecklist({ onTripStartReady, onClose, compact = false }: Tr
   const handleRestoreDefaults = () => {
     if (window.confirm('Restaurar os itens originais recomendados pelo MotoLegado? Seus itens personalizados serão mantidos.')) {
       const customItems = items.filter(i => i.isCustom);
-      const defaults = DEFAULT_CHECKLIST_ITEMS.map(it => ({ ...it, completed: false }));
+      const defaults = DEFAULT_CHECKLIST_ITEMS.map(it => ({ ...it, isRequired: false, completed: false }));
       setItems([...defaults, ...customItems]);
     }
   };
 
-  // Metrics
+  // Metrics (Preenchimento totalmente livre e opcional para o motociclista)
   const totalCount = items.length;
   const completedCount = items.filter(i => i.completed).length;
-  const requiredCount = items.filter(i => i.isRequired).length;
-  const completedRequiredCount = items.filter(i => i.isRequired && i.completed).length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-  const isReadyForTrip = requiredCount > 0 && completedRequiredCount === requiredCount;
+  const isReadyForTrip = true;
 
   // Filter items
   const filteredItems = useMemo(() => {
@@ -376,8 +374,7 @@ export function TripChecklist({ onTripStartReady, onClose, compact = false }: Tr
     const lines: string[] = [];
     lines.push(`🏍️ *CHECKLIST PRÉ-VIAGEM - MOTOLEGADO*`);
     lines.push(`📊 *Progresso Geral:* ${progressPercent}% (${completedCount}/${totalCount} itens checados)`);
-    lines.push(`🚨 *Itens Obrigatórios:* ${completedRequiredCount}/${requiredCount} concluídos`);
-    lines.push(`Status: ${isReadyForTrip ? '✅ PRONTO PARA O ASFALTO' : '⚠️ ATENÇÃO: PENDÊNCIAS RESTANTES'}`);
+    lines.push(`Status: ✅ PRONTO PARA O ASFALTO (Preenchimento Opcional)`);
     lines.push(``);
 
     const categories: ChecklistCategory[] = ['documents', 'parts', 'tools', 'safety', 'logistics'];
@@ -386,7 +383,7 @@ export function TripChecklist({ onTripStartReady, onClose, compact = false }: Tr
       if (catItems.length === 0) return;
       lines.push(`*${CATEGORY_META[cat].label.toUpperCase()}*`);
       catItems.forEach(i => {
-        lines.push(`${i.completed ? '✅' : '⬜'} ${i.label}${i.isRequired ? ' *(Obrigatório)*' : ''}`);
+        lines.push(`${i.completed ? '✅' : '⬜'} ${i.label}`);
       });
       lines.push(``);
     });
@@ -446,12 +443,11 @@ export function TripChecklist({ onTripStartReady, onClose, compact = false }: Tr
             </div>
             
             <div className="flex items-center gap-2 mt-0.5">
-              <span className={cn(
-                "w-1.5 h-1.5 rounded-full shrink-0",
-                isReadyForTrip ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
-              )} />
+              <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-400 animate-pulse" />
               <p className="text-[10px] font-bold text-slate-400 truncate">
-                {isReadyForTrip ? 'Moto liberada pro asfalto' : `${requiredCount - completedRequiredCount} obrigatórios pendentes`}
+                {completedCount > 0 
+                  ? `${completedCount} de ${totalCount} itens checados (Preenchimento Opcional)`
+                  : 'Checklist de apoio à viagem (Preenchimento Opcional)'}
               </p>
             </div>
           </div>
@@ -628,7 +624,7 @@ export function TripChecklist({ onTripStartReady, onClose, compact = false }: Tr
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Buscar item, ferramenta ou documento..."
-              className="w-full bg-slate-900/90 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-base sm:text-xs text-white placeholder-slate-500 outline-none focus:border-orange-500 transition-colors"
+              className="w-full bg-slate-900/90 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-base sm:text-xs text-white placeholder:text-slate-400 outline-none focus:border-orange-500 transition-colors"
             />
             {searchQuery && (
               <button
@@ -818,7 +814,7 @@ export function TripChecklist({ onTripStartReady, onClose, compact = false }: Tr
                     value={newLabel}
                     onChange={e => setNewLabel(e.target.value)}
                     placeholder="Ex: Carregador por indução, Óleo 20W50 500ml..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-base text-white placeholder-slate-500 outline-none focus:border-orange-500 transition-colors"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-base text-white placeholder:text-slate-400 outline-none focus:border-orange-500 transition-colors"
                   />
                 </div>
 
@@ -837,21 +833,6 @@ export function TripChecklist({ onTripStartReady, onClose, compact = false }: Tr
                     <option value="safety">Segurança & Equipamento do Piloto</option>
                     <option value="logistics">Eletrônicos & Conforto</option>
                   </select>
-                </div>
-
-                <div className="pt-1">
-                  <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/80 border border-slate-800 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={newIsRequired}
-                      onChange={e => setNewIsRequired(e.target.checked)}
-                      className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 bg-slate-900 border-slate-700"
-                    />
-                    <div>
-                      <span className="text-xs font-bold text-white block">Item Obrigatório</span>
-                      <span className="text-[10px] text-slate-400 block">Exigido para a liberação de viagem no status geral</span>
-                    </div>
-                  </label>
                 </div>
 
                 {/* Actions */}
@@ -935,12 +916,6 @@ function ChecklistItemCard({
             )}>
               {item.label}
             </span>
-
-            {item.isRequired && (
-              <span className="px-1.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[9px] font-black uppercase tracking-wider shrink-0">
-                Obrigatório
-              </span>
-            )}
 
             {item.isCustom && (
               <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[9px] font-black uppercase tracking-wider shrink-0">

@@ -464,6 +464,23 @@ export function ProfileSettings() {
         console.warn('Aviso ao atualizar perfil:', res.error);
       }
 
+      // Sincroniza armazenamento do endereço do piloto para o diário de bordo
+      try {
+        localStorage.setItem('motolegado_pilot_address', JSON.stringify({
+          cep,
+          street,
+          streetNumber,
+          street_number: streetNumber,
+          neighborhood,
+          city,
+          state,
+          isDefaultStartPoint
+        }));
+        window.dispatchEvent(new CustomEvent('motolegado_profile_updated'));
+      } catch (e) {
+        console.error('Erro ao sincronizar motolegado_pilot_address:', e);
+      }
+
       setSaveSuccess(true);
       showToast('Todas as abas (Piloto, Identidade, Endereço e Motocicleta) foram gravadas com sucesso!', 'success');
       // Permanece na mesma tela e aba atual com status de GRAVADO (sem redirecionar)
@@ -629,7 +646,7 @@ export function ProfileSettings() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Seu nome de piloto"
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-400" 
                   />
                 </div>
                 <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group border-l-2 border-l-orange-500">
@@ -645,7 +662,7 @@ export function ProfileSettings() {
                       value={motorcycle}
                       readOnly
                       placeholder="Preencha o campo Marca / Modelo na aba Motocicleta"
-                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 pr-36 text-sm font-bold text-slate-200 outline-none cursor-default select-none placeholder:text-slate-600 focus:border-slate-700" 
+                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 pr-36 text-sm font-bold text-slate-200 outline-none cursor-default select-none placeholder:text-slate-400 focus:border-slate-700" 
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       <button
@@ -672,7 +689,7 @@ export function ProfileSettings() {
                       disabled={!!user}
                       onChange={(e) => setEmail(e.target.value)}
                       className={cn(
-                        "w-full bg-slate-950 border rounded-2xl p-5 text-sm font-bold outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white disabled:opacity-60",
+                        "w-full bg-slate-950 border rounded-2xl p-5 text-sm font-bold outline-none transition-all placeholder:text-slate-400 backdrop-blur-sm text-white disabled:opacity-60",
                         email === "" 
                           ? "border-slate-800/50 focus:border-orange-500" 
                           : isEmailValid 
@@ -698,7 +715,7 @@ export function ProfileSettings() {
                     placeholder="(00) 00000-0000" 
                     value={phone}
                     onChange={handlePhoneChange}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 backdrop-blur-sm text-white" 
                   />
                 </div>
                 <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group md:col-span-2">
@@ -708,7 +725,7 @@ export function ProfileSettings() {
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                     placeholder="Escreva um resumo sobre suas viagens e sua paixão por duas rodas..."
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white resize-none"
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 backdrop-blur-sm text-white resize-none"
                   />
                 </div>
               </div>
@@ -1156,7 +1173,7 @@ export function ProfileSettings() {
                           performCepSearch();
                         }
                       }}
-                      className="flex-1 bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-700 backdrop-blur-sm text-white font-mono" 
+                      className="flex-1 bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 backdrop-blur-sm text-white font-mono" 
                     />
                     <button 
                       type="button"
@@ -1209,8 +1226,16 @@ export function ProfileSettings() {
                           const parsed = saved ? JSON.parse(saved) : {};
                           localStorage.setItem('motolegado_pilot_address', JSON.stringify({
                             ...parsed,
+                            cep,
+                            street,
+                            streetNumber,
+                            street_number: streetNumber,
+                            neighborhood,
+                            city,
+                            state,
                             isDefaultStartPoint: next
                           }));
+                          window.dispatchEvent(new CustomEvent('motolegado_profile_updated'));
                         } catch (e) {
                           console.error(e);
                         }
@@ -1232,8 +1257,16 @@ export function ProfileSettings() {
                             const parsed = saved ? JSON.parse(saved) : {};
                             localStorage.setItem('motolegado_pilot_address', JSON.stringify({
                               ...parsed,
+                              cep,
+                              street,
+                              streetNumber,
+                              street_number: streetNumber,
+                              neighborhood,
+                              city,
+                              state,
                               isDefaultStartPoint: next
                             }));
+                            window.dispatchEvent(new CustomEvent('motolegado_profile_updated'));
                           } catch (err) {
                             console.error(err);
                           }
@@ -1271,7 +1304,7 @@ export function ProfileSettings() {
                     placeholder="Ex: Av. Paulista ou Rua das Flores"
                     value={street}
                     onChange={(e) => setStreet(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-400" 
                   />
                 </div>
 
@@ -1286,7 +1319,7 @@ export function ProfileSettings() {
                     placeholder="Nº ou S/N"
                     value={streetNumber}
                     onChange={(e) => setStreetNumber(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-400" 
                   />
                 </div>
 
@@ -1300,7 +1333,7 @@ export function ProfileSettings() {
                     placeholder="Bairro"
                     value={neighborhood}
                     onChange={(e) => setNeighborhood(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-400" 
                   />
                 </div>
 
@@ -1316,7 +1349,7 @@ export function ProfileSettings() {
                         value={city} 
                         onChange={(e) => setCity(e.target.value)}
                         placeholder="Ex: São Paulo" 
-                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-400" 
                       />
                     </div>
                     <div className="sm:col-span-4 space-y-2">
@@ -1329,7 +1362,7 @@ export function ProfileSettings() {
                         onChange={(e) => setState(e.target.value.toUpperCase())}
                         placeholder="SP" 
                         maxLength={2}
-                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white uppercase font-mono placeholder:text-slate-700" 
+                        className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white uppercase font-mono placeholder:text-slate-400" 
                       />
                     </div>
                   </div>
@@ -1348,7 +1381,7 @@ export function ProfileSettings() {
                     value={motorcycleNickname} 
                     onChange={(e) => setMotorcycleNickname(e.target.value)}
                     placeholder="Ex: Black Widow, Trovão Negro..." 
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-400" 
                   />
                 </div>
                 <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group border-l-2 border-l-orange-500">
@@ -1363,7 +1396,7 @@ export function ProfileSettings() {
                     value={motorcycle} 
                     onChange={(e) => setMotorcycle(e.target.value)}
                     placeholder="Ex: Harley-Davidson Iron 883, BMW GS 1250" 
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-400" 
                   />
                   <p className="text-[9px] text-slate-500 ml-1">
                     Este valor preenche automaticamente a <strong>Motocicleta Principal</strong> na aba do perfil do piloto.
@@ -1377,7 +1410,7 @@ export function ProfileSettings() {
                     onChange={(e) => setMotorcycleYear(e.target.value)}
                     placeholder="Ex: 2023" 
                     maxLength={4}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-700" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all backdrop-blur-sm text-white placeholder:text-slate-400" 
                   />
                 </div>
                 <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-3 group">
@@ -1388,7 +1421,7 @@ export function ProfileSettings() {
                     onChange={(e) => setMotorcyclePlate(e.target.value.toUpperCase())}
                     placeholder="Ex: ABC-1D23" 
                     maxLength={8}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all uppercase backdrop-blur-sm text-white placeholder:text-slate-700" 
+                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all uppercase backdrop-blur-sm text-white placeholder:text-slate-400" 
                   />
                 </div>
               </div>

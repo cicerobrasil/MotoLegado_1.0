@@ -840,9 +840,26 @@ export function TripReportModal({
                               )}
                             </td>
                             <td className="p-3 text-slate-300 print-text-dark">
-                              <span className="font-semibold">{log.origin || 'Partida'}</span>
-                              <span className="text-orange-500 mx-1.5 font-bold">→</span>
-                              <span className="font-semibold">{log.destination || 'Chegada'}</span>
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-semibold">{log.origin || 'Partida'}</span>
+                                  {log.stages && log.stages.length > 0 && log.stages.map((st, sidx) => (
+                                    <span key={st.id || sidx} className="inline-flex items-center gap-1">
+                                      <span className="text-orange-500 font-bold">→</span>
+                                      <span className="text-orange-400 font-medium text-[11px] px-1.5 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 print:border-slate-300 print:text-black">
+                                        {st.name}
+                                      </span>
+                                    </span>
+                                  ))}
+                                  <span className="text-orange-500 font-bold">→</span>
+                                  <span className="font-semibold">{log.destination || 'Chegada'}</span>
+                                </div>
+                                {log.stages && log.stages.length > 0 && (
+                                  <span className="text-[9px] text-slate-500 mt-0.5 print-text-muted">
+                                    {log.stages.length} {log.stages.length === 1 ? 'parada intermediária' : 'paradas intermediárias'}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="p-3 text-right font-mono font-bold text-orange-400 whitespace-nowrap">
                               {log.distance ? `${log.distance} KM` : '—'}

@@ -24,6 +24,7 @@ import {
   storeSavePaymentRequest,
   storeApprovePaymentRequest
 } from './server/store';
+import { parseGoogleMapsRoute, calculateRouteDistanceAndDuration } from './server/mapsParser';
 
 async function startServer() {
   const app = express();
@@ -428,6 +429,105 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
     }
   });
 
+  // Endpoint para decodificar e processar rotas do Google Maps
+  app.post('/api/routes/parse-maps', async (req, res) => {
+    try {
+      const { url, text } = req.body;
+      const input = (url || text || '').trim();
+
+      if (!input) {
+        return res.status(400).json({ success: false, error: 'Nenhum link ou texto de rota informado.' });
+      }
+
+      let targetUrl = input;
+
+      // Se for um link HTTP/HTTPS (incluindo encurtadores como maps.app.goo.gl ou goo.gl/maps)
+      if (input.startsWith('http://') || input.startsWith('https://')) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+          const response = await fetch(input, {
+            method: 'GET',
+            redirect: 'follow',
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            }
+          });
+          clearTimeout(timeoutId);
+          targetUrl = response.url || input;
+        } catch (fetchErr: any) {
+          console.warn('[ParseMaps] Falha ao seguir redirecionamento automático:', fetchErr?.message || fetchErr);
+        }
+      }
+
+      const parsed = parseGoogleMapsRoute(targetUrl, input);
+
+      if (!parsed.origin && !parsed.destination && parsed.waypoints.length === 0) {
+        return res.status(422).json({
+          success: false,
+          error: 'Não foi possível identificar os pontos da rota. Certifique-se de colar um link de rota (direções/itinerário) do Google Maps ou descrever as paradas separadas por "->" (ex: Curitiba -> Morretes -> Antonina).',
+          resolvedUrl: targetUrl
+        });
+      }
+
+      // Calcula a distância rodoviária real e a duração de viagem automaticamente
+      if (parsed.origin && parsed.destination) {
+        try {
+          const metrics = await calculateRouteDistanceAndDuration(parsed.origin, parsed.destination, parsed.waypoints);
+          if (metrics) {
+            parsed.estimatedDistanceKm = metrics.distanceKm;
+            parsed.estimatedDuration = metrics.duration;
+          }
+        } catch (mErr) {
+          console.warn('[ParseMaps] Falha ao calcular métricas de distância/duração:', mErr);
+        }
+      }
+
+      return res.json({
+        success: true,
+        ...parsed,
+        resolvedUrl: targetUrl
+      });
+    } catch (err: any) {
+      console.error('[ParseMaps] Erro interno:', err);
+      return res.status(500).json({ success: false, error: 'Erro ao processar rota: ' + (err?.message || String(err)) });
+    }
+  });
+
+  // Endpoint dedicado para calcular distância e duração de rotas rodoviárias
+  app.post('/api/routes/calculate-metrics', async (req, res) => {
+    try {
+      const { origin, destination, waypoints = [] } = req.body;
+      if (!origin || !destination) {
+        return res.status(400).json({ success: false, error: 'Origem e destino são obrigatórios para cálculo de rota.' });
+      }
+
+      const wpList = Array.isArray(waypoints) 
+        ? waypoints.map(w => typeof w === 'string' ? w : w?.name || '').filter(Boolean)
+        : [];
+
+      const metrics = await calculateRouteDistanceAndDuration(origin, destination, wpList);
+      if (!metrics) {
+        return res.status(422).json({ 
+          success: false, 
+          error: 'Não foi possível traçar a rota rodoviária entre os pontos informados. Verifique a ortografia das cidades.' 
+        });
+      }
+
+      return res.json({
+        success: true,
+        distanceKm: metrics.distanceKm,
+        duration: metrics.duration
+      });
+    } catch (err: any) {
+      console.error('[CalculateMetrics] Erro interno:', err);
+      return res.status(500).json({ success: false, error: 'Erro ao calcular rota: ' + (err?.message || String(err)) });
+    }
+  });
+
   // Hostinger MySQL Database Status & Diagnostics
   app.get('/api/db/status', async (req, res) => {
     const host = (req.query.host as string) || dbConfig.host;
@@ -602,11 +702,21 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
   app.post('/api/trips', async (req, res) => {
     try {
       const savedTrip = storeSaveTrip(req.body);
-      const { id, pilot_id, title, destination, distance_km, start_date, motorcycle_used, checklist_data, photos } = req.body;
+      const { id, pilot_id, title, origin, destination, distance_km, start_date, motorcycle_used, checklist_data, photos, start_location } = req.body;
+      const finalOrigin = origin || start_location || null;
       safeMySqlQuery(`
-        INSERT INTO trips (id, pilot_id, title, destination, distance_km, start_date, motorcycle_used, checklist_data, photos)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [id || savedTrip.id, pilot_id, title, destination, distance_km || 0, start_date, motorcycle_used || null, JSON.stringify(checklist_data || {}), JSON.stringify(photos || [])]).catch(() => {});
+        INSERT INTO trips (id, pilot_id, title, start_location, destination, distance_km, start_date, motorcycle_used, checklist_data, photos)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          title = VALUES(title),
+          start_location = VALUES(start_location),
+          destination = VALUES(destination),
+          distance_km = VALUES(distance_km),
+          start_date = VALUES(start_date),
+          motorcycle_used = VALUES(motorcycle_used),
+          checklist_data = VALUES(checklist_data),
+          photos = VALUES(photos)
+      `, [id || savedTrip.id, pilot_id, title, finalOrigin, destination, distance_km || 0, start_date, motorcycle_used || null, JSON.stringify(checklist_data || {}), JSON.stringify(photos || [])]).catch(() => {});
 
       res.json({ success: true, message: 'Viagem registrada com sucesso!', trip: savedTrip });
     } catch (err: any) {
