@@ -51,7 +51,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Partner } from './Partners';
-import { CommunityPost, Route } from '../types';
+import { CommunityPost, Route, RouteDifficulty } from '../types';
 import { supabase } from '../lib/supabase';
 import { getDbStatus, initDbTables } from '../lib/api';
 import { DateInput } from './DateInput';
@@ -204,9 +204,23 @@ export function CommandCenter() {
   const [postStatusFilter, setPostStatusFilter] = useState<'todos' | 'pendentes' | 'aprovados' | 'rejeitados'>('pendentes');
   const [postCategoryFilter, setPostCategoryFilter] = useState<string>('todos');
   const [viewingPostModal, setViewingPostModal] = useState<CommunityPost | null>(null);
+  const [isEditingPostInModal, setIsEditingPostInModal] = useState(false);
+  const [editPostContent, setEditPostContent] = useState('');
+  const [editPostCategory, setEditPostCategory] = useState('');
+  const [editPostImage, setEditPostImage] = useState('');
   const [deleteConfirmPost, setDeleteConfirmPost] = useState<CommunityPost | null>(null);
   const [rejectionModalPost, setRejectionModalPost] = useState<CommunityPost | null>(null);
   const [postRejectionReason, setPostRejectionReason] = useState('');
+
+  // Routes Moderation Modal State
+  const [viewingRouteModal, setViewingRouteModal] = useState<Route | null>(null);
+  const [isEditingRouteInModal, setIsEditingRouteInModal] = useState(false);
+  const [editRouteName, setEditRouteName] = useState('');
+  const [editRouteMapsAddress, setEditRouteMapsAddress] = useState('');
+  const [editRouteDescription, setEditRouteDescription] = useState('');
+  const [editRouteRiderTips, setEditRouteRiderTips] = useState('');
+  const [editRouteDifficulty, setEditRouteDifficulty] = useState<RouteDifficulty>(RouteDifficulty.MEDIUM);
+  const [editRouteImage, setEditRouteImage] = useState('');
 
   // Partners Requests State
   const [partnerRequests, setPartnerRequests] = useState<PartnerRequest[]>([]);
@@ -743,6 +757,103 @@ export function CommandCenter() {
     showToast(`Publicação de "${rejectionModalPost.user.name}" foi rejeitada.`, 'info');
     setRejectionModalPost(null);
     setPostRejectionReason('');
+  };
+
+  const handleOpenViewingPost = (post: CommunityPost, editMode = false) => {
+    setViewingPostModal(post);
+    setEditPostContent(post.content || '');
+    setEditPostCategory(post.category || 'GERAL');
+    setEditPostImage(post.image || '');
+    setIsEditingPostInModal(editMode);
+  };
+
+  const handleSaveAndApprovePost = (postId: string) => {
+    const updated = communityPosts.map(p => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          content: editPostContent.trim() || p.content,
+          category: editPostCategory || p.category,
+          image: editPostImage.trim() || undefined,
+          status: 'aprovado' as const,
+          timestamp: 'Publicado agora (Editado pela Moderação)'
+        };
+      }
+      return p;
+    });
+    saveCommunityPosts(updated);
+    const target = communityPosts.find(p => p.id === postId);
+    addAuditLog(`Publicação de "${target?.user.name}" EDITADA & APROVADA pela moderação`);
+    showToast(`Publicação de "${target?.user.name}" foi editada e aprovada com sucesso!`, 'success');
+    setViewingPostModal(null);
+    setIsEditingPostInModal(false);
+  };
+
+  const handleSavePostEditsOnly = (postId: string) => {
+    const updated = communityPosts.map(p => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          content: editPostContent.trim() || p.content,
+          category: editPostCategory || p.category,
+          image: editPostImage.trim() || undefined
+        };
+      }
+      return p;
+    });
+    saveCommunityPosts(updated);
+    addAuditLog(`Edição da publicação salva`);
+    showToast(`Alterações da publicação salvas com sucesso!`, 'success');
+    setIsEditingPostInModal(false);
+    if (viewingPostModal) {
+      setViewingPostModal({
+        ...viewingPostModal,
+        content: editPostContent.trim() || viewingPostModal.content,
+        category: editPostCategory || viewingPostModal.category,
+        image: editPostImage.trim() || undefined
+      });
+    }
+  };
+
+  const saveRoutesList = (updatedRoutes: Route[]) => {
+    setRoutes(updatedRoutes);
+    localStorage.setItem('motolegado_routes', JSON.stringify(updatedRoutes));
+    localStorage.setItem('motolegado_routes_v3', JSON.stringify(updatedRoutes));
+    window.dispatchEvent(new Event('routes-updated'));
+  };
+
+  const handleOpenViewingRoute = (route: Route, editMode = false) => {
+    setViewingRouteModal(route);
+    setEditRouteName(route.name || '');
+    setEditRouteMapsAddress(route.mapsAddress || '');
+    setEditRouteDescription(route.description || '');
+    setEditRouteRiderTips(route.riderTips || '');
+    setEditRouteDifficulty(route.difficulty || RouteDifficulty.MEDIUM);
+    setEditRouteImage(route.image || '');
+    setIsEditingRouteInModal(editMode);
+  };
+
+  const handleSaveAndApproveRoute = (routeId: string) => {
+    const updated = routes.map(r => {
+      if (r.id === routeId) {
+        return {
+          ...r,
+          name: editRouteName.trim() || r.name,
+          mapsAddress: editRouteMapsAddress.trim() || r.mapsAddress,
+          description: editRouteDescription.trim() || r.description,
+          riderTips: editRouteRiderTips.trim() || r.riderTips,
+          difficulty: editRouteDifficulty,
+          image: editRouteImage.trim() || r.image,
+          status: 'aprovado' as const
+        };
+      }
+      return r;
+    });
+    saveRoutesList(updated);
+    addAuditLog(`Roteiro "${editRouteName}" EDITADO & APROVADO pela moderação`);
+    showToast(`Roteiro "${editRouteName}" foi editado e aprovado com sucesso!`, 'success');
+    setViewingRouteModal(null);
+    setIsEditingRouteInModal(false);
   };
 
   const handleConfirmDeletePost = () => {
@@ -2088,33 +2199,64 @@ export function CommandCenter() {
 
                       {/* Action Bar */}
                       {isPending ? (
-                        <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto">
+                        <div className="flex flex-col gap-2 shrink-0 w-full md:w-64">
                           <button
-                            onClick={() => handleApprovePost(post.id)}
-                            className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+                            onClick={() => handleOpenViewingPost(post, false)}
+                            className="w-full py-2.5 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm group"
+                            title="Ver toda a publicação para decidir se aprova, rejeita ou edita"
                           >
-                            <CheckCircle size={14} /> AUTORIZAR & PUBLICAR
+                            <Eye size={14} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                            <span>VER TODA A PUBLICAÇÃO</span>
                           </button>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => handleOpenViewingPost(post, true)}
+                              className="py-2 px-2 bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-800 hover:border-amber-500/50 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                              title="Editar texto, categoria ou foto e aprovar"
+                            >
+                              <Edit3 size={12} className="text-amber-400" />
+                              <span>EDITAR</span>
+                            </button>
+                            <button
+                              onClick={() => handleApprovePost(post.id)}
+                              className="py-2 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                            >
+                              <CheckCircle size={12} />
+                              <span>APROVAR</span>
+                            </button>
+                          </div>
+
                           <button
                             onClick={() => setRejectionModalPost(post)}
-                            className="px-5 py-2.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-500/40 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+                            className="w-full py-2 px-3 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                           >
-                            <XCircle size={14} /> REJEITAR SOLICITAÇÃO
+                            <XCircle size={13} />
+                            <span>REJEITAR SOLICITAÇÃO</span>
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
+                        <div className="flex flex-wrap items-center gap-2 shrink-0 w-full md:w-auto justify-end">
                           <button
-                            onClick={() => setViewingPostModal(post)}
-                            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 transition-all"
+                            onClick={() => handleOpenViewingPost(post, false)}
+                            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer border border-slate-800"
                           >
-                            <Eye size={13} /> Visualizar
+                            <Eye size={13} />
+                            <span>Ver Completo</span>
+                          </button>
+                          <button
+                            onClick={() => handleOpenViewingPost(post, true)}
+                            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-800 hover:border-amber-500/50 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <Edit3 size={13} />
+                            <span>Editar</span>
                           </button>
                           <button
                             onClick={() => setDeleteConfirmPost(post)}
-                            className="px-3.5 py-2 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 transition-all"
+                            className="px-3 py-2 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer"
                           >
-                            <Trash2 size={13} /> Excluir
+                            <Trash2 size={13} />
+                            <span>Excluir</span>
                           </button>
                         </div>
                       )}
@@ -3608,23 +3750,34 @@ export function CommandCenter() {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-2 pt-3 border-t border-slate-800">
-                        {!isApproved && (
-                          <button 
-                            onClick={() => { setPendingActionRoute({ route, action: 'approve' }); setRouteRejectionReasonInput(''); }}
-                            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-600/20"
-                          >
-                            <ShieldCheck size={14} /> Aprovar Roteiro
-                          </button>
-                        )}
-                        {!isRejected && (
-                          <button 
-                            onClick={() => { setPendingActionRoute({ route, action: 'reject' }); setRouteRejectionReasonInput(''); }}
-                            className="flex-1 py-2.5 bg-amber-950/60 hover:bg-amber-900 text-amber-200 border border-amber-500/40 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
-                          >
-                            <XCircle size={14} className="text-amber-400" /> Rejeitar
-                          </button>
-                        )}
+                      <div className="flex flex-col gap-2 pt-3 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenViewingRoute(route, false)}
+                          className="w-full py-2 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm group"
+                        >
+                          <Eye size={13} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                          <span>VER ROTEIRO COMPLETO / EDITAR</span>
+                        </button>
+                        
+                        <div className="flex items-center gap-2">
+                          {!isApproved && (
+                            <button 
+                              onClick={() => { setPendingActionRoute({ route, action: 'approve' }); setRouteRejectionReasonInput(''); }}
+                              className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-600/20 cursor-pointer"
+                            >
+                              <ShieldCheck size={13} /> Aprovar
+                            </button>
+                          )}
+                          {!isRejected && (
+                            <button 
+                              onClick={() => { setPendingActionRoute({ route, action: 'reject' }); setRouteRejectionReasonInput(''); }}
+                              className="flex-1 py-2 bg-amber-950/60 hover:bg-amber-900 text-amber-200 border border-amber-500/40 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              <XCircle size={13} className="text-amber-400" /> Rejeitar
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -3746,7 +3899,247 @@ export function CommandCenter() {
         )}
       </AnimatePresence>
 
-      {/* EDIT EVENT MODAL */}
+      {/* VIEW & EDIT ROUTE MODAL */}
+      <AnimatePresence>
+        {viewingRouteModal && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 15 }} 
+              animate={{ scale: 1, y: 0 }} 
+              exit={{ scale: 0.95, y: 15 }} 
+              className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 max-w-2xl w-full shadow-2xl space-y-5 my-6 max-h-[90vh] overflow-y-auto"
+            >
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                    <Navigation size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black uppercase text-white tracking-wide">
+                      CENTRO DE MODERAÇÃO DE ROTEIROS
+                    </h3>
+                    <p className="text-[10px] text-slate-400">
+                      ID: {viewingRouteModal.id} • Autor: {viewingRouteModal.author?.name || 'Piloto'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingRouteInModal(false)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
+                        !isEditingRouteInModal ? "bg-amber-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                      )}
+                    >
+                      <Eye size={12} /> Ver Completo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingRouteInModal(true)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
+                        isEditingRouteInModal ? "bg-amber-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                      )}
+                    >
+                      <Edit3 size={12} /> Editar pra Aprovar
+                    </button>
+                  </div>
+
+                  <button 
+                    onClick={() => { setViewingRouteModal(null); setIsEditingRouteInModal(false); }} 
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {!isEditingRouteInModal ? (
+                /* VIEW FULL ROUTE */
+                <div className="space-y-4">
+                  {viewingRouteModal.image && (
+                    <div className="rounded-2xl overflow-hidden border border-slate-800 h-52 relative">
+                      <img src={viewingRouteModal.image} alt={viewingRouteModal.name} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+                      <div className="absolute bottom-3 left-4 right-4">
+                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-orange-600 text-white">
+                          {viewingRouteModal.difficulty}
+                        </span>
+                        <h4 className="text-xl font-black uppercase italic text-white mt-1 drop-shadow">
+                          {viewingRouteModal.name}
+                        </h4>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">LOCALIZAÇÃO / ENDEREÇO GOOGLE MAPS</span>
+                    <p className="text-xs text-amber-400 flex items-center gap-1 font-bold">
+                      <MapPin size={13} className="shrink-0" />
+                      {viewingRouteModal.mapsAddress}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Descrição Completa da Rota:</span>
+                    <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">
+                      {viewingRouteModal.description}
+                    </div>
+                  </div>
+
+                  {viewingRouteModal.riderTips && (
+                    <div className="p-3.5 bg-slate-950 border border-slate-800/80 rounded-xl text-xs text-slate-300 space-y-1">
+                      <strong className="text-amber-400 font-bold block text-[10px] uppercase">⚡ Dicas do Autor:</strong>
+                      <p className="whitespace-pre-wrap">{viewingRouteModal.riderTips}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* EDIT TO APPROVE ROUTE */
+                <div className="space-y-4">
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-start gap-2.5">
+                    <Edit3 size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block font-black uppercase text-amber-400 text-[10px]">
+                        Curadoria e Edição de Roteiro
+                      </strong>
+                      <span className="text-[11px] text-amber-200/90 leading-relaxed">
+                        Faça os ajustes necessários no título, descrição ou dicas do roteiro e clique em <strong>"Salvar Edição & Aprovar"</strong>.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Título do Roteiro:</label>
+                    <input 
+                      type="text" 
+                      value={editRouteName} 
+                      onChange={(e) => setEditRouteName(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500 font-bold" 
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Endereço no Google Maps:</label>
+                    <input 
+                      type="text" 
+                      value={editRouteMapsAddress} 
+                      onChange={(e) => setEditRouteMapsAddress(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500" 
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Descrição do Roteiro:</label>
+                    <textarea 
+                      rows={4} 
+                      value={editRouteDescription} 
+                      onChange={(e) => setEditRouteDescription(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500 leading-relaxed" 
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Dicas para Pilotos:</label>
+                    <textarea 
+                      rows={3} 
+                      value={editRouteRiderTips} 
+                      onChange={(e) => setEditRouteRiderTips(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500 leading-relaxed" 
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400">URL da Foto de Capa:</label>
+                    <input 
+                      type="text" 
+                      value={editRouteImage} 
+                      onChange={(e) => setEditRouteImage(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500" 
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-800">
+                {isEditingRouteInModal ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingRouteInModal(false)}
+                      className="w-full sm:w-auto px-4 py-2.5 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 rounded-xl text-xs font-black uppercase cursor-pointer"
+                    >
+                      Cancelar Edição
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveAndApproveRoute(viewingRouteModal.id)}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 cursor-pointer"
+                    >
+                      <CheckCircle size={14} /> SALVAR EDIÇÃO & APROVAR ROTEIRO
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingRouteInModal(true)}
+                      className="w-full sm:w-auto px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <Edit3 size={13} /> EDITAR PRA APROVAR
+                    </button>
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                      {viewingRouteModal.status === 'pendente' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPendingActionRoute({ route: viewingRouteModal, action: 'reject' });
+                              setViewingRouteModal(null);
+                            }}
+                            className="w-full sm:w-auto px-4 py-2.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-black uppercase cursor-pointer"
+                          >
+                            <XCircle size={13} /> Rejeitar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPendingActionRoute({ route: viewingRouteModal, action: 'approve' });
+                              setViewingRouteModal(null);
+                            }}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/20 cursor-pointer"
+                          >
+                            <ShieldCheck size={14} /> APROVAR DIRETO
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setViewingRouteModal(null)}
+                        className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase cursor-pointer"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {editingEvent && (
           <motion.div
@@ -4963,54 +5356,296 @@ export function CommandCenter() {
         )}
       </AnimatePresence>
 
-      {/* VIEW POST DETAILS MODAL */}
+      {/* VIEW POST DETAILS & EDIT TO APPROVE MODAL */}
       <AnimatePresence>
         {viewingPostModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <MessageSquare size={18} className="text-amber-500" />
-                  <span className="text-xs font-black uppercase text-white">DETALHES DA PUBLICAÇÃO</span>
-                </div>
-                <button onClick={() => setViewingPostModal(null)} className="text-slate-400 hover:text-white"><X size={18} /></button>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div className="flex items-center gap-3">
-                  <img src={viewingPostModal.user.avatar} className="w-10 h-10 rounded-full object-cover border border-slate-800" alt={viewingPostModal.user.name} />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <motion.div initial={{ scale: 0.95, y: 15 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 15 }} className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 max-w-2xl w-full shadow-2xl space-y-5 my-6">
+              
+              {/* Header com Tabs de alternância */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                    <MessageSquare size={18} />
+                  </div>
                   <div>
-                    <p className="font-black uppercase text-white">{viewingPostModal.user.name}</p>
-                    <p className="text-[9px] text-slate-500 font-mono uppercase">{viewingPostModal.user.role} • {viewingPostModal.timestamp}</p>
+                    <h3 className="text-sm font-black uppercase text-white tracking-wide">
+                      CENTRO DE MODERAÇÃO DE PUBLICAÇÃO
+                    </h3>
+                    <p className="text-[10px] text-slate-400">
+                      ID: {viewingPostModal.id} • {viewingPostModal.timestamp}
+                    </p>
                   </div>
                 </div>
 
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                  <p className="text-slate-200 leading-relaxed italic">"{viewingPostModal.content}"</p>
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingPostInModal(false)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
+                        !isEditingPostInModal 
+                          ? "bg-amber-600 text-white shadow-sm" 
+                          : "text-slate-400 hover:text-white"
+                      )}
+                    >
+                      <Eye size={12} /> Ver Completo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingPostInModal(true)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
+                        isEditingPostInModal 
+                          ? "bg-amber-600 text-white shadow-sm" 
+                          : "text-slate-400 hover:text-white"
+                      )}
+                    >
+                      <Edit3 size={12} /> Editar pra Aprovar
+                    </button>
+                  </div>
+
+                  <button 
+                    onClick={() => { setViewingPostModal(null); setIsEditingPostInModal(false); }} 
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Autor info bar */}
+              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
+                <div className="flex items-center gap-3">
+                  <img 
+                    src={viewingPostModal.user.avatar} 
+                    className="w-11 h-11 rounded-full object-cover border-2 border-slate-800 shrink-0" 
+                    alt={viewingPostModal.user.name} 
+                  />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-black text-white text-xs uppercase">{viewingPostModal.user.name}</p>
+                      <span className="text-[8px] font-black uppercase bg-slate-900 border border-slate-800 text-amber-400 px-2 py-0.5 rounded">
+                        {viewingPostModal.user.role || 'Piloto'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                      Enviado em: {viewingPostModal.createdAt || viewingPostModal.timestamp}
+                    </p>
+                  </div>
                 </div>
 
-                {viewingPostModal.image && (
-                  <div className="rounded-2xl overflow-hidden border border-slate-800 max-h-60">
-                    <img src={viewingPostModal.image} className="w-full h-full object-cover" alt="Midia" />
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-[9px] font-black uppercase bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2.5 py-1 rounded-lg">
-                    CATEGORIA: {viewingPostModal.category}
+                <div className="flex flex-col items-end gap-1">
+                  <span className={cn(
+                    "text-[9px] font-black uppercase px-2.5 py-1 rounded-lg border",
+                    viewingPostModal.status === 'aprovado' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+                    viewingPostModal.status === 'rejeitado' ? "bg-rose-500/10 border-rose-500/30 text-rose-400" :
+                    "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                  )}>
+                    {viewingPostModal.status.toUpperCase()}
                   </span>
-                  <span className="text-[9px] font-black uppercase bg-slate-900 border border-slate-800 text-slate-400 px-2.5 py-1 rounded-lg">
-                    STATUS: {viewingPostModal.status}
+                  <span className="text-[9px] font-bold text-slate-400 uppercase">
+                    CATEGORIA: <strong className="text-white">{viewingPostModal.category}</strong>
                   </span>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                {viewingPostModal.status === 'pendente' && (
-                  <button onClick={() => handleApprovePost(viewingPostModal.id)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase rounded-xl">Autorizar & Publicar</button>
+              {/* Modal Body */}
+              {!isEditingPostInModal ? (
+                /* MODO 1: VISUALIZAÇÃO COMPLETA */
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Conteúdo Integral da Publicação (Sem Cortes):
+                    </label>
+                    <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800/80 max-h-72 overflow-y-auto">
+                      <p className="text-sm text-slate-100 leading-relaxed whitespace-pre-wrap font-sans">
+                        {viewingPostModal.content}
+                      </p>
+                    </div>
+                  </div>
+
+                  {viewingPostModal.image && (
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Foto / Mídia Anexada:
+                      </label>
+                      <div className="rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 max-h-80 flex items-center justify-center">
+                        <img 
+                          src={viewingPostModal.image} 
+                          className="w-full max-h-80 object-contain rounded-2xl" 
+                          alt="Anexo da Publicação" 
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {viewingPostModal.status === 'rejeitado' && viewingPostModal.rejectionReason && (
+                    <div className="p-3.5 bg-rose-950/40 border border-rose-500/30 rounded-2xl text-xs text-rose-200">
+                      <span className="text-[10px] font-black uppercase text-rose-400 block mb-1">
+                        Motivo da Rejeição:
+                      </span>
+                      <p className="italic">{viewingPostModal.rejectionReason}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* MODO 2: EDITAR PRA APROVAR */
+                <div className="space-y-4">
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-start gap-2.5">
+                    <Edit3 size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block font-black uppercase text-amber-400 text-[10px]">
+                        Modo de Edição Ativo (Curadoria da Moderação)
+                      </strong>
+                      <span className="text-[11px] text-amber-200/90 leading-relaxed">
+                        Corrija eventuais erros, termos impróprios ou ajuste a categoria. Ao clicar em <strong>"Salvar Edição & Aprovar"</strong>, a publicação será salva e entrará no ar no Feed imediatamente!
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                      Texto / Conteúdo da Publicação:
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={editPostContent}
+                      onChange={(e) => setEditPostContent(e.target.value)}
+                      placeholder="Edite o texto da publicação..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-white outline-none focus:border-amber-500 leading-relaxed font-sans"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                        Categoria da Publicação:
+                      </label>
+                      <select
+                        value={editPostCategory}
+                        onChange={(e) => setEditPostCategory(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-amber-500 cursor-pointer uppercase"
+                      >
+                        <option value="ENCONTROS">ENCONTROS</option>
+                        <option value="VIAGENS">VIAGENS</option>
+                        <option value="EXPEDIÇÕES">EXPEDIÇÕES</option>
+                        <option value="MECÂNICA">MECÂNICA</option>
+                        <option value="GERAL">GERAL</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                          URL da Imagem Anexada:
+                        </label>
+                        {editPostImage && (
+                          <button
+                            type="button"
+                            onClick={() => setEditPostImage('')}
+                            className="text-[10px] text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 size={11} /> Remover Foto
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={editPostImage}
+                        onChange={(e) => setEditPostImage(e.target.value)}
+                        placeholder="https://... ou deixe em branco"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  {editPostImage && (
+                    <div className="rounded-xl overflow-hidden max-h-40 border border-slate-800 bg-slate-950 flex items-center justify-center">
+                      <img src={editPostImage} alt="Preview da Imagem" className="max-h-40 object-cover" />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Footer com botões de decisão */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-800">
+                {isEditingPostInModal ? (
+                  /* Botões no modo de Edição */
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingPostInModal(false)}
+                      className="w-full sm:w-auto px-4 py-2.5 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                    >
+                      Cancelar Edição
+                    </button>
+                    
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleSavePostEditsOnly(viewingPostModal.id)}
+                        className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Apenas Salvar Rascunho
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveAndApprovePost(viewingPostModal.id)}
+                        className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 cursor-pointer"
+                      >
+                        <CheckCircle size={14} /> SALVAR EDIÇÃO & APROVAR
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  /* Botões no modo de Visualização */
+                  <>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingPostInModal(true)}
+                        className="w-full sm:w-auto px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                      >
+                        <Edit3 size={13} /> EDITAR PRA APROVAR
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                      {viewingPostModal.status === 'pendente' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRejectionModalPost(viewingPostModal);
+                              setViewingPostModal(null);
+                            }}
+                            className="w-full sm:w-auto px-4 py-2.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <XCircle size={13} /> Rejeitar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleApprovePost(viewingPostModal.id)}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/20 cursor-pointer"
+                          >
+                            <CheckCircle size={14} /> APROVAR DIRETO
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setViewingPostModal(null)}
+                        className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </>
                 )}
-                <button onClick={() => setViewingPostModal(null)} className="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-black uppercase rounded-xl">Fechar</button>
               </div>
+
             </motion.div>
           </motion.div>
         )}

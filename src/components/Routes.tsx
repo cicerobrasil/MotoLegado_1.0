@@ -1,19 +1,90 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   MapPin, Star, Clock, ArrowRight, Plus, Search, Sparkles, Navigation, 
   ExternalLink, RefreshCw, Check, Fuel, Info, X, Heart, Award,
-  ShieldAlert, CheckCircle, XCircle, Lock
+  ShieldAlert, CheckCircle, XCircle, Lock, Camera, Upload, Image as ImageIcon,
+  AlertCircle, Trash2, Loader2, BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Route, RouteDifficulty, RouteRatingMetrics, RouteReview } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
+import { uploadImageToStorage } from '../lib/storage';
+
+export const DEFAULT_ROUTE_FALLBACK = "https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=1200";
+
+export const PRESET_ROUTE_IMAGES = [
+  { label: 'Serra & Curvas', url: 'https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=1200' },
+  { label: 'Montanhas & Estrada', url: 'https://images.unsplash.com/photo-1471466054146-e71bcc0d2bb2?auto=format&fit=crop&q=80&w=1200' },
+  { label: 'Pôr do Sol no Asfalto', url: 'https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=1200' },
+  { label: 'Aventura & Viagem', url: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=1200' }
+];
+
+export function sanitizeAndExtractImageUrl(raw: string): string {
+  if (!raw) return '';
+  let str = raw.trim();
+
+  // Remove aspas ou tags residuais
+  str = str.replace(/^[<"'\s]+|[>"'\s]+$/g, '');
+
+  // Markdown image format: ![alt](url)
+  const mdMatch = str.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+  if (mdMatch && mdMatch[1]) {
+    str = mdMatch[1];
+  }
+
+  // Google Images redirect / search URL: ?imgurl=...
+  if (str.includes('imgurl=')) {
+    try {
+      const match = str.match(/imgurl=([^&]+)/);
+      if (match && match[1]) {
+        return decodeURIComponent(match[1]);
+      }
+    } catch {}
+  }
+
+  // Google Drive: /file/d/FILE_ID/view...
+  if (str.includes('drive.google.com') && str.includes('/file/d/')) {
+    const fileIdMatch = str.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch && fileIdMatch[1]) {
+      return `https://drive.google.com/uc?export=view&id=${fileIdMatch[1]}`;
+    }
+  }
+
+  // Dropbox: ?dl=0 -> ?raw=1
+  if (str.includes('dropbox.com') && str.includes('dl=0')) {
+    str = str.replace('dl=0', 'raw=1');
+  }
+
+  // Se o usuário digitou sem protocolo (ex: images.unsplash.com/...)
+  if (!str.startsWith('http://') && !str.startsWith('https://') && !str.startsWith('data:') && !str.startsWith('/')) {
+    if (str.includes('.') && !str.includes(' ')) {
+      str = `https://${str}`;
+    }
+  }
+
+  return str;
+}
 
 export function Routes() {
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const isVip = isUserProOrBonificado(profile);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
+  const handleLaunchInLogbook = (targetRoute: Route, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const query = new URLSearchParams({
+      routeTitle: targetRoute.name,
+      routeDest: targetRoute.mapsAddress,
+      routeDesc: targetRoute.description || '',
+      routeImg: targetRoute.image || '',
+      routeMaps: targetRoute.mapsUrl || ''
+    }).toString();
+    navigate(`/logbook?${query}`);
+  };
 
   const [routes, setRoutes] = useState<Route[]>([]);
   const [activeFilter, setActiveFilter] = useState<'todos' | 'populares' | 'favoritos' | 'meus' | 'moderacao'>('todos');
@@ -44,6 +115,13 @@ export function Routes() {
   const [rejectingRouteId, setRejectingRouteId] = useState<string | null>(null);
   const [rejectionReasonText, setRejectionReasonText] = useState('');
 
+  // Photo Upload & Preview State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const detailPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isUploadingDetailPhoto, setIsUploadingDetailPhoto] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
+
   // New Route Form State
   const [newTitle, setNewTitle] = useState('');
   const [newMapsAddress, setNewMapsAddress] = useState('');
@@ -52,6 +130,60 @@ export function Routes() {
   const [newDescription, setNewDescription] = useState('');
   const [newRiderTips, setNewRiderTips] = useState('');
   const [newAiTouristInfo, setNewAiTouristInfo] = useState('');
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    setImageLoadError(false);
+    try {
+      const result = await uploadImageToStorage(file, {
+        folder: 'routes',
+        userId: profile?.id || 'pilot'
+      });
+
+      if (result.success && result.url) {
+        setNewImage(result.url);
+        showToast('Foto da rota carregada com sucesso!', 'success');
+      } else {
+        showToast(result.error || 'Erro ao enviar foto.', 'error');
+      }
+    } catch (err: any) {
+      showToast('Falha no upload: ' + (err?.message || 'Erro desconhecido'), 'error');
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDetailPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedRouteDetail) return;
+
+    setIsUploadingDetailPhoto(true);
+    try {
+      const result = await uploadImageToStorage(file, {
+        folder: 'routes',
+        userId: profile?.id || 'pilot'
+      });
+
+      if (result.success && result.url) {
+        const updatedRoute = { ...selectedRouteDetail, image: result.url };
+        setSelectedRouteDetail(updatedRoute);
+        const updatedList = routes.map(r => r.id === selectedRouteDetail.id ? updatedRoute : r);
+        saveRoutes(updatedList);
+        showToast('Foto da rota atualizada com sucesso!', 'success');
+      } else {
+        showToast(result.error || 'Erro ao enviar foto.', 'error');
+      }
+    } catch (err: any) {
+      showToast('Falha no upload: ' + (err?.message || 'Erro desconhecido'), 'error');
+    } finally {
+      setIsUploadingDetailPhoto(false);
+      e.target.value = '';
+    }
+  };
 
   // Initial Metrics State for Create
   const [newMetrics, setNewMetrics] = useState<RouteRatingMetrics>({
@@ -218,11 +350,8 @@ export function Routes() {
       ? newMapsAddress
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(newMapsAddress || newTitle)}`;
 
-    const defaultImages = [
-      "https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1471466054146-e71bcc0d2bb2?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=1200"
-    ];
+    const sanitizedImage = sanitizeAndExtractImageUrl(newImage);
+    const finalImage = sanitizedImage.trim() || DEFAULT_ROUTE_FALLBACK;
 
     const newRouteItem: Route = {
       id: "route-" + Date.now(),
@@ -233,7 +362,7 @@ export function Routes() {
       riderTips: newRiderTips.trim() || "Verifique a calibragem dos pneus e nível de combustível antes de partir.",
       aiTouristInfo: newAiTouristInfo.trim() || undefined,
       difficulty: newDifficulty,
-      image: newImage.trim() || defaultImages[Math.floor(Math.random() * defaultImages.length)],
+      image: finalImage,
       author: {
         name: "Você (Piloto)",
         avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200"
@@ -467,10 +596,14 @@ export function Routes() {
                 {/* Image & Badges */}
                 <div className="relative h-56 overflow-hidden">
                   <img 
-                    src={route.image || "https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=800"} 
+                    src={route.image || DEFAULT_ROUTE_FALLBACK} 
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
                     alt={route.name} 
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = DEFAULT_ROUTE_FALLBACK;
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
                   
@@ -581,13 +714,24 @@ export function Routes() {
                   </div>
                 )}
 
-                <button 
-                  onClick={() => setSelectedRouteDetail(route)}
-                  className="w-full py-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-orange-500/50 text-xs font-black uppercase tracking-wider text-slate-200 group-hover:bg-orange-600 group-hover:text-white group-hover:border-orange-500 transition-all flex items-center justify-center gap-2"
-                >
-                  VER DETALHES & AVALIAÇÕES
-                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                </button>
+                <div className="space-y-2 mt-2">
+                  <button 
+                    onClick={(e) => handleLaunchInLogbook(route, e)}
+                    className="w-full py-2.5 rounded-xl bg-orange-600/10 hover:bg-orange-600 text-orange-400 hover:text-white border border-orange-500/30 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm group/btn"
+                    title="Lançar este roteiro no seu Diário de Bordo para alimentar o Dashboard"
+                  >
+                    <BookOpen size={13} className="group-hover/btn:scale-110 transition-transform" />
+                    <span>Lançar no Diário de Bordo</span>
+                  </button>
+
+                  <button 
+                    onClick={() => setSelectedRouteDetail(route)}
+                    className="w-full py-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-orange-500/50 text-xs font-black uppercase tracking-wider text-slate-200 group-hover:bg-orange-600 group-hover:text-white group-hover:border-orange-500 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    VER DETALHES & AVALIAÇÕES
+                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
               </div>
             </motion.div>
           );
@@ -708,15 +852,134 @@ export function Routes() {
                       </select>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">URL de Foto de Capa (Opcional)</label>
+                    {/* Foto de Capa do Roteiro */}
+                    <div className="md:col-span-2 space-y-3 pt-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1.5">
+                          <Camera size={13} className="text-orange-500" />
+                          Foto de Capa do Roteiro (Upload ou Link)
+                        </label>
+                        {newImage && (
+                          <button
+                            type="button"
+                            onClick={() => { setNewImage(''); setImageLoadError(false); }}
+                            className="text-[10px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 size={11} />
+                            <span>Remover Foto</span>
+                          </button>
+                        )}
+                      </div>
+
                       <input 
-                        type="text"
-                        placeholder="https://images.unsplash.com/..."
-                        value={newImage}
-                        onChange={(e) => setNewImage(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-orange-500"
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePhotoUpload}
                       />
+
+                      {/* Dropzone / Preview visual */}
+                      <div
+                        onClick={() => !isUploadingPhoto && fileInputRef.current?.click()}
+                        className={cn(
+                          "w-full aspect-[21/9] sm:aspect-[3/1] rounded-2xl border-2 flex flex-col items-center justify-center cursor-pointer transition-all relative overflow-hidden group",
+                          newImage 
+                            ? "border-slate-800 bg-slate-950 shadow-lg" 
+                            : "border-dashed border-slate-800 hover:border-orange-500/50 bg-slate-950/60 hover:bg-slate-900/40"
+                        )}
+                      >
+                        {isUploadingPhoto ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 size={28} className="text-orange-500 animate-spin" />
+                            <span className="text-[10px] font-black text-white uppercase tracking-widest">Enviando foto...</span>
+                          </div>
+                        ) : newImage ? (
+                          <>
+                            <img 
+                              src={newImage} 
+                              alt="Preview da Rota" 
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              onError={() => setImageLoadError(true)}
+                              onLoad={() => setImageLoadError(false)}
+                            />
+                            <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-white flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600">
+                                <Camera size={14} />
+                                Trocar Foto
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 text-center p-4">
+                            <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 group-hover:text-orange-400 group-hover:scale-110 transition-all">
+                              <Upload size={18} />
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-black uppercase tracking-wider text-slate-300 group-hover:text-white transition-colors">
+                                Tirar Foto ou Escolher da Galeria
+                              </p>
+                              <p className="text-[9px] font-medium text-slate-500 mt-0.5">
+                                Ou cole o link de uma imagem externa abaixo
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {imageLoadError && newImage && (
+                        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2 text-rose-300 text-xs">
+                          <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <p className="font-bold">O link da imagem não pôde ser carregado diretamente.</p>
+                            <p className="text-[11px] text-rose-300/80">
+                              Links de páginas ou serviços protegidos não exibem fotos diretamente. Você pode fazer o upload da foto acima ou selecionar um dos modelos abaixo.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Input de link direto */}
+                      <div className="space-y-1">
+                        <input 
+                          type="text"
+                          placeholder="Ou cole a URL direta da imagem (ex: https://...)"
+                          value={newImage}
+                          onChange={(e) => {
+                            const sanitized = sanitizeAndExtractImageUrl(e.target.value);
+                            setNewImage(sanitized);
+                            setImageLoadError(false);
+                          }}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-400 outline-none focus:border-orange-500 transition-colors"
+                        />
+                      </div>
+
+                      {/* Modelos recomendados */}
+                      <div className="space-y-1.5 pt-1">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
+                          Ou escolha uma foto recomendada para esta rota:
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {PRESET_ROUTE_IMAGES.map((preset, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setNewImage(preset.url);
+                                setImageLoadError(false);
+                              }}
+                              className={cn(
+                                "px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer",
+                                newImage === preset.url
+                                  ? "bg-orange-500/20 border-orange-500 text-orange-400"
+                                  : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+                              )}
+                            >
+                              📷 {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
 
                   </div>
@@ -886,19 +1149,47 @@ export function Routes() {
               {/* Detail Header Banner */}
               <div className="relative h-52 sm:h-64 md:h-80 overflow-hidden">
                 <img 
-                  src={selectedRouteDetail.image || "https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=1200"} 
+                  src={selectedRouteDetail.image || DEFAULT_ROUTE_FALLBACK} 
                   className="w-full h-full object-cover"
                   alt={selectedRouteDetail.name}
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = DEFAULT_ROUTE_FALLBACK;
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-950/60 to-slate-950/30" />
 
-                <button 
-                  onClick={() => setSelectedRouteDetail(null)}
-                  className="absolute top-4 right-4 p-2 sm:p-2.5 bg-slate-950/80 hover:bg-slate-900 text-white rounded-full border border-slate-700 backdrop-blur-md transition-all z-10"
-                >
-                  <X size={18} />
-                </button>
+                <input 
+                  type="file" 
+                  ref={detailPhotoInputRef} 
+                  className="hidden" 
+                  accept="image/*" 
+                  onChange={handleDetailPhotoUpload} 
+                />
+
+                <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+                  <button 
+                    onClick={() => detailPhotoInputRef.current?.click()}
+                    disabled={isUploadingDetailPhoto}
+                    className="px-3 py-1.5 bg-slate-950/80 hover:bg-slate-900 border border-slate-700 hover:border-orange-500 text-xs font-bold text-white rounded-full flex items-center gap-1.5 backdrop-blur-md transition-all shadow-md cursor-pointer disabled:opacity-50"
+                    title="Atualizar ou trocar foto desta rota"
+                  >
+                    {isUploadingDetailPhoto ? (
+                      <Loader2 size={13} className="text-orange-400 animate-spin" />
+                    ) : (
+                      <Camera size={13} className="text-orange-400" />
+                    )}
+                    <span>{isUploadingDetailPhoto ? 'Enviando...' : 'Trocar Foto'}</span>
+                  </button>
+
+                  <button 
+                    onClick={() => setSelectedRouteDetail(null)}
+                    className="p-2 sm:p-2.5 bg-slate-950/80 hover:bg-slate-900 text-white rounded-full border border-slate-700 backdrop-blur-md transition-all cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
 
                 <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 right-4 sm:right-6 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -1011,15 +1302,27 @@ export function Routes() {
                     </p>
                   </div>
 
-                  <a 
-                    href={selectedRouteDetail.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedRouteDetail.mapsAddress)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-600/20 shrink-0"
-                  >
-                    <ExternalLink size={14} />
-                    ABRIR NO GOOGLE MAPS
-                  </a>
+                  <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleLaunchInLogbook(selectedRouteDetail)}
+                      className="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-orange-600/20 cursor-pointer transition-all active:scale-95"
+                      title="Lançar este roteiro no seu Diário de Bordo para alimentar o Dashboard"
+                    >
+                      <BookOpen size={14} />
+                      LANÇAR NO DIÁRIO DE BORDO
+                    </button>
+
+                    <a 
+                      href={selectedRouteDetail.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedRouteDetail.mapsAddress)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-sm shrink-0 transition-all"
+                    >
+                      <ExternalLink size={14} />
+                      ABRIR NO GOOGLE MAPS
+                    </a>
+                  </div>
                 </div>
 
                 {/* Description & Rider Tips */}

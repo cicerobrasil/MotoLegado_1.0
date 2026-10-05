@@ -25,65 +25,93 @@ export function Dashboard() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   useEffect(() => {
-    // Load Events
-    const savedEvents = localStorage.getItem('motolegado_events');
-    if (savedEvents) {
-      try {
-        setEvents(JSON.parse(savedEvents));
-      } catch (e) {
-        console.error('Error reading motolegado_events', e);
+    const loadDashboardData = () => {
+      // 1. Load Events
+      const savedEvents = localStorage.getItem('motolegado_events');
+      if (savedEvents) {
+        try {
+          setEvents(JSON.parse(savedEvents));
+        } catch (e) {
+          console.error('Error reading motolegado_events', e);
+        }
       }
-    }
 
-    // Load Partners
-    const savedPartners = localStorage.getItem('motolegado_partners');
-    if (savedPartners) {
-      try {
-        setPartners(JSON.parse(savedPartners));
-      } catch (e) {
-        console.error('Error reading motolegado_partners', e);
+      // 2. Load Partners
+      const savedPartners = localStorage.getItem('motolegado_partners');
+      if (savedPartners) {
+        try {
+          setPartners(JSON.parse(savedPartners));
+        } catch (e) {
+          console.error('Error reading motolegado_partners', e);
+        }
       }
-    }
 
-    // Load Logbook (from Supabase if configured and logged in)
-    if (isSupabaseConfigured && user) {
-      supabase
-        .from('logbook_trips')
-        .select('*')
-        .eq('pilot_id', user.id)
-        .order('date', { ascending: false })
-        .then(({ data, error }) => {
-          if (!error && data && data.length > 0) {
-            const mappedLogs: LogEntry[] = data.map((t: any) => ({
-              id: t.id,
-              title: t.title,
-              date: t.date || new Date().toISOString().split('T')[0],
-              origin: t.origin,
-              destination: t.destination,
-              distance: String(t.distance_km || 0),
-              duration: '2h',
-              bike: t.bike_model || profile?.motorcycle || 'Motocicleta',
-              climate: 'sun',
-              road: 'Boa',
-              rating: t.rating || 5,
-              content: t.notes || '',
-              image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
-            }));
-            setLogs(mappedLogs);
-          } else {
-            setLogs([]);
-          }
-        });
-    } else {
+      // 3. Load Logbook - ALWAYS load localStorage first for instant feeding!
+      let currentLocalLogs: LogEntry[] = [];
       const savedLogs = localStorage.getItem('motolegado_logs');
       if (savedLogs) {
         try {
-          setLogs(JSON.parse(savedLogs));
+          const parsed = JSON.parse(savedLogs);
+          if (Array.isArray(parsed)) {
+            currentLocalLogs = parsed;
+            setLogs(parsed);
+          }
         } catch (e) {
           console.error('Error reading motolegado_logs', e);
         }
       }
-    }
+
+      // 4. If Supabase is configured and user logged in, fetch cloud data and update
+      if (isSupabaseConfigured && user) {
+        supabase
+          .from('logbook_trips')
+          .select('*')
+          .eq('pilot_id', user.id)
+          .order('date', { ascending: false })
+          .then(({ data, error }) => {
+            if (!error && data && data.length > 0) {
+              const mappedLogs: LogEntry[] = data.map((t: any) => ({
+                id: t.id,
+                title: t.title,
+                date: t.date || new Date().toISOString().split('T')[0],
+                origin: t.origin,
+                destination: t.destination,
+                distance: String(t.distance_km || 0),
+                duration: '2h',
+                bike: t.bike_model || profile?.motorcycle || 'Motocicleta',
+                climate: 'sun',
+                road: 'Boa',
+                rating: t.rating || 5,
+                content: t.notes || '',
+                image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
+              }));
+              setLogs(mappedLogs);
+              localStorage.setItem('motolegado_logs', JSON.stringify(mappedLogs));
+            } else if (currentLocalLogs.length > 0) {
+              // Maintain local logs! Do NOT wipe with []!
+              setLogs(currentLocalLogs);
+            }
+          },
+          () => {
+            if (currentLocalLogs.length > 0) {
+              setLogs(currentLocalLogs);
+            }
+          });
+      }
+    };
+
+    loadDashboardData();
+
+    // Listen to real-time events from Logbook & gamification
+    window.addEventListener('motolegado_logs_updated', loadDashboardData);
+    window.addEventListener('motolegado_gamification_updated', loadDashboardData);
+    window.addEventListener('storage', loadDashboardData);
+
+    return () => {
+      window.removeEventListener('motolegado_logs_updated', loadDashboardData);
+      window.removeEventListener('motolegado_gamification_updated', loadDashboardData);
+      window.removeEventListener('storage', loadDashboardData);
+    };
   }, [user, isSupabaseConfigured]);
 
   const checkedInEvents = events.filter(evt => evt.checkedIn);
@@ -102,20 +130,35 @@ export function Dashboard() {
   // Active or latest trip
   const latestLog = logs.length > 0 ? logs[0] : null;
 
-  // Dynamic telemetry chart data (with dynamic demonstrative curve when no trips are logged yet)
-  const chartKmData = logs.length > 0 ? [
-    { name: 'Jan', km: Math.round(loggedKm * 0.15) },
-    { name: 'Fev', km: Math.round(loggedKm * 0.25) },
-    { name: 'Mar', km: Math.round(loggedKm * 0.35) },
-    { name: 'Abr', km: Math.round(loggedKm * 0.15) },
-    { name: 'Mai', km: Math.round(loggedKm * 0.10) },
-  ] : [
-    { name: 'Km 0', km: 0 },
-    { name: 'Km 150', km: 150 },
-    { name: 'Km 320', km: 320 },
-    { name: 'Km 580', km: 580 },
-    { name: 'Km 900', km: 900 },
-  ];
+  // Dynamic telemetry chart data reflecting actual trips
+  const chartKmData = useMemo(() => {
+    if (logs.length === 0) {
+      return [
+        { name: 'Km 0', km: 0 },
+        { name: 'Km 150', km: 150 },
+        { name: 'Km 320', km: 320 },
+        { name: 'Km 580', km: 580 },
+        { name: 'Km 900', km: 900 },
+      ];
+    }
+
+    // Sort chronologically (oldest to newest) to display cumulative distance evolution
+    const chronological = [...logs].reverse();
+    let accumulated = 0;
+
+    return chronological.map((log, index) => {
+      const dist = parseInt(log.distance, 10) || 0;
+      accumulated += dist;
+      const titleLabel = log.title 
+        ? (log.title.length > 14 ? log.title.slice(0, 12) + '...' : log.title) 
+        : `Rota ${index + 1}`;
+      return {
+        name: titleLabel,
+        km: accumulated,
+        tripKm: dist
+      };
+    });
+  }, [logs]);
 
   // Live Gamification Engine (KM + Eventos + Diário + Badges)
   const gamification = useMemo(() => {

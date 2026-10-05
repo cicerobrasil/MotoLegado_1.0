@@ -49,62 +49,86 @@ export function ProfileDashboard() {
   }, [profile?.id, user?.id]);
 
   useEffect(() => {
-    // 1. Carregar diários de bordo reais do Supabase se logado
-    if (isSupabaseConfigured && user) {
-      supabase
-        .from('logbook_trips')
-        .select('*')
-        .eq('pilot_id', user.id)
-        .order('date', { ascending: false })
-        .then(({ data, error }) => {
-          if (!error && data && data.length > 0) {
-            const mappedLogs: LogEntry[] = data.map((t: any) => ({
-              id: t.id,
-              date: t.date || new Date().toISOString().split('T')[0],
-              title: t.title || 'Viagem Registrada',
-              distance: String(t.distance_km || 0),
-              bike: t.bike_model || pilotMotorcycle,
-              origin: t.origin || 'Origem',
-              destination: t.destination || 'Destino',
-              duration: '2h 30min',
-              climate: 'sun',
-              road: 'Tapete (Perfeita)',
-              content: t.notes || '',
-              rating: t.rating || 5,
-              image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
-            }));
-            setLogs(mappedLogs);
-          } else {
-            setLogs([]);
-          }
-        });
-    } else {
+    const loadProfileDashboardData = () => {
+      // 1. Carregar diários de bordo reais do localStorage de forma imediata
+      let localLogs: LogEntry[] = [];
       const savedLogs = localStorage.getItem('motolegado_logs');
       if (savedLogs) {
         try {
-          setLogs(JSON.parse(savedLogs));
+          const parsed = JSON.parse(savedLogs);
+          if (Array.isArray(parsed)) {
+            localLogs = parsed;
+            setLogs(parsed);
+          }
         } catch (e) {
           console.error(e);
         }
-      } else {
-        setLogs([]);
       }
-    }
 
-    // Load events
-    const savedEvents = localStorage.getItem('motolegado_events');
-    if (savedEvents) {
-      try {
-        const parsed = JSON.parse(savedEvents);
-        const cleaned = parsed.map((evt: any) => ({
-          ...evt,
-          checkedIn: !!evt.checkedIn
-        }));
-        setEvents(cleaned);
-      } catch (e) {
-        console.error(e);
+      // 2. Se Supabase estiver configurado, sincronizar sem apagar dados locais
+      if (isSupabaseConfigured && user) {
+        supabase
+          .from('logbook_trips')
+          .select('*')
+          .eq('pilot_id', user.id)
+          .order('date', { ascending: false })
+          .then(({ data, error }) => {
+            if (!error && data && data.length > 0) {
+              const mappedLogs: LogEntry[] = data.map((t: any) => ({
+                id: t.id,
+                date: t.date || new Date().toISOString().split('T')[0],
+                title: t.title || 'Viagem Registrada',
+                distance: String(t.distance_km || 0),
+                bike: t.bike_model || pilotMotorcycle,
+                origin: t.origin || 'Origem',
+                destination: t.destination || 'Destino',
+                duration: '2h 30min',
+                climate: 'sun',
+                road: 'Tapete (Perfeita)',
+                content: t.notes || '',
+                rating: t.rating || 5,
+                image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
+              }));
+              setLogs(mappedLogs);
+              localStorage.setItem('motolegado_logs', JSON.stringify(mappedLogs));
+            } else if (localLogs.length > 0) {
+              setLogs(localLogs);
+            }
+          },
+          () => {
+            if (localLogs.length > 0) {
+              setLogs(localLogs);
+            }
+          });
       }
-    }
+
+      // 3. Load events
+      const savedEvents = localStorage.getItem('motolegado_events');
+      if (savedEvents) {
+        try {
+          const parsed = JSON.parse(savedEvents);
+          const cleaned = parsed.map((evt: any) => ({
+            ...evt,
+            checkedIn: !!evt.checkedIn
+          }));
+          setEvents(cleaned);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    };
+
+    loadProfileDashboardData();
+
+    window.addEventListener('motolegado_logs_updated', loadProfileDashboardData);
+    window.addEventListener('motolegado_gamification_updated', loadProfileDashboardData);
+    window.addEventListener('storage', loadProfileDashboardData);
+
+    return () => {
+      window.removeEventListener('motolegado_logs_updated', loadProfileDashboardData);
+      window.removeEventListener('motolegado_gamification_updated', loadProfileDashboardData);
+      window.removeEventListener('storage', loadProfileDashboardData);
+    };
   }, [user, isSupabaseConfigured]);
 
   // Centralized Live Gamification Engine

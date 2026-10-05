@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown, Navigation, ExternalLink, Share2 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -142,6 +142,29 @@ export function Logbook() {
   const [image, setImage] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const tripPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Se redirecionado a partir de um Roteiro, preenche automaticamente os dados e abre o formulário
+  useEffect(() => {
+    const routeTitle = searchParams.get('routeTitle');
+    if (routeTitle) {
+      setTitle(routeTitle.toUpperCase());
+      const dest = searchParams.get('routeDest');
+      if (dest) setDestination(dest);
+      const desc = searchParams.get('routeDesc');
+      if (desc) setContent(desc);
+      const img = searchParams.get('routeImg');
+      if (img) setImage(img);
+      const mUrl = searchParams.get('routeMaps');
+      if (mUrl) setMapsUrl(mUrl);
+      const dist = searchParams.get('routeDist');
+      if (dist) setDistance(dist);
+      setDate(new Date().toISOString().split('T')[0]);
+      setIsFormOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   // Sincroniza dinamicamente ponto de partida e moto quando o perfil for atualizado ou carregado
   useEffect(() => {
@@ -307,7 +330,9 @@ export function Logbook() {
     const updated = [newEntry, ...logs];
     setLogs(updated);
     localStorage.setItem('motolegado_logs', JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('motolegado_logs_updated', { detail: updated }));
     window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
+    window.dispatchEvent(new Event('storage'));
   };
 
   const handleFinish = async () => {
