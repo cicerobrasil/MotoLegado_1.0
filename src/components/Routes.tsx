@@ -68,6 +68,67 @@ export function sanitizeAndExtractImageUrl(raw: string): string {
   return str;
 }
 
+// Função utilitária para estimar ou extrair métricas de distância e duração com alta fidelidade
+export function estimateRouteMetrics(route: Partial<Route>): { distance: string; duration: string } {
+  // 1. Distância explícita cadastrada
+  if (route.distance && Number(route.distance) > 0) {
+    const distNum = Number(route.distance);
+    let dur = route.duration || '';
+    if (!dur) {
+      const totalMinutes = Math.round((distNum / 65) * 60);
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      dur = hours > 0 ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}` : `${mins}min`;
+    }
+    return { distance: String(distNum), duration: dur };
+  }
+
+  // 2. Extração inteligente via regex a partir de descrição, dicas e endereços
+  const fullText = `${route.name || ''} ${route.description || ''} ${route.riderTips || ''} ${route.mapsAddress || ''}`;
+  const distMatch = fullText.match(/(\d{1,4}(?:[.,]\d+)?)\s*(?:km|kms|quilômetros|quilometros)\b/i);
+  let distNum = distMatch ? parseFloat(distMatch[1].replace(',', '.')) : 0;
+
+  const durMatch = fullText.match(/(\d{1,2})\s*(?:h|hrs|horas?)(?:\s*(?:e\s*)?(\d{1,2})\s*(?:min|minutos?))?/i);
+  let durStr = '';
+  if (durMatch) {
+    const h = durMatch[1];
+    const m = durMatch[2];
+    durStr = m ? `${h}h ${m}min` : `${h}h 00min`;
+  }
+
+  // 3. Fallback inteligente de acordo com o nível de dificuldade
+  if (!distNum || distNum <= 0) {
+    switch (route.difficulty) {
+      case RouteDifficulty.EASY:
+        distNum = 95;
+        break;
+      case RouteDifficulty.MEDIUM:
+        distNum = 180;
+        break;
+      case RouteDifficulty.HARD:
+        distNum = 290;
+        break;
+      case RouteDifficulty.EXPERT:
+        distNum = 420;
+        break;
+      default:
+        distNum = 150;
+    }
+  }
+
+  if (!durStr) {
+    const totalMinutes = Math.round((distNum / 65) * 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    durStr = hours > 0 ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}` : `${mins}min`;
+  }
+
+  return {
+    distance: String(Math.round(distNum)),
+    duration: durStr
+  };
+}
+
 export function Routes() {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -76,12 +137,16 @@ export function Routes() {
 
   const handleLaunchInLogbook = (targetRoute: Route, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const metrics = estimateRouteMetrics(targetRoute);
     const query = new URLSearchParams({
       routeTitle: targetRoute.name,
-      routeDest: targetRoute.mapsAddress,
+      routeDest: targetRoute.mapsAddress || targetRoute.endPoint || '',
+      routeOrigin: targetRoute.startPoint || '',
       routeDesc: targetRoute.description || '',
       routeImg: targetRoute.image || '',
-      routeMaps: targetRoute.mapsUrl || ''
+      routeMaps: targetRoute.mapsUrl || '',
+      routeDist: metrics.distance,
+      routeDuration: metrics.duration
     }).toString();
     navigate(`/logbook?${query}`);
   };
@@ -100,6 +165,8 @@ export function Routes() {
     }
     setNewTitle('');
     setNewMapsAddress('');
+    setNewDistance('');
+    setNewDuration('');
     setNewImage('');
     setNewDescription('');
     setNewRiderTips('');
@@ -125,6 +192,8 @@ export function Routes() {
   // New Route Form State
   const [newTitle, setNewTitle] = useState('');
   const [newMapsAddress, setNewMapsAddress] = useState('');
+  const [newDistance, setNewDistance] = useState('');
+  const [newDuration, setNewDuration] = useState('');
   const [newDifficulty, setNewDifficulty] = useState<RouteDifficulty>(RouteDifficulty.MEDIUM);
   const [newImage, setNewImage] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -353,6 +422,16 @@ export function Routes() {
     const sanitizedImage = sanitizeAndExtractImageUrl(newImage);
     const finalImage = sanitizedImage.trim() || DEFAULT_ROUTE_FALLBACK;
 
+    const metrics = estimateRouteMetrics({
+      name: newTitle.trim(),
+      mapsAddress: newMapsAddress.trim(),
+      description: newDescription.trim(),
+      riderTips: newRiderTips.trim(),
+      difficulty: newDifficulty,
+      distance: newDistance ? parseInt(newDistance.replace(/\D/g, ''), 10) : undefined,
+      duration: newDuration.trim() || undefined
+    });
+
     const newRouteItem: Route = {
       id: "route-" + Date.now(),
       name: newTitle.trim(),
@@ -362,6 +441,8 @@ export function Routes() {
       riderTips: newRiderTips.trim() || "Verifique a calibragem dos pneus e nível de combustível antes de partir.",
       aiTouristInfo: newAiTouristInfo.trim() || undefined,
       difficulty: newDifficulty,
+      distance: parseInt(metrics.distance, 10),
+      duration: metrics.duration,
       image: finalImage,
       author: {
         name: "Você (Piloto)",
@@ -382,6 +463,8 @@ export function Routes() {
     // Reset Form
     setNewTitle('');
     setNewMapsAddress('');
+    setNewDistance('');
+    setNewDuration('');
     setNewDescription('');
     setNewRiderTips('');
     setNewAiTouristInfo('');
@@ -664,13 +747,25 @@ export function Routes() {
                   </p>
 
                   {/* Metrics Stats */}
-                  <div className="grid grid-cols-2 gap-2 py-3 border-y border-slate-800/80 bg-slate-950/40 px-3 rounded-2xl text-center">
+                  <div className="grid grid-cols-4 gap-2 py-3 border-y border-slate-800/80 bg-slate-950/40 px-2 sm:px-3 rounded-2xl text-center">
                     <div>
-                      <span className="text-[9px] font-black uppercase text-slate-500 block">Dificuldade</span>
-                      <span className="text-xs font-black text-orange-400 uppercase">{route.difficulty}</span>
+                      <span className="text-[8px] font-black uppercase text-slate-500 block">Distância</span>
+                      <span className="text-xs font-black text-orange-400 font-mono">
+                        {estimateRouteMetrics(route).distance} KM
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[9px] font-black uppercase text-slate-500 block">Avaliação</span>
+                      <span className="text-[8px] font-black uppercase text-slate-500 block">Tempo</span>
+                      <span className="text-xs font-bold text-slate-300 font-mono truncate block">
+                        {estimateRouteMetrics(route).duration}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[8px] font-black uppercase text-slate-500 block">Dificuldade</span>
+                      <span className="text-xs font-black text-slate-300 uppercase truncate block">{route.difficulty}</span>
+                    </div>
+                    <div>
+                      <span className="text-[8px] font-black uppercase text-slate-500 block">Avaliação</span>
                       <span className="text-xs font-black text-amber-400 flex items-center justify-center gap-1">
                         <Star size={11} className="fill-amber-400" />
                         {route.rating}
@@ -850,6 +945,38 @@ export function Routes() {
                         <option value={RouteDifficulty.HARD}>Difícil (Serras travadas e tráfego)</option>
                         <option value={RouteDifficulty.EXPERT}>Especialista (Curvas extremas e alta altitude)</option>
                       </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Distância Estimada (KM)</label>
+                      <input 
+                        type="text"
+                        placeholder="Ex: 220"
+                        value={newDistance}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewDistance(val);
+                          const num = parseInt(val.replace(/\D/g, ''), 10);
+                          if (!isNaN(num) && num > 0 && !newDuration) {
+                            const totalMinutes = Math.round((num / 65) * 60);
+                            const hours = Math.floor(totalMinutes / 60);
+                            const mins = totalMinutes % 60;
+                            setNewDuration(hours > 0 ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}` : `${mins}min`);
+                          }
+                        }}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Duração Estimada de Viagem</label>
+                      <input 
+                        type="text"
+                        placeholder="Ex: 3h 30min"
+                        value={newDuration}
+                        onChange={(e) => setNewDuration(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500"
+                      />
                     </div>
 
                     {/* Foto de Capa do Roteiro */}
@@ -1270,22 +1397,28 @@ export function Routes() {
                 )}
 
                 {/* Stats Bar */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center">
                   <div>
-                    <span className="text-[9px] font-black uppercase text-slate-500 block">Nível de Dificuldade</span>
-                    <span className="text-xs font-black text-orange-400 uppercase">{selectedRouteDetail.difficulty}</span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-black uppercase text-slate-500 block">Média de Avaliações</span>
-                    <span className="text-xs font-black text-amber-400 flex items-center justify-center gap-1">
-                      <Star size={12} className="fill-amber-400" />
-                      {selectedRouteDetail.rating} / 5.0
+                    <span className="text-[9px] font-black uppercase text-slate-500 block">Distância</span>
+                    <span className="text-xs font-black text-orange-400 font-mono">
+                      {estimateRouteMetrics(selectedRouteDetail).distance} KM
                     </span>
                   </div>
                   <div>
-                    <span className="text-[9px] font-black uppercase text-slate-500 block">Autor do Cadastramento</span>
-                    <span className="text-xs font-bold text-slate-200 truncate block">
-                      {selectedRouteDetail.author?.name || 'Membro MotoLegado'}
+                    <span className="text-[9px] font-black uppercase text-slate-500 block">Duração Estimada</span>
+                    <span className="text-xs font-black text-slate-300 font-mono">
+                      {estimateRouteMetrics(selectedRouteDetail).duration}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-black uppercase text-slate-500 block">Nível de Dificuldade</span>
+                    <span className="text-xs font-black text-amber-400 uppercase">{selectedRouteDetail.difficulty}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-black uppercase text-slate-500 block">Avaliação Média</span>
+                    <span className="text-xs font-black text-amber-400 flex items-center justify-center gap-1">
+                      <Star size={12} className="fill-amber-400" />
+                      {selectedRouteDetail.rating} / 5.0
                     </span>
                   </div>
                 </div>

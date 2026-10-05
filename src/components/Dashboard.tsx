@@ -85,8 +85,15 @@ export function Dashboard() {
                 content: t.notes || '',
                 image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
               }));
-              setLogs(mappedLogs);
-              localStorage.setItem('motolegado_logs', JSON.stringify(mappedLogs));
+              
+              // Mescla de forma segura preservando registros recém-criados localmente
+              const dict: Record<string, LogEntry> = {};
+              currentLocalLogs.forEach(l => { dict[l.id] = l; });
+              mappedLogs.forEach(l => { dict[l.id] = l; });
+              const combinedLogs: LogEntry[] = Object.values(dict).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+              setLogs(combinedLogs);
+              localStorage.setItem('motolegado_logs', JSON.stringify(combinedLogs));
             } else if (currentLocalLogs.length > 0) {
               // Maintain local logs! Do NOT wipe with []!
               setLogs(currentLocalLogs);

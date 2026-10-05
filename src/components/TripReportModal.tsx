@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, 
   FileDown, 
@@ -18,14 +18,22 @@ import {
   CheckCircle2,
   AlertCircle,
   Copy,
-  Download
+  Download,
+  CheckSquare,
+  MapPin,
+  Camera,
+  Fuel,
+  UtensilsCrossed,
+  Bed,
+  Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import { LogEntry } from './Logbook';
+import { TripStage } from './TripStagesManager';
 import { cn } from '../lib/utils';
 
-interface TripReportModalProps {
+export interface TripReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   logs: LogEntry[];
@@ -33,7 +41,18 @@ interface TripReportModalProps {
   pilotClub?: string;
   pilotMotorcycle?: string;
   pilotId?: string;
+  initialSelectedTripId?: string;
 }
+
+const STAGE_LABELS: Record<string, string> = {
+  scenic: 'Mirante / Ponto Turístico',
+  fuel: 'Abastecimento Estratégico',
+  food: 'Almoço / Gastronomia',
+  sleep: 'Pernoite / Hotel',
+  meet: 'Ponto de Encontro',
+  service: 'Oficina / Apoio',
+  custom: 'Parada Programada'
+};
 
 // Helper universal e resiliente para disparo de downloads no navegador
 function triggerDownload(blob: Blob, filename: string) {
@@ -74,6 +93,16 @@ function triggerDownload(blob: Blob, filename: string) {
   }
 }
 
+// Sanitização de texto para garantir compatibilidade com fontes padrão do jsPDF
+function cleanPdfText(str?: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove acentos combinados para compatibilidade estrita
+    .replace(/[^\x20-\x7E]/g, ' ')
+    .trim();
+}
+
 export function TripReportModal({
   isOpen,
   onClose,
@@ -82,15 +111,26 @@ export function TripReportModal({
   pilotClub,
   pilotMotorcycle,
   pilotId,
+  initialSelectedTripId,
 }: TripReportModalProps) {
   const [dateFilter, setDateFilter] = useState<'all' | 'year' | '6months' | '30days'>('all');
+  const [selectedTripId, setSelectedTripId] = useState<string>('all');
   const [copiedShare, setCopiedShare] = useState(false);
   const [copiedCSV, setCopiedCSV] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Sincroniza se o usuário abriu o modal a partir de um card específico
+  useEffect(() => {
+    if (initialSelectedTripId) {
+      setSelectedTripId(initialSelectedTripId);
+    } else {
+      setSelectedTripId('all');
+    }
+  }, [initialSelectedTripId, isOpen]);
+
   // Filtrar logs de acordo com o período selecionado
-  const filteredLogs = useMemo(() => {
+  const filteredByDateLogs = useMemo(() => {
     if (dateFilter === 'all') return logs;
     const now = new Date();
     return logs.filter((log) => {
@@ -107,14 +147,24 @@ export function TripReportModal({
     });
   }, [logs, dateFilter]);
 
+  // Logs a serem exibidos e exportados (todos ou roteiro individual selecionado)
+  const displayLogs = useMemo(() => {
+    if (selectedTripId !== 'all') {
+      const found = logs.find(l => l.id === selectedTripId);
+      if (found) return [found];
+    }
+    return filteredByDateLogs;
+  }, [logs, filteredByDateLogs, selectedTripId]);
+
   // Cálculos de Telemetria
   const metrics = useMemo(() => {
     let totalKm = 0;
     let maxKm = 0;
     let longestTripTitle = '';
     let totalRating = 0;
+    let totalCompletedStages = 0;
 
-    filteredLogs.forEach((log) => {
+    displayLogs.forEach((log) => {
       const km = parseFloat(String(log.distance).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
       totalKm += km;
       if (km > maxKm) {
@@ -122,20 +172,24 @@ export function TripReportModal({
         longestTripTitle = `${log.origin || 'Origem'} → ${log.destination || 'Destino'}`;
       }
       totalRating += log.rating || 5;
+      if (log.stages && log.stages.length > 0) {
+        totalCompletedStages += log.stages.length;
+      }
     });
 
-    const avgKm = filteredLogs.length > 0 ? Math.round(totalKm / filteredLogs.length) : 0;
-    const avgRating = filteredLogs.length > 0 ? (totalRating / filteredLogs.length).toFixed(1) : '5.0';
+    const avgKm = displayLogs.length > 0 ? Math.round(totalKm / displayLogs.length) : 0;
+    const avgRating = displayLogs.length > 0 ? (totalRating / displayLogs.length).toFixed(1) : '5.0';
 
     return {
       totalKm: Math.round(totalKm),
-      totalTrips: filteredLogs.length,
+      totalTrips: displayLogs.length,
       avgKm,
       maxKm: Math.round(maxKm),
       longestTripTitle: longestTripTitle || 'N/A',
       avgRating,
+      totalCompletedStages
     };
-  }, [filteredLogs]);
+  }, [displayLogs]);
 
   const reportId = useMemo(() => {
     return `ML-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -157,7 +211,7 @@ export function TripReportModal({
     try {
       const headers = [
         'Data',
-        'Título da Viagem',
+        'Título do Roteiro',
         'Origem',
         'Destino',
         'Distância (KM)',
@@ -166,42 +220,54 @@ export function TripReportModal({
         'Condição do Asfalto',
         'Clima',
         'Avaliação (1-5)',
+        'Total de Etapas Concluídas',
+        'Detalhamento das Etapas',
         'Notas e Diário'
       ];
 
-      const rows = filteredLogs.length > 0 
-        ? filteredLogs.map((log) => [
-            `"${log.date || ''}"`,
-            `"${(log.title || '').replace(/"/g, '""')}"`,
-            `"${(log.origin || '').replace(/"/g, '""')}"`,
-            `"${(log.destination || '').replace(/"/g, '""')}"`,
-            `"${String(log.distance || 0).replace(/"/g, '""')}"`,
-            `"${(log.duration || '').replace(/"/g, '""')}"`,
-            `"${(log.bike || pilotMotorcycle || '').replace(/"/g, '""')}"`,
-            `"${(log.road || '').replace(/"/g, '""')}"`,
-            `"${(log.climate || '').replace(/"/g, '""')}"`,
-            `"${log.rating || 5}"`,
-            `"${(log.content || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`
-          ])
+      const rows = displayLogs.length > 0 
+        ? displayLogs.map((log) => {
+            const stagesSummary = (log.stages || [])
+              .map((st, i) => `${i + 1}. [OK] ${st.name} (${STAGE_LABELS[st.type] || st.type}${st.kmMark ? ` - KM ${st.kmMark}` : ''})`)
+              .join(' | ');
+
+            return [
+              `"${log.date || ''}"`,
+              `"${(log.title || '').replace(/"/g, '""')}"`,
+              `"${(log.origin || '').replace(/"/g, '""')}"`,
+              `"${(log.destination || '').replace(/"/g, '""')}"`,
+              `"${String(log.distance || 0).replace(/"/g, '""')}"`,
+              `"${(log.duration || '').replace(/"/g, '""')}"`,
+              `"${(log.bike || pilotMotorcycle || '').replace(/"/g, '""')}"`,
+              `"${(log.road || '').replace(/"/g, '""')}"`,
+              `"${(log.climate || '').replace(/"/g, '""')}"`,
+              `"${log.rating || 5}"`,
+              `"${log.stages?.length || 0}"`,
+              `"${stagesSummary.replace(/"/g, '""')}"`,
+              `"${(log.content || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`
+            ];
+          })
         : [[
             `"${new Date().toISOString().slice(0, 10)}"`,
-            `"Exemplo: Primeira Expedição"`,
-            `"São Paulo"`,
-            `"Curitiba"`,
-            `"408"`,
-            `"5h 30min"`,
+            `"Exemplo: Roteiro Serra do Rio do Rastro"`,
+            `"Florianópolis"`,
+            `"Bom Jardim da Serra"`,
+            `"230"`,
+            `"4h 30min"`,
             `"${(pilotMotorcycle || 'Moto Cadastrada').replace(/"/g, '""')}"`,
             `"Tapete"`,
             `"Ensolarado"`,
             `"5"`,
-            `"Modelo de relatório MotoLegado emitido"`
+            `"2"`,
+            `"1. [OK] Mirante Serra (Mirante) | 2. [OK] Posto Cascata (Abastecimento)"`,
+            `"Roteiro oficial MotoLegado emitido"`
           ]];
 
       const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const safeName = (pilotName || 'Piloto').toLowerCase().replace(/\s+/g, '_');
       const today = new Date().toISOString().slice(0, 10);
-      const filename = `MotoLegado_Relatorio_Viagens_${safeName}_${today}.csv`;
+      const filename = `MotoLegado_Diario_Roteiros_${safeName}_${today}.csv`;
 
       triggerDownload(blob, filename);
 
@@ -212,16 +278,16 @@ export function TripReportModal({
       setTimeout(() => setStatusMessage(null), 5000);
     } catch (err: any) {
       console.error('Erro na exportação CSV:', err);
-      setStatusMessage({ text: 'Falha ao baixar CSV. Tente copiar o resumo ou gerar em PDF.', type: 'error' });
+      setStatusMessage({ text: 'Falha ao baixar CSV. Tente gerar em PDF ou imprimir.', type: 'error' });
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // 2. Geração e Download Direto do Arquivo PDF (.pdf) com jsPDF
+  // 2. Geração e Download do Arquivo PDF (.pdf) com jsPDF
   const handleGeneratePDF = () => {
     setIsGenerating(true);
-    setStatusMessage({ text: 'Compilando e gerando arquivo PDF...', type: 'info' });
+    setStatusMessage({ text: 'Compilando e gerando arquivo PDF com roteiros e etapas...', type: 'info' });
 
     try {
       const doc = new jsPDF({
@@ -233,7 +299,7 @@ export function TripReportModal({
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
 
-      // Top Header Brand Bar (Dark Slate / Orange)
+      // Top Header Brand Bar (Dark Slate 900 / Orange 600)
       doc.setFillColor(15, 23, 42); // slate-900
       doc.rect(0, 0, pageWidth, 26, 'F');
 
@@ -249,7 +315,7 @@ export function TripReportModal({
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(203, 213, 225); // slate-300
-      doc.text('PLATAFORMA OFICIAL DO MOTOCICLISMO · DIÁRIO DE BORDO & TELEMETRIA', 14, 18);
+      doc.text('DIARIO DE BORDO OFICIAL · ROTEIROS E ETAPAS CONCLUIDAS', 14, 18);
 
       // Report ID & Date
       doc.setFontSize(8);
@@ -258,160 +324,181 @@ export function TripReportModal({
       doc.text(`ID: ${reportId}`, pageWidth - 14, 11, { align: 'right' });
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(148, 163, 184); // slate-400
-      doc.text(`Emissão: ${issueDate}`, pageWidth - 14, 17, { align: 'right' });
+      doc.text(`Emissao: ${issueDate}`, pageWidth - 14, 17, { align: 'right' });
 
       // Title Section
       let y = 35;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(15);
+      doc.setFontSize(14);
       doc.setTextColor(15, 23, 42);
-      doc.text('DOSSIÊ OFICIAL DO PILOTO', 14, y);
+      
+      const isSingleMode = selectedTripId !== 'all';
+      doc.text(
+        isSingleMode 
+          ? 'DOSSIE DE ROTEIRO & ETAPAS CONCLUIDAS' 
+          : 'DOSSIE DO DIARIO DE BORDO & HISTORICO DE ROTEIROS', 
+        14, 
+        y
+      );
 
       y += 5;
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
+      doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
-      doc.text('Relatório oficial de expedições, quilometragem certificada e histórico de asfalto.', 14, y);
+      doc.text(
+        'Relatorio oficial com historico de quilometragem, rotas percorridas e pontos de parada certificados.', 
+        14, 
+        y
+      );
 
       // Pilot Credentials Box
       y += 6;
-      doc.setFillColor(248, 250, 252); // slate-50
-      doc.setDrawColor(203, 213, 225); // slate-300
-      doc.roundedRect(14, y, pageWidth - 28, 20, 2, 2, 'FD');
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(203, 213, 225);
+      doc.roundedRect(14, y, pageWidth - 28, 18, 2, 2, 'FD');
 
-      doc.setFontSize(7.5);
+      doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(100, 116, 139);
-      doc.text('PILOTO:', 18, y + 6);
-      doc.text('MOTO CLUBE:', 78, y + 6);
-      doc.text('MOTOCICLETA:', 138, y + 6);
+      doc.text('PILOTO:', 18, y + 5.5);
+      doc.text('MOTO CLUBE:', 78, y + 5.5);
+      doc.text('MOTOCICLETA:', 138, y + 5.5);
 
-      doc.setFontSize(9.5);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(15, 23, 42);
-      doc.text(pilotName || 'Piloto MotoLegado', 18, y + 13);
+      doc.text(cleanPdfText(pilotName || 'Piloto MotoLegado'), 18, y + 12);
 
       doc.setTextColor(217, 119, 6); // amber-600
-      doc.text(pilotClub || 'Piloto Independente', 78, y + 13);
+      doc.text(cleanPdfText(pilotClub || 'Piloto Independente'), 78, y + 12);
 
       doc.setTextColor(15, 23, 42);
-      doc.text(pilotMotorcycle || 'Moto Cadastrada', 138, y + 13);
+      doc.text(cleanPdfText(pilotMotorcycle || 'Moto Cadastrada'), 138, y + 12);
 
       // Telemetry Metrics Grid (4 cards)
-      y += 24;
+      y += 22;
       const cardWidth = (pageWidth - 28 - 9) / 4;
       const stats = [
         { label: 'KM TOTAL', val: `${metrics.totalKm.toLocaleString()} KM`, color: [234, 88, 12] },
-        { label: 'EXPEDIÇÕES', val: `${metrics.totalTrips}`, color: [15, 23, 42] },
-        { label: 'MÉDIA / VIAGEM', val: `${metrics.avgKm.toLocaleString()} KM`, color: [217, 119, 6] },
-        { label: 'NOTA ESTRADAS', val: `${metrics.avgRating} / 5.0`, color: [16, 185, 129] },
+        { label: 'ROTEIROS', val: `${metrics.totalTrips}`, color: [15, 23, 42] },
+        { label: 'ETAPAS CONCLUIDAS', val: `${metrics.totalCompletedStages}`, color: [16, 185, 129] },
+        { label: 'NOTA MEDIA', val: `${metrics.avgRating} / 5.0`, color: [217, 119, 6] },
       ];
 
       stats.forEach((st, idx) => {
         const cx = 14 + idx * (cardWidth + 3);
         doc.setFillColor(248, 250, 252);
         doc.setDrawColor(226, 232, 240);
-        doc.roundedRect(cx, y, cardWidth, 15, 2, 2, 'FD');
+        doc.roundedRect(cx, y, cardWidth, 14, 2, 2, 'FD');
 
         doc.setFontSize(6.5);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(100, 116, 139);
         doc.text(st.label, cx + 3, y + 4.5);
 
-        doc.setFontSize(10);
+        doc.setFontSize(9.5);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(st.color[0], st.color[1], st.color[2]);
-        doc.text(st.val, cx + 3, y + 11.5);
+        doc.text(st.val, cx + 3, y + 10.5);
       });
 
-      // Table Header Section
-      y += 20;
+      // Section Title: Roteiros e Etapas
+      y += 18;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10.5);
+      doc.setFontSize(10);
       doc.setTextColor(15, 23, 42);
-      doc.text(`REGISTRO DE EXPEDIÇÕES (${filteredLogs.length})`, 14, y);
+      doc.text(`REGISTRO DE ROTEIROS E ETAPAS CONCLUIDAS (${displayLogs.length})`, 14, y);
 
       y += 4;
-      // Table Header Row
-      doc.setFillColor(15, 23, 42);
-      doc.rect(14, y, pageWidth - 28, 6.5, 'F');
 
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(255, 255, 255);
-      doc.text('DATA', 17, y + 4.5);
-      doc.text('TÍTULO / EXPEDIÇÃO', 38, y + 4.5);
-      doc.text('TRAJETO (ORIGEM → DESTINO)', 96, y + 4.5);
-      doc.text('DISTÂNCIA', 156, y + 4.5);
-      doc.text('ESTRADA', 176, y + 4.5);
-
-      y += 6.5;
-
-      if (filteredLogs.length === 0) {
+      if (displayLogs.length === 0) {
         doc.setFont('helvetica', 'italic');
         doc.setFontSize(8.5);
         doc.setTextColor(100, 116, 139);
-        doc.text('Nenhuma viagem registrada no período selecionado.', 18, y + 8);
+        doc.text('Nenhum roteiro registrado no periodo selecionado.', 18, y + 8);
         y += 16;
       } else {
-        doc.setFontSize(7);
-        filteredLogs.forEach((log, index) => {
-          // Check page break
-          if (y > pageHeight - 20) {
+        displayLogs.forEach((log, index) => {
+          // Previsão de altura necessária para o card do roteiro + etapas
+          const stagesCount = log.stages?.length || 0;
+          const estimatedHeight = 24 + (stagesCount > 0 ? 8 + stagesCount * 5 : 0);
+
+          if (y + estimatedHeight > pageHeight - 20) {
             doc.addPage();
             y = 16;
-            // Repeat Table Header
-            doc.setFillColor(15, 23, 42);
-            doc.rect(14, y, pageWidth - 28, 6.5, 'F');
-            doc.setFontSize(7);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(255, 255, 255);
-            doc.text('DATA', 17, y + 4.5);
-            doc.text('TÍTULO / EXPEDIÇÃO', 38, y + 4.5);
-            doc.text('TRAJETO (ORIGEM → DESTINO)', 96, y + 4.5);
-            doc.text('DISTÂNCIA', 156, y + 4.5);
-            doc.text('ESTRADA', 176, y + 4.5);
-            y += 6.5;
           }
 
-          // Row background alternate
-          if (index % 2 === 1) {
-            doc.setFillColor(248, 250, 252);
-            doc.rect(14, y, pageWidth - 28, 7.5, 'F');
-          }
-          doc.setDrawColor(241, 245, 249);
-          doc.line(14, y + 7.5, pageWidth - 14, y + 7.5);
+          // Header do Roteiro (Faixa escura)
+          doc.setFillColor(15, 23, 42);
+          doc.roundedRect(14, y, pageWidth - 28, 7, 1, 1, 'F');
 
-          doc.setFont('courier', 'normal');
-          doc.setTextColor(100, 116, 139);
-          const dateStr = log.date ? new Date(log.date).toLocaleDateString('pt-BR') : '—';
-          doc.text(dateStr, 17, y + 5);
-
+          doc.setFontSize(7.5);
           doc.setFont('helvetica', 'bold');
-          doc.setTextColor(15, 23, 42);
-          const safeTitle = (log.title || 'Sem Título').substring(0, 30);
-          doc.text(safeTitle, 38, y + 5);
-
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(51, 65, 85);
-          const safeRoute = `${log.origin || 'Partida'} → ${log.destination || 'Chegada'}`.substring(0, 34);
-          doc.text(safeRoute, 96, y + 5);
+          doc.setTextColor(255, 255, 255);
+          const safeDate = log.date ? new Date(log.date).toLocaleDateString('pt-BR') : '—';
+          doc.text(`[${safeDate}] ${cleanPdfText(log.title || 'ROTEIRO')}`, 17, y + 5);
 
           doc.setFont('courier', 'bold');
-          doc.setTextColor(234, 88, 12);
+          doc.setTextColor(251, 146, 60);
           const distStr = log.distance ? `${log.distance} KM` : '—';
-          doc.text(distStr, 156, y + 5);
+          doc.text(distStr, pageWidth - 18, y + 5, { align: 'right' });
+
+          y += 7;
+
+          // Trajeto e Detalhes Técnicos
+          doc.setFillColor(248, 250, 252);
+          doc.setDrawColor(226, 232, 240);
+
+          const contentHeight = stagesCount > 0 ? 10 + stagesCount * 5.2 : 12;
+          doc.rect(14, y, pageWidth - 28, contentHeight, 'FD');
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7.5);
+          doc.setTextColor(51, 65, 85);
+          const safeOrigin = cleanPdfText(log.origin || 'Partida');
+          const safeDest = cleanPdfText(log.destination || 'Chegada');
+          doc.text(`Trajeto: ${safeOrigin} -> ${safeDest}`, 17, y + 4.5);
 
           doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
           doc.setTextColor(100, 116, 139);
-          const roadStr = (log.road || 'Padrão').split(' ')[0].substring(0, 12);
-          doc.text(roadStr, 176, y + 5);
+          const roadClean = cleanPdfText(log.road || 'Normal');
+          doc.text(`Estrada: ${roadClean} | Avaliacao: ${log.rating || 5}/5.0 | Moto: ${cleanPdfText(log.bike || pilotMotorcycle || '')}`, 17, y + 8.5);
 
-          y += 7.5;
+          // Renderização das Etapas Concluídas (Stages)
+          if (stagesCount > 0) {
+            let stageY = y + 13;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(6.5);
+            doc.setTextColor(234, 88, 12); // orange-600
+            doc.text(`ETAPAS & PONTOS DE PARADA CONCLUIDOS (${stagesCount}):`, 17, stageY);
+
+            stageY += 4;
+            log.stages!.forEach((st, sidx) => {
+              doc.setFont('helvetica', 'bold');
+              doc.setFontSize(6.5);
+              doc.setTextColor(16, 185, 129); // emerald
+              doc.text(`[OK]`, 18, stageY);
+
+              doc.setFont('helvetica', 'normal');
+              doc.setTextColor(30, 41, 59);
+              const stageTypeLabel = cleanPdfText(STAGE_LABELS[st.type] || st.type);
+              const stageName = cleanPdfText(st.name || 'Parada');
+              const kmPart = st.kmMark ? ` - KM ${cleanPdfText(st.kmMark)}` : '';
+              const notesPart = st.notes ? ` (${cleanPdfText(st.notes)})` : '';
+
+              doc.text(`Etapa ${sidx + 1}: ${stageName} [${stageTypeLabel}]${kmPart}${notesPart}`, 25, stageY);
+              stageY += 4.5;
+            });
+
+            y += contentHeight + 4;
+          } else {
+            y += contentHeight + 4;
+          }
         });
       }
 
-      // Footer with page numbering
+      // Rodapé oficial em todas as páginas
       const totalPages = doc.getNumberOfPages();
       for (let p = 1; p <= totalPages; p++) {
         doc.setPage(p);
@@ -421,15 +508,15 @@ export function TripReportModal({
         doc.setFontSize(6.5);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(148, 163, 184);
-        doc.text(`Documento emitido via MotoLegado · Autenticação: ${reportId}`, 14, pageHeight - 6);
-        doc.text(`Página ${p} de ${totalPages}`, pageWidth - 14, pageHeight - 6, { align: 'right' });
+        doc.text(`Documento emitido via Diario de Bordo MotoLegado · Autenticacao: ${reportId}`, 14, pageHeight - 6);
+        doc.text(`Pagina ${p} de ${totalPages}`, pageWidth - 14, pageHeight - 6, { align: 'right' });
       }
 
       const safeName = (pilotName || 'Piloto').toLowerCase().replace(/\s+/g, '_');
       const today = new Date().toISOString().slice(0, 10);
-      const filename = `MotoLegado_Relatorio_Viagens_${safeName}_${today}.pdf`;
+      const filename = `MotoLegado_Diario_Roteiros_${safeName}_${today}.pdf`;
 
-      // Download real PDF
+      // Download do PDF
       doc.save(filename);
 
       setStatusMessage({ 
@@ -439,10 +526,10 @@ export function TripReportModal({
       setTimeout(() => setStatusMessage(null), 5000);
     } catch (err: any) {
       console.error('Erro ao gerar PDF com jsPDF:', err);
-      // Tentativa de fallback via window.print() se suportado
+      // Tentativa de fallback via window.print() se falhar
       try {
         window.print();
-        setStatusMessage({ text: 'Menu de impressão aberto.', type: 'info' });
+        setStatusMessage({ text: 'Menu de impressão aberto para salvar como PDF.', type: 'info' });
       } catch (printErr) {
         setStatusMessage({ text: 'Falha ao gerar PDF. Baixe a planilha CSV como alternativa.', type: 'error' });
       }
@@ -451,18 +538,28 @@ export function TripReportModal({
     }
   };
 
-  // 3. Compartilhamento Rápido no WhatsApp
+  // 3. Impressão direta pelo navegador (permite Salvar como PDF nativo de alta resolução)
+  const handlePrint = () => {
+    try {
+      window.print();
+    } catch (e) {
+      console.error('Erro ao disparar impressão:', e);
+      setStatusMessage({ text: 'Use o botão "BAIXAR PDF" para obter o arquivo.', type: 'info' });
+    }
+  };
+
+  // 4. Compartilhamento Rápido no WhatsApp
   const handleShareWhatsApp = () => {
     const text = 
-      `🏍️ *RELATÓRIO DE EXPEDIÇÕES MOTOLEGADO*\n` +
+      `🏍️ *RELATÓRIO DO DIÁRIO DE BORDO - MOTOLEGADO*\n` +
       `👤 *Piloto:* ${pilotName || 'Piloto'}\n` +
       `🛡️ *Moto Clube:* ${pilotClub || 'Independente'}\n` +
       `🔥 *Máquina:* ${pilotMotorcycle || 'Moto Cadastrada'}\n\n` +
-      `📊 *Telemetria Acumulada:*\n` +
-      `🛣️ *Quilometragem Total:* ${metrics.totalKm.toLocaleString()} KM\n` +
-      `📍 *Expedições Concluídas:* ${metrics.totalTrips}\n` +
-      `⚡ *Média por Viagem:* ${metrics.avgKm.toLocaleString()} KM\n` +
-      `⭐ *Avaliação Média das Pistas:* ${metrics.avgRating}/5.0\n\n` +
+      `📊 *Resumo de Telemetria:*\n` +
+      `🛣️ *Quilometragem Acumulada:* ${metrics.totalKm.toLocaleString()} KM\n` +
+      `📍 *Roteiros Concluídos:* ${metrics.totalTrips}\n` +
+      `🏁 *Etapas e Paradas Certificadas:* ${metrics.totalCompletedStages}\n` +
+      `⭐ *Avaliação Média:* ${metrics.avgRating}/5.0\n\n` +
       `_Emitido via Diário de Bordo Oficial MotoLegado_`;
 
     if (navigator.clipboard) {
@@ -479,13 +576,16 @@ export function TripReportModal({
     }
   };
 
-  // 4. Copiar Tabela em Texto para Área de Transferência
+  // 5. Copiar Tabela em Texto para Área de Transferência
   const handleCopyClipboard = () => {
     const lines = [
-      `RELATÓRIO DE VIAGENS MOTOLEGADO - ${pilotName || 'PILOTO'}`,
-      `Quilometragem Total: ${metrics.totalKm.toLocaleString()} KM | Viagens: ${metrics.totalTrips}`,
+      `RELATÓRIO DO DIÁRIO DE BORDO MOTOLEGADO - ${pilotName || 'PILOTO'}`,
+      `Quilometragem Total: ${metrics.totalKm.toLocaleString()} KM | Roteiros: ${metrics.totalTrips} | Etapas Concluídas: ${metrics.totalCompletedStages}`,
       `----------------------------------------------------------------`,
-      ...filteredLogs.map(l => `${l.date || '—'} | ${l.title || 'Sem título'} | ${l.origin || ''} -> ${l.destination || ''} | ${l.distance || 0} KM`),
+      ...displayLogs.map(l => {
+        const stStr = l.stages && l.stages.length > 0 ? ` [${l.stages.length} etapas]` : '';
+        return `${l.date || '—'} | ${l.title || 'Sem título'} | ${l.origin || ''} -> ${l.destination || ''} | ${l.distance || 0} KM${stStr}`;
+      }),
     ];
     if (navigator.clipboard) {
       navigator.clipboard.writeText(lines.join('\n'));
@@ -498,7 +598,7 @@ export function TripReportModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-black/85 backdrop-blur-md">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto bg-black/85 backdrop-blur-md">
         
         {/* Print Stylesheet for Browser Printing */}
         <style dangerouslySetInnerHTML={{ __html: `
@@ -554,6 +654,11 @@ export function TripReportModal({
             .print-text-muted {
               color: #64748b !important;
             }
+            .print-badge {
+              border: 1px solid #cbd5e1 !important;
+              background-color: #f1f5f9 !important;
+              color: #0f172a !important;
+            }
           }
         ` }} />
 
@@ -561,25 +666,25 @@ export function TripReportModal({
           initial={{ opacity: 0, scale: 0.96, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 15 }}
-          className="relative w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+          className="relative w-full max-w-5xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
         >
           {/* Top Bar / Header */}
           <div className="no-print p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-slate-950/70">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-orange-600/20 border border-orange-500/40 flex items-center justify-center text-orange-400">
+              <div className="w-10 h-10 rounded-2xl bg-orange-600/20 border border-orange-500/40 flex items-center justify-center text-orange-400 shrink-0">
                 <FileDown size={20} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg sm:text-xl font-black italic uppercase text-white tracking-tight">
-                    RELATÓRIOS DO DIÁRIO DE BORDO
+                    EXPORTAR DIÁRIO DE BORDO
                   </h2>
-                  <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[9px] font-black uppercase tracking-wider">
-                    Plano Pro & VIP
+                  <span className="px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[9px] font-black uppercase tracking-wider font-mono">
+                    PDF & Impressão
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Exporte o dossiê oficial das suas expedições em PDF direto e planilha CSV.
+                  Salve seus roteiros e etapas concluídas em formato PDF para impressão física ou arquivamento digital.
                 </p>
               </div>
             </div>
@@ -615,53 +720,88 @@ export function TripReportModal({
             )}
           </AnimatePresence>
 
-          {/* Quick Action Controls & Filters Bar */}
-          <div className="no-print p-4 sm:px-6 bg-slate-950/40 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-            {/* Filter by Period */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Período:</span>
-              <div className="inline-flex p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs font-bold">
-                {[
-                  { id: 'all', label: 'Todas as Viagens' },
-                  { id: 'year', label: 'Este Ano' },
-                  { id: '6months', label: 'Últimos 6 Meses' },
-                  { id: '30days', label: 'Últimos 30 Dias' },
-                ].map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => setDateFilter(f.id as any)}
-                    className={cn(
-                      "px-2.5 sm:px-3 py-1 rounded-lg transition-all text-[11px] font-black uppercase tracking-wider cursor-pointer",
-                      dateFilter === f.id
-                        ? "bg-orange-600 text-white shadow-md shadow-orange-600/30"
-                        : "text-slate-400 hover:text-white"
-                    )}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+          {/* Filters Bar: Roteiro & Período */}
+          <div className="no-print p-4 sm:px-6 bg-slate-950/50 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+            
+            {/* Seletor de Roteiro Individual ou Todos */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Route size={14} className="text-orange-500" />
+                  Roteiro:
+                </span>
+                <select
+                  value={selectedTripId}
+                  onChange={(e) => setSelectedTripId(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-orange-500/60 max-w-[220px] sm:max-w-xs"
+                >
+                  <option value="all">Todos os Roteiros ({filteredByDateLogs.length})</option>
+                  {logs.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.title || 'Roteiro sem título'} {l.stages?.length ? `(${l.stages.length} etapas)` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {/* Período (apenas quando vendo todos) */}
+              {selectedTripId === 'all' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Período:</span>
+                  <div className="inline-flex p-0.5 bg-slate-900 rounded-xl border border-slate-800 text-xs font-bold">
+                    {[
+                      { id: 'all', label: 'Tudo' },
+                      { id: 'year', label: 'Ano' },
+                      { id: '6months', label: '6M' },
+                      { id: '30days', label: '30D' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => setDateFilter(f.id as any)}
+                        className={cn(
+                          "px-2 sm:px-2.5 py-1 rounded-lg transition-all text-[10px] font-black uppercase tracking-wider cursor-pointer",
+                          dateFilter === f.id
+                            ? "bg-orange-600 text-white shadow-sm"
+                            : "text-slate-400 hover:text-white"
+                        )}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Main Export Action Buttons */}
+            {/* Quick Action Export Buttons */}
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="btn-secondary py-2 px-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer hover:border-slate-600 active:scale-95 transition-transform"
+                title="Abrir diálogo de impressão do navegador ou Salvar como PDF nativo"
+              >
+                <Printer size={15} className="text-slate-300" />
+                <span className="hidden sm:inline">IMPRIMIR</span>
+              </button>
+
               <button
                 type="button"
                 disabled={isGenerating}
                 onClick={handleExportCSV}
-                className="btn-secondary py-2 px-3.5 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer hover:border-emerald-500/50 hover:text-emerald-400 active:scale-95 transition-transform disabled:opacity-50"
+                className="btn-secondary py-2 px-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer hover:border-emerald-500/50 hover:text-emerald-400 active:scale-95 transition-transform disabled:opacity-50"
                 title="Baixar planilha compatível com Excel e Google Sheets"
               >
                 <FileSpreadsheet size={15} className="text-emerald-400" />
-                <span>BAIXAR CSV</span>
+                <span className="hidden sm:inline">CSV</span>
               </button>
 
               <button
                 type="button"
                 disabled={isGenerating}
                 onClick={handleGeneratePDF}
-                className="btn-primary py-2 px-4 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-lg shadow-orange-600/20 active:scale-95 transition-transform disabled:opacity-50"
-                title="Gerar e baixar o relatório oficial em formato PDF"
+                className="btn-primary py-2 px-3.5 sm:px-4 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-lg shadow-orange-600/20 active:scale-95 transition-transform disabled:opacity-50"
+                title="Gerar e baixar arquivo PDF completo com roteiros e etapas concluídas"
               >
                 <Download size={15} />
                 <span>BAIXAR PDF</span>
@@ -669,63 +809,34 @@ export function TripReportModal({
 
               <button
                 type="button"
-                onClick={handleCopyClipboard}
-                className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors"
-                title="Copiar dados para área de transferência"
-              >
-                {copiedCSV ? (
-                  <>
-                    <Check size={14} className="text-emerald-400" />
-                    <span className="hidden sm:inline text-emerald-400">Copiado!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={14} />
-                    <span className="hidden sm:inline">Copiar</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
                 onClick={handleShareWhatsApp}
-                className="p-2 sm:px-3 sm:py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="p-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors"
                 title="Compartilhar resumo no WhatsApp"
               >
-                {copiedShare ? (
-                  <>
-                    <Check size={14} className="text-emerald-400" />
-                    <span className="hidden sm:inline">Copiado!</span>
-                  </>
-                ) : (
-                  <>
-                    <Share2 size={14} />
-                    <span className="hidden sm:inline">WhatsApp</span>
-                  </>
-                )}
+                {copiedShare ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
               </button>
             </div>
           </div>
 
           {/* Document Content / Print Preview Area */}
-          <div className="p-4 sm:p-8 overflow-y-auto flex-1 space-y-6">
+          <div className="p-3 sm:p-6 md:p-8 overflow-y-auto flex-1 space-y-6">
             
             {/* The printable card container */}
-            <div id="printable-report" className="bg-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 text-slate-200">
+            <div id="printable-report" className="bg-slate-950 border border-slate-800 rounded-3xl p-5 sm:p-8 space-y-6 text-slate-200">
               
               {/* Document Header */}
-              <div className="border-b border-slate-800 pb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="border-b border-slate-800 pb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-orange-500 font-black tracking-widest text-sm uppercase">MOTOLEGADO</span>
                     <span className="text-slate-600">·</span>
-                    <span className="text-slate-400 text-xs uppercase font-bold tracking-wider">PLATAFORMA OFICIAL DO MOTOCICLISMO</span>
+                    <span className="text-slate-400 text-xs uppercase font-bold tracking-wider">DIÁRIO DE BORDO OFICIAL</span>
                   </div>
                   <h1 className="text-2xl sm:text-3xl font-black italic uppercase text-white tracking-tight print-text-dark">
-                    DOSSIÊ DO DIÁRIO DE BORDO
+                    {selectedTripId !== 'all' ? 'DOSSIÊ DE ROTEIRO & ETAPAS' : 'DOSSIÊ OFICIAL DE ROTEIROS'}
                   </h1>
                   <p className="text-xs text-slate-400 mt-1 print-text-muted">
-                    Relatório oficial de expedições, quilometragem certificada e histórico de asfalto.
+                    Histórico consolidado de roteiros percorridos, quilometragem certificada e etapas concluídas.
                   </p>
                 </div>
 
@@ -773,107 +884,145 @@ export function TripReportModal({
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 print-card">
-                  <div className="text-[9px] font-black uppercase text-slate-500 tracking-wider print-text-muted">EXPEDIÇÕES CONCLUÍDAS</div>
+                  <div className="text-[9px] font-black uppercase text-slate-500 tracking-wider print-text-muted">ROTEIROS CONCLUÍDOS</div>
                   <div className="text-xl sm:text-2xl font-black italic text-white mt-1 print-text-dark">
-                    {metrics.totalTrips} <span className="text-xs text-slate-500 font-sans print-text-muted">viagens</span>
+                    {metrics.totalTrips} <span className="text-xs text-slate-500 font-sans print-text-muted">expedições</span>
                   </div>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 print-card">
-                  <div className="text-[9px] font-black uppercase text-slate-500 tracking-wider print-text-muted">MÉDIA POR EXPEDIÇÃO</div>
-                  <div className="text-xl sm:text-2xl font-black italic text-amber-400 mt-1 font-mono">
-                    {metrics.avgKm.toLocaleString()} <span className="text-xs text-slate-500 font-sans print-text-muted">KM</span>
+                  <div className="text-[9px] font-black uppercase text-slate-500 tracking-wider print-text-muted">ETAPAS CONCLUÍDAS</div>
+                  <div className="text-xl sm:text-2xl font-black italic text-emerald-400 mt-1 font-mono flex items-center gap-1.5">
+                    <CheckCircle2 size={18} className="text-emerald-400" />
+                    <span>{metrics.totalCompletedStages}</span>
                   </div>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 print-card">
                   <div className="text-[9px] font-black uppercase text-slate-500 tracking-wider print-text-muted">ESTRADAS AVALIADAS</div>
-                  <div className="text-xl sm:text-2xl font-black italic text-emerald-400 mt-1 flex items-center gap-1.5 print-text-dark">
-                    <Star size={16} className="fill-emerald-400 text-emerald-400" />
+                  <div className="text-xl sm:text-2xl font-black italic text-amber-400 mt-1 flex items-center gap-1.5 print-text-dark">
+                    <Star size={16} className="fill-amber-400 text-amber-400" />
                     <span>{metrics.avgRating}</span>
                     <span className="text-xs text-slate-500 font-sans print-text-muted">/ 5.0</span>
                   </div>
                 </div>
               </div>
 
-              {/* Table of Trips */}
-              <div className="space-y-3">
+              {/* Roteiros e Etapas Detalhadas */}
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-black uppercase italic tracking-wider text-white print-text-dark flex items-center gap-2">
                     <Route size={16} className="text-orange-500" />
-                    <span>Registro Detalhado das Viagens ({filteredLogs.length})</span>
+                    <span>Roteiros e Etapas Concluídas ({displayLogs.length})</span>
                   </h3>
                   <span className="text-xs text-slate-500 print-text-muted">
-                    Ordenado cronologicamente
+                    Certificado pelo Diário de Bordo
                   </span>
                 </div>
 
-                {filteredLogs.length === 0 ? (
+                {displayLogs.length === 0 ? (
                   <div className="p-8 text-center border border-dashed border-slate-800 rounded-2xl text-slate-500 text-xs">
-                    Nenhuma viagem registrada no período selecionado.
+                    Nenhum roteiro registrado no período selecionado.
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-2xl border border-slate-800">
-                    <table className="w-full text-left border-collapse print-table">
-                      <thead>
-                        <tr className="bg-slate-900/90 text-slate-400 text-[10px] uppercase font-black tracking-wider border-b border-slate-800">
-                          <th className="p-3">Data</th>
-                          <th className="p-3">Título da Expedição</th>
-                          <th className="p-3">Trajeto (Origem → Destino)</th>
-                          <th className="p-3 text-right">Distância</th>
-                          <th className="p-3">Pista / Clima</th>
-                          <th className="p-3 text-center">Nota</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800/60 text-xs">
-                        {filteredLogs.map((log) => (
-                          <tr key={log.id} className="hover:bg-slate-900/40 transition-colors">
-                            <td className="p-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
-                              {log.date ? new Date(log.date).toLocaleDateString('pt-BR') : '—'}
-                            </td>
-                            <td className="p-3 font-bold text-white italic uppercase print-text-dark">
-                              {log.title || 'Sem Título'}
-                              {log.content && (
-                                <p className="text-[10px] text-slate-400 font-normal line-clamp-1 mt-0.5 print-text-muted">
-                                  {log.content}
-                                </p>
-                              )}
-                            </td>
-                            <td className="p-3 text-slate-300 print-text-dark">
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-semibold">{log.origin || 'Partida'}</span>
-                                  {log.stages && log.stages.length > 0 && log.stages.map((st, sidx) => (
-                                    <span key={st.id || sidx} className="inline-flex items-center gap-1">
-                                      <span className="text-orange-500 font-bold">→</span>
-                                      <span className="text-orange-400 font-medium text-[11px] px-1.5 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 print:border-slate-300 print:text-black">
-                                        {st.name}
-                                      </span>
-                                    </span>
-                                  ))}
-                                  <span className="text-orange-500 font-bold">→</span>
-                                  <span className="font-semibold">{log.destination || 'Chegada'}</span>
-                                </div>
-                                {log.stages && log.stages.length > 0 && (
-                                  <span className="text-[9px] text-slate-500 mt-0.5 print-text-muted">
-                                    {log.stages.length} {log.stages.length === 1 ? 'parada intermediária' : 'paradas intermediárias'}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-3 text-right font-mono font-bold text-orange-400 whitespace-nowrap">
+                  <div className="space-y-4">
+                    {displayLogs.map((log, idx) => (
+                      <div 
+                        key={log.id || idx}
+                        className="rounded-2xl border border-slate-800/90 bg-slate-900/50 p-4 sm:p-5 space-y-4 print-card"
+                      >
+                        {/* Header do Roteiro */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] font-mono text-slate-400 print-text-muted">
+                                {log.date ? new Date(log.date).toLocaleDateString('pt-BR') : '—'}
+                              </span>
+                              <span className="text-slate-600">·</span>
+                              <h4 className="text-base font-black italic uppercase text-white tracking-wide print-text-dark">
+                                {log.title || 'Roteiro Sem Título'}
+                              </h4>
+                            </div>
+                            <p className="text-xs font-bold text-slate-300 flex items-center gap-1.5 mt-1 print-text-dark">
+                              <MapPin size={13} className="text-orange-500 shrink-0" />
+                              <span>{log.origin || 'Partida'}</span>
+                              <span className="text-orange-500">➔</span>
+                              <span>{log.destination || 'Destino'}</span>
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="px-3 py-1 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 font-mono font-bold text-xs print-badge">
                               {log.distance ? `${log.distance} KM` : '—'}
-                            </td>
-                            <td className="p-3 text-slate-400 text-[11px] whitespace-nowrap print-text-muted">
-                              <span>{log.road || 'Padrão'}</span>
-                            </td>
-                            <td className="p-3 text-center font-bold text-amber-400 whitespace-nowrap">
+                            </span>
+                            <span className="px-3 py-1 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold print-badge">
                               ⭐ {log.rating || 5}/5
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Observações / Descrição */}
+                        {log.content && (
+                          <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 text-xs text-slate-300 leading-relaxed print:bg-white print:border-slate-300 print-text-dark">
+                            <p className="italic">{log.content}</p>
+                          </div>
+                        )}
+
+                        {/* Seção de Etapas Concluídas */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-orange-400 flex items-center gap-1.5 print-text-dark">
+                              <CheckCircle2 size={13} className="text-emerald-400" />
+                              Etapas & Paradas Concluídas ({log.stages?.length || 0}):
+                            </span>
+                            {(!log.stages || log.stages.length === 0) && (
+                              <span className="text-[10px] text-slate-500 italic print-text-muted">
+                                Trajeto direto sem paradas intermediárias registradas.
+                              </span>
+                            )}
+                          </div>
+
+                          {log.stages && log.stages.length > 0 && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {log.stages.map((st, sidx) => (
+                                <div 
+                                  key={st.id || sidx}
+                                  className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-start gap-2.5 print-card"
+                                >
+                                  <div className="w-5 h-5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                                    <Check size={12} className="stroke-[3]" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <p className="text-xs font-bold text-white uppercase truncate print-text-dark">
+                                        {sidx + 1}. {st.name}
+                                      </p>
+                                      {st.kmMark && (
+                                        <span className="text-[10px] font-mono text-orange-400 font-bold shrink-0 print-text-dark">
+                                          KM {st.kmMark}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5 print-text-muted">
+                                      <span className="font-semibold text-slate-300 print-text-dark">
+                                        {STAGE_LABELS[st.type] || st.type}
+                                      </span>
+                                      {st.notes && (
+                                        <>
+                                          <span>·</span>
+                                          <span className="italic truncate">{st.notes}</span>
+                                        </>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -885,7 +1034,7 @@ export function TripReportModal({
                   <span>Documento gerado pelo sistema de telemetria e passaporte do piloto MotoLegado</span>
                 </div>
                 <div>
-                  Página 1 de 1 · Código Seguro: <span className="font-mono text-slate-400 print-text-dark">{reportId}</span>
+                  Página 1 de 1 · Código de Autenticação: <span className="font-mono text-slate-400 print-text-dark">{reportId}</span>
                 </div>
               </div>
 
@@ -896,7 +1045,7 @@ export function TripReportModal({
           <div className="no-print p-4 sm:p-5 bg-slate-950/80 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="text-xs text-slate-400 flex items-center gap-2">
               <Sparkles size={14} className="text-amber-400 shrink-0" />
-              <span>Clique em <strong>BAIXAR PDF</strong> para obter o documento oficial ou <strong>BAIXAR CSV</strong> para planilhas.</span>
+              <span>Clique em <strong>BAIXAR PDF</strong> para salvar seu arquivo ou <strong>IMPRIMIR</strong> para enviar diretamente à impressora.</span>
             </div>
 
             <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
@@ -910,19 +1059,18 @@ export function TripReportModal({
 
               <button
                 type="button"
-                disabled={isGenerating}
-                onClick={handleExportCSV}
+                onClick={handlePrint}
                 className="btn-secondary py-2 px-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform"
               >
-                <FileSpreadsheet size={15} className="text-emerald-400" />
-                <span>BAIXAR CSV</span>
+                <Printer size={15} />
+                <span>IMPRIMIR</span>
               </button>
 
               <button
                 type="button"
                 disabled={isGenerating}
                 onClick={handleGeneratePDF}
-                className="btn-primary py-2 px-4 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform shadow-lg shadow-orange-600/20"
+                className="btn-primary py-2 px-4 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform shadow-lg shadow-orange-600/20 disabled:opacity-50"
               >
                 <Download size={15} />
                 <span>BAIXAR PDF</span>

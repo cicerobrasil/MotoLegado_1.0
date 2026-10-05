@@ -121,6 +121,7 @@ export function Logbook() {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<UpgradeFeatureTrigger>('diario_ilimitado');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [selectedTripToExport, setSelectedTripToExport] = useState<LogEntry | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   const defaultStartPoint = getDefaultStartPoint(profile);
@@ -150,16 +151,39 @@ export function Logbook() {
     const routeTitle = searchParams.get('routeTitle');
     if (routeTitle) {
       setTitle(routeTitle.toUpperCase());
-      const dest = searchParams.get('routeDest');
+      const dest = searchParams.get('routeDest') || '';
       if (dest) setDestination(dest);
-      const desc = searchParams.get('routeDesc');
+      const orig = searchParams.get('routeOrigin') || '';
+      if (orig) setOrigin(orig);
+      const desc = searchParams.get('routeDesc') || '';
       if (desc) setContent(desc);
-      const img = searchParams.get('routeImg');
+      const img = searchParams.get('routeImg') || '';
       if (img) setImage(img);
-      const mUrl = searchParams.get('routeMaps');
+      const mUrl = searchParams.get('routeMaps') || '';
       if (mUrl) setMapsUrl(mUrl);
-      const dist = searchParams.get('routeDist');
-      if (dist) setDistance(dist);
+
+      // Preenchimento garantido de distância e duração
+      let dist = searchParams.get('routeDist') || '';
+      let dur = searchParams.get('routeDuration') || '';
+
+      // Se a distância veio vazia ou zerada, extrai do texto ou estima
+      if (!dist || dist.trim() === '' || dist === '0') {
+        const fullTxt = `${routeTitle} ${dest} ${desc}`;
+        const match = fullTxt.match(/(\d{1,4}(?:[.,]\d+)?)\s*(?:km|kms|quilômetros|quilometros)\b/i);
+        dist = match ? match[1].replace(',', '.') : '150';
+      }
+
+      // Se a duração veio vazia, calcula com base na velocidade média de cicloturismo (65 km/h)
+      if (!dur || dur.trim() === '') {
+        const distNum = parseFloat(dist.replace(/\D/g, '')) || 150;
+        const totalMinutes = Math.round((distNum / 65) * 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        dur = hours > 0 ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}` : `${mins}min`;
+      }
+
+      setDistance(dist.replace(/\D/g, '') || '150');
+      setDuration(dur);
       setDate(new Date().toISOString().split('T')[0]);
       setIsFormOpen(true);
       setSearchParams({}, { replace: true });
@@ -220,12 +244,8 @@ export function Logbook() {
     setIsFormOpen(true);
   };
 
-  const handleOpenReportModal = () => {
-    if (!isProOrBonificado) {
-      setUpgradeFeature('relatorio_viagem');
-      setIsUpgradeModalOpen(true);
-      return;
-    }
+  const handleOpenReportModal = (singleTrip?: LogEntry) => {
+    setSelectedTripToExport(singleTrip || null);
     setIsReportModalOpen(true);
   };
 
@@ -256,6 +276,20 @@ export function Logbook() {
 
   // Load logs on mount / auth change
   useEffect(() => {
+    let localLogs: LogEntry[] = [];
+    const saved = localStorage.getItem('motolegado_logs');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          localLogs = parsed;
+          setLogs(parsed);
+        }
+      } catch (e) {
+        console.error('Error loading logbook from localStorage', e);
+      }
+    }
+
     if (isSupabaseConfigured && user) {
       supabase
         .from('logbook_trips')
@@ -281,25 +315,22 @@ export function Logbook() {
               stages: Array.isArray(t.stages) ? t.stages : (Array.isArray(t.checklist_data?.stages) ? t.checklist_data.stages : []),
               mapsUrl: t.maps_url || t.checklist_data?.mapsUrl || undefined
             }));
-            setLogs(mappedLogs);
-          } else {
-            setLogs([]);
+
+            // Merge local and cloud without losing newly saved logs
+            const dict: Record<string, LogEntry> = {};
+            localLogs.forEach(l => { dict[l.id] = l; });
+            mappedLogs.forEach(l => { dict[l.id] = l; });
+            const merged: LogEntry[] = Object.values(dict).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+            setLogs(merged);
+            localStorage.setItem('motolegado_logs', JSON.stringify(merged));
+          } else if (localLogs.length > 0) {
+            setLogs(localLogs);
           }
+        },
+        () => {
+          if (localLogs.length > 0) setLogs(localLogs);
         });
-    } else {
-      const saved = localStorage.getItem('motolegado_logs');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setLogs(parsed);
-            return;
-          }
-        } catch (e) {
-          console.error('Error loading logbook from localStorage', e);
-        }
-      }
-      setLogs([]);
     }
   }, [user, isSupabaseConfigured]);
 
@@ -555,7 +586,17 @@ export function Logbook() {
                   <input 
                     type="text" 
                     value={distance}
-                    onChange={(e) => setDistance(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDistance(val);
+                      const num = parseInt(val.replace(/\D/g, ''), 10);
+                      if (!isNaN(num) && num > 0 && (!duration || duration.trim() === '')) {
+                        const totalMinutes = Math.round((num / 65) * 60);
+                        const hours = Math.floor(totalMinutes / 60);
+                        const mins = totalMinutes % 60;
+                        setDuration(hours > 0 ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}` : `${mins}min`);
+                      }
+                    }}
                     placeholder="Ex: 340km" 
                     className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50" 
                   />
@@ -823,6 +864,19 @@ export function Logbook() {
           )}
 
           <button 
+            type="button"
+            onClick={() => handleOpenReportModal()}
+            className="w-full sm:w-auto px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-orange-500/70 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg group shrink-0 active:scale-95"
+            title="Exportar diário de bordo com roteiros e etapas concluídas em formato PDF para impressão ou arquivo"
+          >
+            <FileDown size={17} className="text-orange-500 group-hover:scale-110 transition-transform" />
+            <span>EXPORTAR DIÁRIO</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-600/20 text-orange-400 font-bold border border-orange-500/30 font-mono">
+              PDF
+            </span>
+          </button>
+
+          <button 
             onClick={handleOpenForm}
             className="w-full sm:w-auto btn-primary"
           >
@@ -864,16 +918,16 @@ export function Logbook() {
           </button>
         </div>
 
-        {/* Action: Exportar Relatórios de Viagem */}
+        {/* Action: Exportar Diário */}
         <button
-          onClick={handleOpenReportModal}
+          onClick={() => handleOpenReportModal()}
           className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-orange-500/50 text-slate-300 hover:text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md group shrink-0 w-full sm:w-auto"
-          title="Exportar dossiê oficial e relatórios das suas viagens em PDF e planilha CSV"
+          title="Exportar roteiros e etapas concluídas em formato PDF para impressão ou arquivo"
         >
           <FileDown size={15} className="text-orange-500 group-hover:scale-110 transition-transform" />
-          <span>Exportar Relatório</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono font-bold">
-            PDF & CSV
+          <span>Exportar Diário</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-orange-500/10 border border-orange-500/30 text-orange-400 font-mono font-bold">
+            PDF & Impressão
           </span>
         </button>
       </div>
@@ -1044,11 +1098,22 @@ export function Logbook() {
                              </div>
                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{log.bike}</p>
                           </div>
-                          <div className={cn(
-                            "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-widest",
-                            log.climate === 'sun' ? "bg-orange-500/10 border-orange-500/20 text-orange-500" : "bg-slate-800 border-slate-700 text-slate-400"
-                          )}>
-                            <Sun size={12} /> CÉU LIMPO
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReportModal(log)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-orange-500/40 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95"
+                              title="Salvar este roteiro e suas etapas concluídas em formato PDF"
+                            >
+                              <FileDown size={13} className="text-orange-500" />
+                              <span>Exportar PDF</span>
+                            </button>
+                            <div className={cn(
+                              "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-widest",
+                              log.climate === 'sun' ? "bg-orange-500/10 border-orange-500/20 text-orange-500" : "bg-slate-800 border-slate-700 text-slate-400"
+                            )}>
+                              <Sun size={12} /> CÉU LIMPO
+                            </div>
                           </div>
                        </div>
                     </div>
@@ -1082,12 +1147,16 @@ export function Logbook() {
 
       <TripReportModal
         isOpen={isReportModalOpen}
-        onClose={() => setIsReportModalOpen(false)}
+        onClose={() => {
+          setIsReportModalOpen(false);
+          setSelectedTripToExport(null);
+        }}
         logs={logs}
         pilotName={profile?.name || user?.user_metadata?.full_name || 'Piloto MotoLegado'}
         pilotClub={profile?.club_name || 'Piloto Independente'}
         pilotMotorcycle={profile?.motorcycle || 'Motocicleta Cadastrada'}
         pilotId={profile?.id || user?.id}
+        initialSelectedTripId={selectedTripToExport?.id}
       />
     </div>
   );

@@ -52,6 +52,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Partner } from './Partners';
 import { CommunityPost, Route, RouteDifficulty } from '../types';
+import { estimateRouteMetrics } from './Routes';
 import { supabase } from '../lib/supabase';
 import { getDbStatus, initDbTables } from '../lib/api';
 import { DateInput } from './DateInput';
@@ -217,6 +218,8 @@ export function CommandCenter() {
   const [isEditingRouteInModal, setIsEditingRouteInModal] = useState(false);
   const [editRouteName, setEditRouteName] = useState('');
   const [editRouteMapsAddress, setEditRouteMapsAddress] = useState('');
+  const [editRouteDistance, setEditRouteDistance] = useState('');
+  const [editRouteDuration, setEditRouteDuration] = useState('');
   const [editRouteDescription, setEditRouteDescription] = useState('');
   const [editRouteRiderTips, setEditRouteRiderTips] = useState('');
   const [editRouteDifficulty, setEditRouteDifficulty] = useState<RouteDifficulty>(RouteDifficulty.MEDIUM);
@@ -823,9 +826,12 @@ export function CommandCenter() {
   };
 
   const handleOpenViewingRoute = (route: Route, editMode = false) => {
+    const metrics = estimateRouteMetrics(route);
     setViewingRouteModal(route);
     setEditRouteName(route.name || '');
     setEditRouteMapsAddress(route.mapsAddress || '');
+    setEditRouteDistance(route.distance ? String(route.distance) : metrics.distance);
+    setEditRouteDuration(route.duration || metrics.duration);
     setEditRouteDescription(route.description || '');
     setEditRouteRiderTips(route.riderTips || '');
     setEditRouteDifficulty(route.difficulty || RouteDifficulty.MEDIUM);
@@ -840,6 +846,8 @@ export function CommandCenter() {
           ...r,
           name: editRouteName.trim() || r.name,
           mapsAddress: editRouteMapsAddress.trim() || r.mapsAddress,
+          distance: parseInt(editRouteDistance.replace(/\D/g, ''), 10) || undefined,
+          duration: editRouteDuration.trim() || undefined,
           description: editRouteDescription.trim() || r.description,
           riderTips: editRouteRiderTips.trim() || r.riderTips,
           difficulty: editRouteDifficulty,
@@ -3989,6 +3997,21 @@ export function CommandCenter() {
                     </p>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-3 p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-center">
+                    <div>
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">DISTÂNCIA ESTIMADA</span>
+                      <p className="text-xs text-orange-400 font-mono font-bold">
+                        {estimateRouteMetrics(viewingRouteModal).distance} KM
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">DURAÇÃO ESTIMADA</span>
+                      <p className="text-xs text-slate-300 font-mono font-bold">
+                        {estimateRouteMetrics(viewingRouteModal).duration}
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="space-y-1">
                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Descrição Completa da Rota:</span>
                     <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">
@@ -4036,6 +4059,29 @@ export function CommandCenter() {
                       onChange={(e) => setEditRouteMapsAddress(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500" 
                     />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Distância Estimada (KM):</label>
+                      <input 
+                        type="text" 
+                        value={editRouteDistance} 
+                        onChange={(e) => setEditRouteDistance(e.target.value)}
+                        placeholder="Ex: 180"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500 font-mono" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Duração Estimada:</label>
+                      <input 
+                        type="text" 
+                        value={editRouteDuration} 
+                        onChange={(e) => setEditRouteDuration(e.target.value)}
+                        placeholder="Ex: 2h 45min"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500 font-mono" 
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-1">
