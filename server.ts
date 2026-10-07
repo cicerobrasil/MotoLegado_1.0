@@ -29,7 +29,10 @@ import { parseGoogleMapsRoute, calculateRouteDistanceAndDuration } from './serve
 async function startServer() {
   const app = express();
   const httpServer = http.createServer(app);
-  const PORT = parseInt(process.env.PORT || '3000', 10);
+  // No ambiente de desenvolvimento (AI Studio), o dev server deve obrigatoriamente rodar na porta 3000
+  const PORT = process.env.NODE_ENV === 'production' && process.env.PORT
+    ? parseInt(process.env.PORT, 10)
+    : 3000;
 
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));

@@ -107,6 +107,14 @@ export default defineConfig(({mode}) => {
         },
       }),
     ],
+    esbuild: {
+      target: 'es2022',
+    },
+    optimizeDeps: {
+      esbuildOptions: {
+        target: 'es2022',
+      },
+    },
     build: {
       target: 'es2022',
       chunkSizeWarningLimit: 1500,
