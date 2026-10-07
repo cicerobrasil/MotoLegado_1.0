@@ -11,6 +11,8 @@ import { TripChecklist } from './TripChecklist';
 import { TripReportModal } from './TripReportModal';
 import { DateInput } from './DateInput';
 import { TripStagesManager, TripStage, STAGE_TYPE_CONFIG } from './TripStagesManager';
+import { Route } from '../types';
+import { estimateRouteMetrics } from './Routes';
 
 export interface LogEntry {
   id: string;
@@ -144,6 +146,82 @@ export function Logbook() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const tripPhotoInputRef = useRef<HTMLInputElement>(null);
 
+  // Roteiros cadastrados para seleção direta no Diário de Bordo
+  const [availableRoutes, setAvailableRoutes] = useState<Route[]>([]);
+  const [selectedRouteId, setSelectedRouteId] = useState<string>('');
+
+  // Carrega roteiros para o seletor
+  useEffect(() => {
+    const loadRoutes = () => {
+      try {
+        const saved = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            setAvailableRoutes(parsed);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao carregar roteiros:', err);
+      }
+      setAvailableRoutes([]);
+    };
+
+    loadRoutes();
+    window.addEventListener('routes-updated', loadRoutes);
+    window.addEventListener('storage', loadRoutes);
+    return () => {
+      window.removeEventListener('routes-updated', loadRoutes);
+      window.removeEventListener('storage', loadRoutes);
+    };
+  }, []);
+
+  // Lógica principal: quando um roteiro é selecionado, calcula e auto-preenche distância, duração e dados
+  const handleSelectRouteForEntry = (routeId: string) => {
+    setSelectedRouteId(routeId);
+    if (!routeId) return;
+
+    const targetRoute = availableRoutes.find(r => r.id === routeId);
+    if (!targetRoute) return;
+
+    // 1. Título do roteiro
+    if (targetRoute.name) {
+      setTitle(targetRoute.name.toUpperCase());
+    }
+
+    // 2. Destino e Ponto de Partida
+    const dest = targetRoute.mapsAddress || targetRoute.endPoint || '';
+    if (dest) {
+      setDestination(dest);
+    }
+    if (targetRoute.startPoint) {
+      setOrigin(targetRoute.startPoint);
+    } else if (defaultStartPoint && (!origin || origin === '')) {
+      setOrigin(defaultStartPoint);
+    }
+
+    // 3. Notas e Descrição
+    if (targetRoute.description) {
+      setContent(targetRoute.description);
+    }
+
+    // 4. Foto de Capa
+    if (targetRoute.image) {
+      setImage(targetRoute.image);
+    }
+
+    // 5. Link Google Maps
+    if (targetRoute.mapsUrl) {
+      setMapsUrl(targetRoute.mapsUrl);
+    }
+
+    // 6. CÁLCULO E AUTO-PREENCHIMENTO DE DISTÂNCIA E DURAÇÃO
+    const metrics = estimateRouteMetrics(targetRoute);
+    setDistance(metrics.distance);
+    setDuration(metrics.duration);
+  };
+
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Se redirecionado a partir de um Roteiro, preenche automaticamente os dados e abre o formulário
@@ -166,14 +244,27 @@ export function Logbook() {
       let dist = searchParams.get('routeDist') || '';
       let dur = searchParams.get('routeDuration') || '';
 
-      // Se a distância veio vazia ou zerada, extrai do texto ou estima
+      // Tenta localizar o roteiro cadastrado correspondente para métricas mais apuradas
+      const matched = availableRoutes.find(r => 
+        (r.name && r.name.toLowerCase() === routeTitle.toLowerCase()) ||
+        (r.mapsAddress && dest && r.mapsAddress.toLowerCase() === dest.toLowerCase())
+      );
+
+      if (matched) {
+        setSelectedRouteId(matched.id);
+        const m = estimateRouteMetrics(matched);
+        if (!dist || dist.trim() === '' || dist === '0') dist = m.distance;
+        if (!dur || dur.trim() === '') dur = m.duration;
+      }
+
+      // Se a distância veio vazia ou zerada, extrai do texto ou calcula
       if (!dist || dist.trim() === '' || dist === '0') {
         const fullTxt = `${routeTitle} ${dest} ${desc}`;
         const match = fullTxt.match(/(\d{1,4}(?:[.,]\d+)?)\s*(?:km|kms|quilômetros|quilometros)\b/i);
         dist = match ? match[1].replace(',', '.') : '150';
       }
 
-      // Se a duração veio vazia, calcula com base na velocidade média de cicloturismo (65 km/h)
+      // Se a duração veio vazia, calcula com base na velocidade média de moto (65 km/h)
       if (!dur || dur.trim() === '') {
         const distNum = parseFloat(dist.replace(/\D/g, '')) || 150;
         const totalMinutes = Math.round((distNum / 65) * 60);
@@ -188,7 +279,7 @@ export function Logbook() {
       setIsFormOpen(true);
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, availableRoutes]);
 
   // Sincroniza dinamicamente ponto de partida e moto quando o perfil for atualizado ou carregado
   useEffect(() => {
@@ -241,6 +332,7 @@ export function Logbook() {
     setDuration('');
     setContent('');
     setImage('');
+    setSelectedRouteId('');
     setIsFormOpen(true);
   };
 
@@ -413,6 +505,7 @@ export function Logbook() {
     setDuration('');
     setContent('');
     setImage('');
+    setSelectedRouteId('');
     setIsFormOpen(false);
   };
 
@@ -490,6 +583,56 @@ export function Logbook() {
                 Abrir Checklist
               </button>
             </div>
+
+            {/* Route Selector (Auto-populates Title, Destination, Distance & Duration) */}
+            {availableRoutes.length > 0 && (
+              <div className="space-y-2.5 p-4 sm:p-5 bg-gradient-to-r from-orange-500/10 via-slate-900/40 to-slate-900/60 border border-orange-500/30 rounded-2xl shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                  <label className="text-[10px] font-black text-orange-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <Navigation size={14} className="text-orange-500" />
+                    SELECIONAR ROTEIRO CADASTRADO (CÁLCULO AUTOMÁTICO DE KM & TEMPO)
+                  </label>
+                  {selectedRouteId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRouteId('');
+                      }}
+                      className="text-[9px] font-black text-slate-400 hover:text-white uppercase transition-colors self-start sm:self-auto cursor-pointer"
+                    >
+                      ✕ Limpar Roteiro
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <select
+                    value={selectedRouteId}
+                    onChange={(e) => handleSelectRouteForEntry(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 hover:border-orange-500/50 focus:border-orange-500 rounded-xl py-3.5 px-4 text-xs font-bold text-white outline-none transition-all cursor-pointer"
+                  >
+                    <option value="">-- Escolha um roteiro para auto-preencher distância, tempo e destino --</option>
+                    {availableRoutes.map((r) => {
+                      const m = estimateRouteMetrics(r);
+                      return (
+                        <option key={r.id} value={r.id}>
+                          {r.name} • {m.distance} KM • {m.duration} ({r.difficulty})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                {selectedRouteId ? (
+                  <p className="text-[10px] text-emerald-400 font-bold flex items-center gap-1.5 ml-1">
+                    <Sparkles size={12} />
+                    Roteiro selecionado! Distância ({distance} KM) e Duração ({duration}) calculadas e preenchidas automaticamente.
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-slate-400 ml-1">
+                    Ao selecionar um roteiro, o título, destino, link do mapa, fotos, distância e duração de pilotagem serão calculados e preenchidos automaticamente.
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Title Input */}
             <div className="space-y-3">
@@ -580,7 +723,14 @@ export function Logbook() {
                 </div>
               </div>
               <div className="space-y-3">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">DISTÂNCIA TOTAL (KM)</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">DISTÂNCIA TOTAL (KM)</label>
+                  {distance && (
+                    <span className="text-[9px] font-bold text-orange-400 font-mono">
+                      {distance.replace(/\D/g, '')} KM
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <Compass className="absolute left-5 top-1/2 -translate-y-1/2 text-orange-500/50 rotate-45" size={16} />
                   <input 
@@ -590,28 +740,49 @@ export function Logbook() {
                       const val = e.target.value;
                       setDistance(val);
                       const num = parseInt(val.replace(/\D/g, ''), 10);
-                      if (!isNaN(num) && num > 0 && (!duration || duration.trim() === '')) {
+                      if (!isNaN(num) && num > 0) {
                         const totalMinutes = Math.round((num / 65) * 60);
                         const hours = Math.floor(totalMinutes / 60);
                         const mins = totalMinutes % 60;
                         setDuration(hours > 0 ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}` : `${mins}min`);
                       }
                     }}
-                    placeholder="Ex: 340km" 
-                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50" 
+                    placeholder="Ex: 288" 
+                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50 font-mono" 
                   />
                 </div>
               </div>
               <div className="space-y-3">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">DURAÇÃO DA VIAGEM</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">DURAÇÃO DA VIAGEM</label>
+                  {distance && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const num = parseInt(distance.replace(/\D/g, ''), 10);
+                        if (!isNaN(num) && num > 0) {
+                          const totalMinutes = Math.round((num / 65) * 60);
+                          const hours = Math.floor(totalMinutes / 60);
+                          const mins = totalMinutes % 60;
+                          setDuration(hours > 0 ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}` : `${mins}min`);
+                        }
+                      }}
+                      className="text-[9px] font-bold text-orange-400 hover:text-orange-300 uppercase flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Recalcular tempo estimado com base na velocidade de pilotagem em viagem (65 km/h com paradas)"
+                    >
+                      <Sparkles size={10} />
+                      <span>Recalcular Tempo</span>
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <Clock className="absolute left-5 top-1/2 -translate-y-1/2 text-orange-500/50" size={16} />
                   <input 
                     type="text" 
                     value={duration}
                     onChange={(e) => setDuration(e.target.value)}
-                    placeholder="Ex: 5h 30min" 
-                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50" 
+                    placeholder="Ex: 4h 24min" 
+                    className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50 font-mono" 
                   />
                 </div>
               </div>
@@ -1103,10 +1274,10 @@ export function Logbook() {
                               type="button"
                               onClick={() => handleOpenReportModal(log)}
                               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-orange-500/40 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95"
-                              title="Salvar este roteiro e suas etapas concluídas em formato PDF"
+                              title="Exportar este roteiro e suas etapas concluídas em formato PDF ou impressão"
                             >
                               <FileDown size={13} className="text-orange-500" />
-                              <span>Exportar PDF</span>
+                              <span>Exportar Roteiro</span>
                             </button>
                             <div className={cn(
                               "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-widest",
