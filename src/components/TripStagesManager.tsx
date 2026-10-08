@@ -21,6 +21,7 @@ import {
   Info
 } from 'lucide-react';
 import { apiParseGoogleMapsRoute } from '../lib/api';
+import { parseGoogleMapsRouteClient } from '../lib/mapsParserClient';
 
 export type StageType = 'fuel' | 'food' | 'scenic' | 'sleep' | 'meet' | 'service' | 'custom';
 
@@ -186,11 +187,32 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
     setImportFeedback(null);
 
     try {
+      let routeData: any = null;
       const res = await apiParseGoogleMapsRoute(clean);
-      if (res.error || !res.data || !res.data.success) {
+      if (res.data && res.data.success && (res.data.origin || res.data.destination || (res.data.waypoints && res.data.waypoints.length > 0))) {
+        routeData = res.data;
+      } else {
+        // Fallback resiliente no cliente para extração imediata
+        const clientParsed = parseGoogleMapsRouteClient(clean);
+        if (clientParsed.origin || clientParsed.destination || clientParsed.waypoints.length > 0) {
+          routeData = {
+            success: true,
+            origin: clientParsed.origin,
+            destination: clientParsed.destination,
+            waypoints: clientParsed.waypoints,
+            title: clientParsed.title,
+            suggestedStages: clientParsed.suggestedStages,
+            fullRouteUrl: clientParsed.fullRouteUrl,
+            estimatedDistanceKm: clientParsed.estimatedDistanceKm,
+            estimatedDuration: clientParsed.estimatedDuration
+          };
+        }
+      }
+
+      if (!routeData) {
         setImportFeedback({ 
           type: 'error', 
-          message: res.error || 'Não foi possível decodificar a rota. Verifique se o link possui origem e destino.' 
+          message: res?.error || 'Não foi possível identificar a rota. Verifique se o link possui origem e destino ou descreva os pontos separados por "->".' 
         });
         setIsImporting(false);
         return;
@@ -204,7 +226,7 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
         fullRouteUrl,
         estimatedDistanceKm,
         estimatedDuration 
-      } = res.data;
+      } = routeData;
 
       if (parsedOrigin) {
         setOrigin(parsedOrigin);

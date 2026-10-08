@@ -49,6 +49,242 @@ function sanitizePilot($pilot) {
     return $pilot;
 }
 
+// -------------------------------------------------------------
+// Utilitários para Processamento de Rotas do Google Maps
+// -------------------------------------------------------------
+
+function resolveRedirectUrl($url) {
+    if (!preg_match('#^https?://#i', $url)) {
+        return $url;
+    }
+    
+    // Tenta cURL primeiro
+    if (function_exists('curl_init')) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_MAXREDIRS, 7);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+        curl_exec($ch);
+        $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        curl_close($ch);
+        if (!empty($finalUrl) && $finalUrl !== $url) {
+            return $finalUrl;
+        }
+    }
+    
+    // Fallback com get_headers
+    $headers = @get_headers($url, 1);
+    if ($headers && isset($headers['Location'])) {
+        $loc = is_array($headers['Location']) ? end($headers['Location']) : $headers['Location'];
+        if (!empty($loc)) return $loc;
+    }
+    
+    return $url;
+}
+
+function cleanLocationName($raw) {
+    if (empty($raw)) return '';
+    $str = trim($raw);
+    if (strpos($str, '?') !== false) {
+        $str = explode('?', $str)[0];
+    }
+    $str = str_replace('+', ' ', $str);
+    $str = urldecode($str);
+    $str = trim($str, "/ \"'");
+    return $str;
+}
+
+function guessStageType($name) {
+    $lower = mb_strtolower($name, 'UTF-8');
+    if (strpos($lower, 'posto') !== false || strpos($lower, 'graal') !== false || strpos($lower, 'ipiranga') !== false || strpos($lower, 'shell') !== false || strpos($lower, 'abastecimento') !== false) {
+        return 'fuel';
+    }
+    if (strpos($lower, 'restaurante') !== false || strpos($lower, 'café') !== false || strpos($lower, 'cafe') !== false || strpos($lower, 'lanchonete') !== false || strpos($lower, 'churrascaria') !== false || strpos($lower, 'almoço') !== false) {
+        return 'food';
+    }
+    if (strpos($lower, 'mirante') !== false || strpos($lower, 'serra') !== false || strpos($lower, 'pico') !== false || strpos($lower, 'cascata') !== false || strpos($lower, 'cachoeira') !== false || strpos($lower, 'parque') !== false || strpos($lower, 'pedra') !== false || strpos($lower, 'praia') !== false) {
+        return 'scenic';
+    }
+    if (strpos($lower, 'hotel') !== false || strpos($lower, 'pousada') !== false || strpos($lower, 'resort') !== false || strpos($lower, 'camping') !== false || strpos($lower, 'hostel') !== false || strpos($lower, 'pernoite') !== false) {
+        return 'sleep';
+    }
+    if (strpos($lower, 'oficina') !== false || strpos($lower, 'motopeças') !== false || strpos($lower, 'borracharia') !== false || strpos($lower, 'revisão') !== false) {
+        return 'service';
+    }
+    if (strpos($lower, 'encontro') !== false || strpos($lower, 'motoclube') !== false || strpos($lower, 'sede') !== false || strpos($lower, 'confraria') !== false) {
+        return 'meet';
+    }
+    return 'scenic';
+}
+
+function parseGoogleMapsRoutePhp($urlOrText) {
+    $input = trim($urlOrText ?? '');
+    $res = [
+        'origin' => '',
+        'destination' => '',
+        'waypoints' => [],
+        'title' => '',
+        'suggestedStages' => [],
+        'fullRouteUrl' => null
+    ];
+    if (empty($input)) return $res;
+
+    // 1. Tenta formato com /maps/dir/ ponto1 / ponto2 / ponto3...
+    if (strpos($input, '/maps/dir/') !== false || strpos($input, '/dir/') !== false) {
+        $dirPos = strpos($input, '/dir/');
+        $afterDir = substr($input, $dirPos + 5);
+        $segments = explode('/', $afterDir);
+        $rawPoints = [];
+
+        foreach ($segments as $seg) {
+            $clean = trim($seg);
+            if (empty($clean) || $clean[0] === '@') continue;
+            if (strpos($clean, 'data=') === 0 || strpos($clean, 'am=') === 0 || strpos($clean, '!1m') !== false || strpos($clean, '!4m') !== false) continue;
+            $loc = cleanLocationName($clean);
+            if (!empty($loc) && !in_array($loc, $rawPoints)) {
+                $rawPoints[] = $loc;
+            }
+        }
+
+        if (count($rawPoints) >= 2) {
+            $res['origin'] = $rawPoints[0];
+            $res['destination'] = end($rawPoints);
+            $res['waypoints'] = array_slice($rawPoints, 1, -1);
+        } else if (count($rawPoints) === 1) {
+            $res['destination'] = $rawPoints[0];
+        }
+    }
+
+    // 2. Tenta parâmetros de busca query (?api=1&origin=...&destination=...&waypoints=...)
+    if (empty($res['origin']) || empty($res['destination'])) {
+        $parsedUrl = parse_url($input);
+        if (isset($parsedUrl['query'])) {
+            parse_str($parsedUrl['query'], $queryParams);
+            if (!empty($queryParams['origin'])) $res['origin'] = cleanLocationName($queryParams['origin']);
+            if (!empty($queryParams['destination'])) $res['destination'] = cleanLocationName($queryParams['destination']);
+            if (!empty($queryParams['waypoints'])) {
+                $wps = explode('|', $queryParams['waypoints']);
+                foreach ($wps as $w) {
+                    $cw = cleanLocationName($w);
+                    if (!empty($cw) && !in_array($cw, $res['waypoints'])) $res['waypoints'][] = $cw;
+                }
+            }
+            if (!empty($queryParams['saddr']) && empty($res['origin'])) {
+                $res['origin'] = cleanLocationName($queryParams['saddr']);
+            }
+            if (!empty($queryParams['daddr']) && empty($res['destination'])) {
+                $parts = preg_split('/\s*\+?to:\s*/i', $queryParams['daddr']);
+                $res['destination'] = cleanLocationName($parts[0]);
+                if (count($parts) > 1) {
+                    for ($i = 1; $i < count($parts); $i++) {
+                        $cw = cleanLocationName($parts[$i]);
+                        if (!empty($cw) && !in_array($cw, $res['waypoints'])) $res['waypoints'][] = $cw;
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Texto com delimitadores (-> / ➔ / → / /)
+    if (empty($res['origin']) && empty($res['destination'])) {
+        $delim = null;
+        if (strpos($input, '->') !== false) $delim = '->';
+        else if (strpos($input, '➔') !== false) $delim = '➔';
+        else if (strpos($input, '→') !== false) $delim = '→';
+        else if (strpos($input, '/') !== false && strpos($input, 'http') === false) $delim = '/';
+
+        if ($delim) {
+            $rawList = array_map('cleanLocationName', explode($delim, $input));
+            $rawList = array_values(array_filter($rawList));
+            if (count($rawList) >= 2) {
+                $res['origin'] = $rawList[0];
+                $res['destination'] = end($rawList);
+                $res['waypoints'] = array_slice($rawList, 1, -1);
+            }
+        }
+    }
+
+    // Título e estágios sugeridos
+    if (!empty($res['origin']) && !empty($res['destination'])) {
+        $res['title'] = "{$res['origin']} a {$res['destination']}";
+    } else if (!empty($res['destination'])) {
+        $res['title'] = "Roteiro para {$res['destination']}";
+    }
+
+    $res['suggestedStages'] = array_map(function($wp) {
+        return [
+            'name' => $wp,
+            'type' => guessStageType($wp),
+            'notes' => ''
+        ];
+    }, $res['waypoints']);
+
+    if (!empty($res['origin']) && !empty($res['destination'])) {
+        $origEnc = urlencode($res['origin']);
+        $destEnc = urlencode($res['destination']);
+        $wpParam = !empty($res['waypoints']) ? '&waypoints=' . implode('|', array_map('urlencode', $res['waypoints'])) : '';
+        $res['fullRouteUrl'] = "https://www.google.com/maps/dir/?api=1&origin={$origEnc}&destination={$destEnc}{$wpParam}&travelmode=driving";
+    }
+
+    return $res;
+}
+
+function calculateRouteMetricsPhp($origin, $destination, $waypoints = []) {
+    $all = array_merge([$origin], $waypoints, [$destination]);
+    $legCount = max(1, count($all) - 1);
+    
+    // Tenta geocodificar com Nominatim e calcular via OSRM
+    $coords = [];
+    foreach ($all as $loc) {
+        $found = null;
+        $q = urlencode($loc . ', Brasil');
+        $ctx = stream_context_create([
+            'http' => [
+                'timeout' => 2,
+                'header' => "User-Agent: MotoLegadoApp/2.0\r\n"
+            ]
+        ]);
+        $geoJson = @file_get_contents("https://nominatim.openstreetmap.org/search?q={$q}&format=json&limit=1", false, $ctx);
+        if ($geoJson) {
+            $data = json_decode($geoJson, true);
+            if (!empty($data[0]['lat']) && !empty($data[0]['lon'])) {
+                $found = [$data[0]['lon'], $data[0]['lat']];
+            }
+        }
+        if ($found) $coords[] = $found;
+    }
+
+    if (count($coords) >= 2) {
+        $coordStr = implode(';', array_map(function($c) { return "{$c[0]},{$c[1]}"; }, $coords));
+        $osrmJson = @file_get_contents("https://router.project-osrm.org/route/v1/driving/{$coordStr}?overview=false", false, stream_context_create(['http' => ['timeout' => 3]]));
+        if ($osrmJson) {
+            $routeData = json_decode($osrmJson, true);
+            if (!empty($routeData['routes'][0])) {
+                $meters = $routeData['routes'][0]['distance'];
+                $seconds = $routeData['routes'][0]['duration'];
+                $factor = count($all) / count($coords);
+                $km = max(1, round(($meters / 1000) * ($factor > 1 ? 1.15 : 1)));
+                $mins = max(1, round(($seconds / 60) * ($factor > 1 ? 1.15 : 1)));
+                $h = floor($mins / 60);
+                $m = $mins % 60;
+                $dur = $h > 0 ? "{$h}h " . ($m > 0 ? "{$m}min" : "") : "{$m}min";
+                return ['distanceKm' => $km, 'duration' => trim($dur)];
+            }
+        }
+    }
+
+    // Fallback rodoviário proporcional garantido
+    $km = round($legCount * 85);
+    $mins = round($km * 1.05);
+    $h = floor($mins / 60);
+    $m = $mins % 60;
+    return ['distanceKm' => $km, 'duration' => "{$h}h " . ($m > 0 ? "{$m}min" : "15min")];
+}
+
 // Inicializador de tabelas MySQL automático na Hostinger
 function ensureDatabaseSchema($pdo) {
     static $initialized = false;
@@ -911,6 +1147,89 @@ if ($route === '/trips' && $method === 'POST') {
     saveLocalStore($store);
 
     echo json_encode(['success' => true, 'trip' => $fullTrip]);
+    exit;
+}
+
+// 9. Processar rota e decodificar link do Google Maps: POST /routes/parse-maps
+if ($route === '/routes/parse-maps' && $method === 'POST') {
+    $input = trim($body['url'] ?? ($body['text'] ?? ''));
+    if (empty($input)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Nenhum link ou texto de rota informado.']);
+        exit;
+    }
+
+    $targetUrl = resolveRedirectUrl($input);
+    $parsed = parseGoogleMapsRoutePhp($targetUrl);
+
+    if (empty($parsed['origin']) && empty($parsed['destination']) && empty($parsed['waypoints'])) {
+        http_response_code(422);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Não foi possível identificar os pontos da rota. Certifique-se de colar um link de rota (direções/itinerário) do Google Maps ou descrever as paradas separadas por "->".',
+            'resolvedUrl' => $targetUrl
+        ]);
+        exit;
+    }
+
+    $metrics = calculateRouteMetricsPhp($parsed['origin'], $parsed['destination'], $parsed['waypoints']);
+    $parsed['estimatedDistanceKm'] = $metrics['distanceKm'];
+    $parsed['estimatedDuration'] = $metrics['duration'];
+    $parsed['resolvedUrl'] = $targetUrl;
+
+    echo json_encode(array_merge(['success' => true], $parsed));
+    exit;
+}
+
+// 10. Calcular métricas rodoviárias: POST /routes/calculate-metrics
+if ($route === '/routes/calculate-metrics' && $method === 'POST') {
+    $origin = trim($body['origin'] ?? '');
+    $destination = trim($body['destination'] ?? '');
+    $waypoints = $body['waypoints'] ?? [];
+    if (empty($origin) || empty($destination)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Origem e destino são obrigatórios para cálculo de rota.']);
+        exit;
+    }
+    $metrics = calculateRouteMetricsPhp($origin, $destination, is_array($waypoints) ? $waypoints : []);
+    echo json_encode(array_merge(['success' => true], $metrics));
+    exit;
+}
+
+// 11. Excluir viagem: DELETE /trips/{id}
+if (preg_match('#^/trips/([^/]+)$#', $route, $matches) && $method === 'DELETE') {
+    $tripId = $matches[1];
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM trips WHERE id = ?");
+            $stmt->execute([$tripId]);
+        } catch (Exception $e) {}
+    }
+    $store = loadLocalStore();
+    if (isset($store['trips'])) {
+        $store['trips'] = array_values(array_filter($store['trips'], function($t) use ($tripId) {
+            return ($t['id'] ?? '') !== $tripId;
+        }));
+        saveLocalStore($store);
+    }
+    echo json_encode(['success' => true, 'message' => 'Viagem excluída com sucesso!']);
+    exit;
+}
+
+// 12. Listar pilotos: GET /pilots
+if ($route === '/pilots' && $method === 'GET') {
+    $pilots = [];
+    if ($pdo) {
+        try {
+            $stmt = $pdo->query("SELECT * FROM pilots ORDER BY created_at DESC");
+            $pilots = array_map('sanitizePilot', $stmt->fetchAll());
+        } catch (Exception $e) {}
+    }
+    if (empty($pilots)) {
+        $store = loadLocalStore();
+        $pilots = array_values(array_map('sanitizePilot', $store['pilots'] ?? []));
+    }
+    echo json_encode(['success' => true, 'pilots' => $pilots]);
     exit;
 }
 
