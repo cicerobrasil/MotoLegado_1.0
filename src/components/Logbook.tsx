@@ -309,6 +309,39 @@ export function Logbook() {
     return 'Período Personalizado';
   }, [startDateFilter, endDateFilter]);
 
+  // Cálculos de métricas e estatísticas para exibição no Diário de Bordo (chamados incondicionalmente no topo)
+  const totalKmCalculated = useMemo(() => {
+    return logs.reduce((acc, curr) => {
+      const num = parseInt(curr.distance, 10);
+      return acc + (isNaN(num) ? 0 : num);
+    }, 0);
+  }, [logs]);
+
+  const filteredKmCalculated = useMemo(() => {
+    return filteredLogs.reduce((acc, curr) => {
+      const num = parseInt(curr.distance, 10);
+      return acc + (isNaN(num) ? 0 : num);
+    }, 0);
+  }, [filteredLogs]);
+
+  const filteredMinutesCalculated = useMemo(() => {
+    return filteredLogs.reduce((acc, curr) => {
+      return acc + parseDurationToMinutes(curr.duration);
+    }, 0);
+  }, [filteredLogs]);
+
+  const filteredDurationFormatted = useMemo(() => {
+    return formatMinutesToReadable(filteredMinutesCalculated);
+  }, [filteredMinutesCalculated]);
+
+  const filteredPhotosCount = useMemo(() => {
+    return filteredLogs.reduce((acc, curr) => {
+      const proofs = curr.documentaryProofs?.length || 0;
+      const extraPhotos = curr.photos?.length || 0;
+      return acc + Math.max(proofs, extraPhotos, curr.image ? 1 : 0);
+    }, 0);
+  }, [filteredLogs]);
+
   const defaultStartPoint = getDefaultStartPoint(profile);
 
   // Form State
@@ -1666,38 +1699,6 @@ export function Logbook() {
       </div>
     );
   }
-
-  const totalKmCalculated = useMemo(() => {
-    return logs.reduce((acc, curr) => {
-      const num = parseInt(curr.distance, 10);
-      return acc + (isNaN(num) ? 0 : num);
-    }, 0);
-  }, [logs]);
-
-  const filteredKmCalculated = useMemo(() => {
-    return filteredLogs.reduce((acc, curr) => {
-      const num = parseInt(curr.distance, 10);
-      return acc + (isNaN(num) ? 0 : num);
-    }, 0);
-  }, [filteredLogs]);
-
-  const filteredMinutesCalculated = useMemo(() => {
-    return filteredLogs.reduce((acc, curr) => {
-      return acc + parseDurationToMinutes(curr.duration);
-    }, 0);
-  }, [filteredLogs]);
-
-  const filteredDurationFormatted = useMemo(() => {
-    return formatMinutesToReadable(filteredMinutesCalculated);
-  }, [filteredMinutesCalculated]);
-
-  const filteredPhotosCount = useMemo(() => {
-    return filteredLogs.reduce((acc, curr) => {
-      const proofs = curr.documentaryProofs?.length || 0;
-      const extraPhotos = curr.photos?.length || 0;
-      return acc + Math.max(proofs, extraPhotos, curr.image ? 1 : 0);
-    }, 0);
-  }, [filteredLogs]);
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-12 bg-slate-950 min-h-screen">
