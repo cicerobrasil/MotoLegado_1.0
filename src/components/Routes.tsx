@@ -151,6 +151,23 @@ export function Routes() {
     navigate(`/logbook?${query}`);
   };
 
+  const handleCompleteRouteWithCamera = (targetRoute: Route, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const metrics = estimateRouteMetrics(targetRoute);
+    const query = new URLSearchParams({
+      routeTitle: targetRoute.name,
+      routeDest: targetRoute.mapsAddress || targetRoute.endPoint || '',
+      routeOrigin: targetRoute.startPoint || '',
+      routeDesc: targetRoute.description || '',
+      routeImg: targetRoute.image || '',
+      routeMaps: targetRoute.mapsUrl || '',
+      routeDist: metrics.distance,
+      routeDuration: metrics.duration,
+      openCamera: 'true'
+    }).toString();
+    navigate(`/logbook?${query}`);
+  };
+
   const [routes, setRoutes] = useState<Route[]>([]);
   const [activeFilter, setActiveFilter] = useState<'todos' | 'populares' | 'favoritos' | 'meus' | 'moderacao'>('todos');
   const [searchText, setSearchText] = useState('');
@@ -810,14 +827,25 @@ export function Routes() {
                 )}
 
                 <div className="space-y-2 mt-2">
-                  <button 
-                    onClick={(e) => handleLaunchInLogbook(route, e)}
-                    className="w-full py-2.5 rounded-xl bg-orange-600/10 hover:bg-orange-600 text-orange-400 hover:text-white border border-orange-500/30 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm group/btn"
-                    title="Lançar este roteiro no seu Diário de Bordo para alimentar o Dashboard"
-                  >
-                    <BookOpen size={13} className="group-hover/btn:scale-110 transition-transform" />
-                    <span>Lançar no Diário de Bordo</span>
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={(e) => handleLaunchInLogbook(route, e)}
+                      className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm group/btn"
+                      title="Lançar este roteiro no seu Diário de Bordo para alimentar o Dashboard"
+                    >
+                      <BookOpen size={13} className="text-orange-500 group-hover/btn:scale-110 transition-transform" />
+                      <span>No Diário</span>
+                    </button>
+
+                    <button 
+                      onClick={(e) => handleCompleteRouteWithCamera(route, e)}
+                      className="py-2.5 rounded-xl bg-orange-600/15 hover:bg-orange-600 text-orange-400 hover:text-white border border-orange-500/40 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm group/cam active:scale-95"
+                      title="Tirar foto com a câmera para comprovar e concluir este roteiro no Diário de Bordo"
+                    >
+                      <Camera size={13} className="group-hover/cam:scale-110 transition-transform" />
+                      <span>Comprovar</span>
+                    </button>
+                  </div>
 
                   <button 
                     onClick={() => setSelectedRouteDetail(route)}
@@ -1438,22 +1466,32 @@ export function Routes() {
                   <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => handleLaunchInLogbook(selectedRouteDetail)}
+                      onClick={() => handleCompleteRouteWithCamera(selectedRouteDetail)}
                       className="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-orange-600/20 cursor-pointer transition-all active:scale-95"
+                      title="Tirar foto com a câmera para comprovar e concluir este roteiro no Diário de Bordo"
+                    >
+                      <Camera size={14} />
+                      TIRAR FOTO / COMPROVAR
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleLaunchInLogbook(selectedRouteDetail)}
+                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95"
                       title="Lançar este roteiro no seu Diário de Bordo para alimentar o Dashboard"
                     >
-                      <BookOpen size={14} />
-                      LANÇAR NO DIÁRIO DE BORDO
+                      <BookOpen size={14} className="text-orange-500" />
+                      LANÇAR NO DIÁRIO
                     </button>
 
                     <a 
                       href={selectedRouteDetail.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedRouteDetail.mapsAddress)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-sm shrink-0 transition-all"
+                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-sm shrink-0 transition-all"
                     >
                       <ExternalLink size={14} />
-                      ABRIR NO GOOGLE MAPS
+                      GOOGLE MAPS
                     </a>
                   </div>
                 </div>

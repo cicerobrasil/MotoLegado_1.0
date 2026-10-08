@@ -1021,6 +1021,31 @@ export function TripReportModal({
                           )}
                         </div>
 
+                        {/* Provas Fotográficas Documentais */}
+                        {((log.documentaryProofs && log.documentaryProofs.length > 0) || (log.photos && log.photos.length > 0)) && (
+                          <div className="pt-2 border-t border-slate-800/60 print:border-slate-300">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-orange-400 flex items-center gap-1.5 mb-2 print-text-dark">
+                              <Camera size={13} className="text-orange-500" />
+                              Provas Fotográficas Certificadas ({log.documentaryProofs?.length || log.photos?.length || 0}):
+                            </span>
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                              {log.documentaryProofs && log.documentaryProofs.length > 0 ? (
+                                log.documentaryProofs.map((p) => (
+                                  <div key={p.id} className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border border-slate-800 print-card shrink-0 bg-black">
+                                    <img src={p.url} alt="Prova" className="w-full h-full object-cover" />
+                                  </div>
+                                ))
+                              ) : (
+                                log.photos?.map((url, idx) => (
+                                  <div key={idx} className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border border-slate-800 print-card shrink-0 bg-black">
+                                    <img src={url} alt="Prova" className="w-full h-full object-cover" />
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                       </div>
                     ))}
                   </div>

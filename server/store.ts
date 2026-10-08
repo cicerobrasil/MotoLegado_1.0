@@ -212,12 +212,38 @@ export function storeSavePilot(pilot: Partial<StoredPilot> & { email?: string; i
   return merged;
 }
 
+// Obter todos os pilotos cadastrados (para painel administrativo)
+export function storeGetAllPilots(): StoredPilot[] {
+  const store = loadStore();
+  const seen = new Set<string>();
+  const list: StoredPilot[] = [];
+  for (const p of Object.values(store.pilots)) {
+    if (p && p.id && !seen.has(p.id)) {
+      seen.add(p.id);
+      list.push(p);
+    }
+  }
+  return list;
+}
+
 // Obter viagens
 export function storeGetTrips(pilotId?: string): StoredTrip[] {
   const store = loadStore();
   if (!pilotId) return store.trips;
   const target = pilotId.toLowerCase();
   return store.trips.filter(t => t.pilot_id && t.pilot_id.toLowerCase() === target);
+}
+
+// Excluir viagem
+export function storeDeleteTrip(id: string): boolean {
+  const store = loadStore();
+  const initLen = store.trips.length;
+  store.trips = store.trips.filter(t => t.id !== id);
+  if (store.trips.length !== initLen) {
+    saveStore(store);
+    return true;
+  }
+  return false;
 }
 
 // Salvar viagem

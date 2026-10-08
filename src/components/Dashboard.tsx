@@ -13,8 +13,9 @@ import { Calendar, Store, Percent, Route, BookOpen, CheckCircle, Plus, MapPin, T
 import { MotoEvent } from './Events';
 import { Partner } from './Partners';
 import { LogEntry } from './Logbook';
+import { RouteMetricsPanel } from './RouteMetricsPanel';
 import { useAuth } from '../context/AuthContext';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getTripsFromHostinger } from '../lib/api';
 import { getPilotLiveGamification } from '../lib/gamification';
 
 export function Dashboard() {
@@ -61,50 +62,78 @@ export function Dashboard() {
         }
       }
 
-      // 4. If Supabase is configured and user logged in, fetch cloud data and update
-      if (isSupabaseConfigured && user) {
-        supabase
-          .from('logbook_trips')
-          .select('*')
-          .eq('pilot_id', user.id)
-          .order('date', { ascending: false })
-          .then(({ data, error }) => {
-            if (!error && data && data.length > 0) {
-              const mappedLogs: LogEntry[] = data.map((t: any) => ({
+      // 4. Carregar e sincronizar viagens do MySQL na Hostinger
+      getTripsFromHostinger(user?.id)
+        .then((res) => {
+          if (res && res.trips && res.trips.length > 0) {
+            const mappedLogs: LogEntry[] = res.trips.map((t: any) => {
+              let checklist: any = {};
+              if (typeof t.checklist_data === 'string') {
+                try { checklist = JSON.parse(t.checklist_data); } catch {}
+              } else if (typeof t.checklist_data === 'object' && t.checklist_data) {
+                checklist = t.checklist_data;
+              }
+
+              let photos: string[] = [];
+              if (typeof t.photos === 'string') {
+                try { photos = JSON.parse(t.photos); } catch {}
+              } else if (Array.isArray(t.photos)) {
+                photos = t.photos;
+              }
+
+              return {
                 id: t.id,
                 title: t.title,
-                date: t.date || new Date().toISOString().split('T')[0],
-                origin: t.origin,
-                destination: t.destination,
-                distance: String(t.distance_km || 0),
-                duration: '2h',
-                bike: t.bike_model || profile?.motorcycle || 'Motocicleta',
-                climate: 'sun',
-                road: 'Boa',
-                rating: t.rating || 5,
-                content: t.notes || '',
-                image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
-              }));
-              
-              // Mescla de forma segura preservando registros recém-criados localmente
-              const dict: Record<string, LogEntry> = {};
-              currentLocalLogs.forEach(l => { dict[l.id] = l; });
-              mappedLogs.forEach(l => { dict[l.id] = l; });
-              const combinedLogs: LogEntry[] = Object.values(dict).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+                category: checklist?.category || t.category || 'Viagem',
+                date: (t.start_date ? String(t.start_date).split('T')[0] : '') || t.date || new Date().toISOString().split('T')[0],
+                origin: t.start_location || t.origin || '',
+                destination: t.destination || '',
+                distance: String(Math.round(t.distance_km || 0)),
+                duration: checklist?.duration || '2h',
+                bike: t.motorcycle_used || t.bike_model || profile?.motorcycle || 'Motocicleta',
+                climate: checklist?.climate || 'sun',
+                road: checklist?.road || 'Boa',
+                rating: checklist?.rating || t.rating || 5,
+                content: t.description || checklist?.content || t.notes || '',
+                image: photos[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
+              };
+            });
+            
+            // Mescla de forma segura sem duplicações preservando registros recém-criados localmente
+            const merged: LogEntry[] = [];
+            const seenKeys = new Set<string>();
 
-              setLogs(combinedLogs);
-              localStorage.setItem('motolegado_logs', JSON.stringify(combinedLogs));
-            } else if (currentLocalLogs.length > 0) {
-              // Maintain local logs! Do NOT wipe with []!
-              setLogs(currentLocalLogs);
-            }
-          },
-          () => {
-            if (currentLocalLogs.length > 0) {
-              setLogs(currentLocalLogs);
-            }
-          });
-      }
+            mappedLogs.forEach(ml => {
+              const cleanTitle = (ml.title || '').trim().toLowerCase();
+              const distKey = (ml.distance || '').replace(/\D/g, '');
+              const key = `${cleanTitle}_${distKey}`;
+              seenKeys.add(ml.id);
+              if (key && cleanTitle) seenKeys.add(key);
+              merged.push(ml);
+            });
+
+            currentLocalLogs.forEach(ll => {
+              const cleanTitle = (ll.title || '').trim().toLowerCase();
+              const distKey = (ll.distance || '').replace(/\D/g, '');
+              const key = `${cleanTitle}_${distKey}`;
+              if (!seenKeys.has(ll.id) && (!key || !seenKeys.has(key))) {
+                seenKeys.add(ll.id);
+                if (key && cleanTitle) seenKeys.add(key);
+                merged.push(ll);
+              }
+            });
+
+            setLogs(merged);
+            localStorage.setItem('motolegado_logs', JSON.stringify(merged));
+          } else if (currentLocalLogs.length > 0) {
+            setLogs(currentLocalLogs);
+          }
+        })
+        .catch(() => {
+          if (currentLocalLogs.length > 0) {
+            setLogs(currentLocalLogs);
+          }
+        });
     };
 
     loadDashboardData();
@@ -119,7 +148,7 @@ export function Dashboard() {
       window.removeEventListener('motolegado_gamification_updated', loadDashboardData);
       window.removeEventListener('storage', loadDashboardData);
     };
-  }, [user, isSupabaseConfigured]);
+  }, [user]);
 
   const checkedInEvents = events.filter(evt => evt.checkedIn);
   const displayEvents = checkedInEvents.length > 0 ? checkedInEvents.slice(0, 3) : events.slice(0, 3);
@@ -352,6 +381,12 @@ export function Dashboard() {
             <span>Cadastrar Nova Aventura</span>
           </button>
         </div>
+
+        {/* Painel Interativo de Métricas Recharts: Total de Quilometragem & Tempo Acumulado */}
+        <RouteMetricsPanel 
+          logs={logs} 
+          onNewTripClick={() => navigate('/logbook')} 
+        />
 
         {/* Checked In Events Section */}
         <div className="col-span-12 lg:col-span-6 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-3xl lg:rounded-[2.5rem] p-4 sm:p-6 lg:p-8 flex flex-col justify-between">

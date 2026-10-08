@@ -18,8 +18,10 @@ import {
   storeGetPilotById, 
   storeGetPilotByEmail, 
   storeSavePilot, 
+  storeGetAllPilots,
   storeGetTrips, 
   storeSaveTrip,
+  storeDeleteTrip,
   storeGetPaymentRequests,
   storeSavePaymentRequest,
   storeApprovePaymentRequest
@@ -585,6 +587,23 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
   app.post('/api/auth/reset-password', handleResetPassword);
   app.post('/api/auth/change-password', handleChangePassword);
 
+  // Pilots API - Listar todos os pilotos (para CommandCenter / Admin)
+  app.get('/api/pilots', async (req, res) => {
+    try {
+      let pilots: any[] = [];
+      const mysqlRes: any = await safeMySqlQuery('SELECT * FROM pilots ORDER BY created_at DESC');
+      if (mysqlRes && mysqlRes[0] && Array.isArray(mysqlRes[0]) && mysqlRes[0].length > 0) {
+        pilots = mysqlRes[0];
+      }
+      if (pilots.length === 0) {
+        pilots = storeGetAllPilots();
+      }
+      return res.json({ success: true, pilots });
+    } catch (err: any) {
+      return res.json({ success: true, pilots: storeGetAllPilots() });
+    }
+  });
+
   // Pilots API - Obter perfil por ID ou E-mail
   app.get('/api/pilots/:id', async (req, res) => {
     try {
@@ -724,6 +743,18 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
       res.json({ success: true, message: 'Viagem registrada com sucesso!', trip: savedTrip });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Excluir viagem do banco de dados MySQL e do armazenamento
+  app.delete('/api/trips/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      storeDeleteTrip(id);
+      await safeMySqlQuery('DELETE FROM trips WHERE id = ?', [id]).catch(() => {});
+      return res.json({ success: true, message: 'Viagem excluída com sucesso!' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 

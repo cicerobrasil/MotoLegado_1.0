@@ -851,19 +851,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn('Aviso ao sincronizar perfil com backend:', e);
     }
 
-    if (isSupabaseConfigured && user) {
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .update(updates)
-          .eq('id', user.id);
-
-        if (error) console.warn('Aviso Supabase update:', error.message);
-      } catch (err: any) {
-        console.warn('Aviso Supabase exceção:', err);
-      }
-    }
-
     return { error: null };
   };
 
@@ -888,18 +875,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('motolegado_pilot_plan', newPlan);
     }
 
-    if (isSupabaseConfigured) {
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .update(updates)
-          .eq('id', userId);
-
-        if (error) throw error;
-      } catch (err: any) {
-        console.warn('Erro ao atualizar plano no Supabase:', err.message);
-        return { error: err };
-      }
+    // Sincronizar plano com a Hostinger MySQL
+    try {
+      await syncPilotToHostinger({
+        id: userId,
+        plan: newPlan,
+        is_pro: isPro,
+        ...(newPlan === 'bonificado' ? { bonificado_at: now } : {})
+      });
+    } catch (err: any) {
+      console.warn('Aviso ao sincronizar plano com a Hostinger:', err);
     }
 
     return { error: null };

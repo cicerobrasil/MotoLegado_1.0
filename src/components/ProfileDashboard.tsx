@@ -8,7 +8,7 @@ import { getPilotLiveGamification, PILOT_RANKS } from '../lib/gamification';
 import { LogEntry } from './Logbook';
 import { MotoEvent } from './Events';
 import { useAuth } from '../context/AuthContext';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getTripsFromHostinger } from '../lib/api';
 import { DigitalIdModal } from './DigitalIdModal';
 
 export function ProfileDashboard() {
@@ -65,42 +65,76 @@ export function ProfileDashboard() {
         }
       }
 
-      // 2. Se Supabase estiver configurado, sincronizar sem apagar dados locais
-      if (isSupabaseConfigured && user) {
-        supabase
-          .from('logbook_trips')
-          .select('*')
-          .eq('pilot_id', user.id)
-          .order('date', { ascending: false })
-          .then(({ data, error }) => {
-            if (!error && data && data.length > 0) {
-              const mappedLogs: LogEntry[] = data.map((t: any) => ({
+      // 2. Carregar e sincronizar viagens do MySQL na Hostinger
+      getTripsFromHostinger(user?.id)
+        .then((res) => {
+          if (res && res.trips && res.trips.length > 0) {
+            const mappedLogs: LogEntry[] = res.trips.map((t: any) => {
+              let checklist: any = {};
+              if (typeof t.checklist_data === 'string') {
+                try { checklist = JSON.parse(t.checklist_data); } catch {}
+              } else if (typeof t.checklist_data === 'object' && t.checklist_data) {
+                checklist = t.checklist_data;
+              }
+
+              let photos: string[] = [];
+              if (typeof t.photos === 'string') {
+                try { photos = JSON.parse(t.photos); } catch {}
+              } else if (Array.isArray(t.photos)) {
+                photos = t.photos;
+              }
+
+              return {
                 id: t.id,
-                date: t.date || new Date().toISOString().split('T')[0],
+                date: (t.start_date ? String(t.start_date).split('T')[0] : '') || t.date || new Date().toISOString().split('T')[0],
                 title: t.title || 'Viagem Registrada',
-                distance: String(t.distance_km || 0),
-                bike: t.bike_model || pilotMotorcycle,
-                origin: t.origin || 'Origem',
+                distance: String(Math.round(t.distance_km || 0)),
+                bike: t.motorcycle_used || t.bike_model || pilotMotorcycle,
+                origin: t.start_location || t.origin || 'Origem',
                 destination: t.destination || 'Destino',
-                duration: '2h 30min',
-                climate: 'sun',
-                road: 'Tapete (Perfeita)',
-                content: t.notes || '',
-                rating: t.rating || 5,
-                image: t.photos?.[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
-              }));
-              setLogs(mappedLogs);
-              localStorage.setItem('motolegado_logs', JSON.stringify(mappedLogs));
-            } else if (localLogs.length > 0) {
-              setLogs(localLogs);
-            }
-          },
-          () => {
-            if (localLogs.length > 0) {
-              setLogs(localLogs);
-            }
-          });
-      }
+                duration: checklist?.duration || '2h 30min',
+                climate: checklist?.climate || 'sun',
+                road: checklist?.road || 'Tapete (Perfeita)',
+                content: t.description || checklist?.content || t.notes || '',
+                rating: checklist?.rating || t.rating || 5,
+                image: photos[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
+              };
+            });
+            // Mescla de forma segura sem perdas nem duplicações
+            const merged: LogEntry[] = [];
+            const seenKeys = new Set<string>();
+
+            mappedLogs.forEach(ml => {
+              const cleanTitle = (ml.title || '').trim().toLowerCase();
+              const distKey = (ml.distance || '').replace(/\D/g, '');
+              const key = `${cleanTitle}_${distKey}`;
+              seenKeys.add(ml.id);
+              if (key && cleanTitle) seenKeys.add(key);
+              merged.push(ml);
+            });
+
+            localLogs.forEach(ll => {
+              const cleanTitle = (ll.title || '').trim().toLowerCase();
+              const distKey = (ll.distance || '').replace(/\D/g, '');
+              const key = `${cleanTitle}_${distKey}`;
+              if (!seenKeys.has(ll.id) && (!key || !seenKeys.has(key))) {
+                seenKeys.add(ll.id);
+                if (key && cleanTitle) seenKeys.add(key);
+                merged.push(ll);
+              }
+            });
+
+            setLogs(merged);
+            localStorage.setItem('motolegado_logs', JSON.stringify(merged));
+          } else if (localLogs.length > 0) {
+            setLogs(localLogs);
+          }
+        })
+        .catch(() => {
+          if (localLogs.length > 0) {
+            setLogs(localLogs);
+          }
+        });
 
       // 3. Load events
       const savedEvents = localStorage.getItem('motolegado_events');
@@ -129,7 +163,7 @@ export function ProfileDashboard() {
       window.removeEventListener('motolegado_gamification_updated', loadProfileDashboardData);
       window.removeEventListener('storage', loadProfileDashboardData);
     };
-  }, [user, isSupabaseConfigured]);
+  }, [user]);
 
   // Centralized Live Gamification Engine
   const gamificationData = useMemo(() => {

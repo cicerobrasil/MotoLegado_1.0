@@ -168,3 +168,27 @@ export interface LeaderboardPilot {
   pointsTrend?: 'up' | 'down' | 'same';
   rankChange?: number; // e.g. +2, -1, 0
 }
+
+export type DocumentaryProofType = 
+  | 'arrival'      // Ponto de Chegada / Destino
+  | 'odometer'     // Odômetro / Painel
+  | 'motorcycle'   // Moto no Local / Mirante
+  | 'scenic'       // Paisagem / Estrada
+  | 'receipt'      // Comprovante / Parada
+  | 'brotherhood'  // Confraria / Irmandade
+  | 'general';     // Prova Geral
+
+export interface DocumentaryProof {
+  id: string;
+  url: string;
+  type: DocumentaryProofType;
+  caption?: string;
+  timestamp: string;
+  location?: string;
+  coords?: {
+    latitude: number;
+    longitude: number;
+  };
+  hasWatermark?: boolean;
+}
+

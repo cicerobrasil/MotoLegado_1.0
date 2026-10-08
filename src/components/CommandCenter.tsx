@@ -53,8 +53,7 @@ import { cn } from '../lib/utils';
 import { Partner } from './Partners';
 import { CommunityPost, Route, RouteDifficulty } from '../types';
 import { estimateRouteMetrics } from './Routes';
-import { supabase } from '../lib/supabase';
-import { getDbStatus, initDbTables } from '../lib/api';
+import { getDbStatus, initDbTables, getPilotsFromHostinger, syncPilotToHostinger } from '../lib/api';
 import { DateInput } from './DateInput';
 
 // Helper to format date cleanly
@@ -138,7 +137,7 @@ const PARTNER_CATEGORIES: Partner['category'][] = [
 ];
 
 export function CommandCenter() {
-  const { profile, loading, user, isSupabaseConfigured, updateUserPlan } = useAuth();
+  const { profile, loading, user, updateUserPlan } = useAuth();
   const navigate = useNavigate();
   const isAdmin = profile?.role === 'admin';
 
@@ -328,26 +327,21 @@ export function CommandCenter() {
   const [viewingPilotModal, setViewingPilotModal] = useState<any | null>(null);
   const [loadingPilots, setLoadingPilots] = useState(false);
 
-  // Carregar e sincronizar lista de pilotos
+  // Carregar e sincronizar lista de pilotos via Hostinger MySQL
   const loadPilots = async () => {
     setLoadingPilots(true);
     let pilots: any[] = [];
 
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (!error && data && data.length > 0) {
-          pilots = data.map((p: any) => ({
-            ...p,
-            plan_type: p.plan_type || (p.is_pro ? 'pago' : 'gratuito')
-          }));
-        }
-      } catch (err) {
-        console.warn('Erro ao carregar perfis do Supabase:', err);
+    try {
+      const res = await getPilotsFromHostinger();
+      if (res && res.pilots && res.pilots.length > 0) {
+        pilots = res.pilots.map((p: any) => ({
+          ...p,
+          plan_type: p.plan || p.plan_type || (p.is_pro ? 'pago' : 'gratuito')
+        }));
       }
+    } catch (err) {
+      console.warn('Aviso ao carregar pilotos da Hostinger:', err);
     }
 
     if (pilots.length === 0) {
@@ -527,21 +521,16 @@ export function CommandCenter() {
       await updateUserPlan(pilotId, newPlan);
     }
 
-    if (isSupabaseConfigured) {
-      try {
-        await supabase
-          .from('profiles')
-          .update({
-            plan_type: newPlan,
-            is_pro: isPro,
-            bonificado_at: newPlan === 'bonificado' ? now : null,
-            bonificado_by: newPlan === 'bonificado' ? (profile?.name || 'Comando MotoLegado') : null
-          })
-          .eq('id', pilotId);
-      } catch (err: any) {
-        console.warn('Erro ao atualizar plano no Supabase:', err);
-      }
-    }
+    // Sincronizar alteração de plano no servidor Hostinger
+    syncPilotToHostinger({
+      id: pilotId,
+      plan: newPlan,
+      is_pro: isPro,
+      bonificado_at: newPlan === 'bonificado' ? now : null,
+      bonificado_by: newPlan === 'bonificado' ? (profile?.name || 'Comando MotoLegado') : null
+    }).catch(err => {
+      console.warn('Aviso ao sincronizar plano com a Hostinger:', err);
+    });
 
     const logAction = newPlan === 'bonificado'
       ? `MODO BONIFICADO: Concedido acesso VIP Pro a ${targetPilot.name} (${targetPilot.email})`

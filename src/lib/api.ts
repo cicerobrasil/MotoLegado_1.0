@@ -105,6 +105,20 @@ export async function getTripsFromHostinger(pilotId?: string) {
   return result.data;
 }
 
+// Excluir viagem no MySQL da Hostinger
+export async function deleteTripFromHostinger(tripId: string) {
+  const result = await fetchFromApi<{ success: boolean; message?: string }>(`/api/trips/${encodeURIComponent(tripId)}`, {
+    method: 'DELETE'
+  });
+  return result.data;
+}
+
+// Buscar todos os pilotos cadastrados (para administração no CommandCenter)
+export async function getPilotsFromHostinger() {
+  const result = await fetchFromApi<{ success: boolean; pilots: any[] }>('/api/pilots');
+  return result.data;
+}
+
 // Status e Diagnóstico do Banco de Dados MySQL na Hostinger
 export async function getDbStatus() {
   return fetchFromApi<{
