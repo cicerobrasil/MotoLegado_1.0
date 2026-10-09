@@ -117,8 +117,9 @@ export async function uploadImageToStorage(
 ): Promise<UploadResult> {
   const { folder, userId, maxDimension = 1600, quality = 0.85 } = options;
 
-  // Validação preliminar
-  if (!file.type.startsWith('image/')) {
+  // Validação preliminar: aceita qualquer tipo de imagem ou extensão comum de foto mobile
+  const isImage = (file.type && file.type.startsWith('image/')) || /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif)$/i.test(file.name || '');
+  if (!isImage) {
     return {
       url: '',
       success: false,

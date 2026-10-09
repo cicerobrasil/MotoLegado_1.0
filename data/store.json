@@ -115,5 +115,88 @@
       "updated_at": "2026-09-30T14:52:28.883Z"
     }
   },
-  "trips": []
+  "trips": [
+    {
+      "id": "1791473720461",
+      "pilot_id": "pilot_1790795008269_78f425",
+      "title": "ARARANGUÁ",
+      "origin": "Itajaí, Santa Catarina",
+      "start_location": "Itajaí, Santa Catarina",
+      "destination": "Araranguá, SC, 88900-000",
+      "distance_km": "85.00",
+      "start_date": "2026-10-01T00:00:00.000Z",
+      "motorcycle_used": "BMW R 1250 GS ADVENTURE",
+      "photos": [
+        "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800"
+      ],
+      "checklist_data": {
+        "stages": [],
+        "documentaryProofs": [],
+        "image": "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800",
+        "category": "Viagem",
+        "duration": "2h 30min",
+        "climate": "cloud",
+        "road": "Chão Batido / Terra",
+        "rating": 2,
+        "content": "Viagem para Araranguá realizada e registrada no Diário de Bordo."
+      },
+      "description": "Viagem para Araranguá realizada e registrada no Diário de Bordo.",
+      "created_at": "2026-10-08T15:35:20.000Z",
+      "end_date": null,
+      "status": "completed"
+    },
+    {
+      "id": "1791564032310",
+      "pilot_id": "pilot_1790944780541_cb7b48",
+      "title": "CAMPO LARGO, PR",
+      "origin": "Curitiba, PR",
+      "destination": "Campo Largo, PR",
+      "distance_km": "35.00",
+      "start_date": "2026-10-09T00:00:00.000Z",
+      "motorcycle_used": "Yamaha MT-07",
+      "image": "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800",
+      "photos": [
+        "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800"
+      ],
+      "checklist_data": {
+        "image": "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800",
+        "documentaryProofs": [],
+        "category": "Viagem",
+        "duration": "45min",
+        "climate": "sun",
+        "road": "Tapete (Perfeita)",
+        "rating": 5,
+        "content": "Passeio curto até Campo Largo pela BR-277."
+      },
+      "description": "Passeio curto até Campo Largo pela BR-277.",
+      "created_at": "2026-10-09T16:40:07.000Z",
+      "start_location": "Curitiba, PR",
+      "end_date": null,
+      "status": "completed"
+    },
+    {
+      "id": "1791473131484",
+      "pilot_id": "pilot_1790795008269_78f425",
+      "title": "JOINVILLE",
+      "description": "Viagem na chuva muito boa",
+      "start_location": "Itajaí, Santa Catarina",
+      "destination": "R. Dona Francisca, Joinville - SC",
+      "distance_km": "85.00",
+      "start_date": "2026-10-08T00:00:00.000Z",
+      "end_date": null,
+      "status": "completed",
+      "motorcycle_used": "BMW R 1250 GS ADVENTURE",
+      "checklist_data": {
+        "stages": [],
+        "climate": "rain",
+        "road": "Tapete (Perfeita)",
+        "rating": 5,
+        "content": "Viagem na chuva muito boa"
+      },
+      "photos": [
+        "/uploads/trips/test.jpg"
+      ],
+      "created_at": "2026-10-08T15:25:31.000Z"
+    }
+  ]
 }

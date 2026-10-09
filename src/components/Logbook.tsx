@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, ChangeEvent } from 'react';
 import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown, Navigation, ExternalLink, Share2, ShieldCheck, Eye, Layers, CheckCircle2, Filter, RotateCcw, TrendingUp, SlidersHorizontal, Pencil, Check, Wrench, Users, Tag, ChevronDown } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
@@ -37,6 +37,14 @@ export const LOGBOOK_CATEGORIES: LogbookCategoryConfig[] = [
   { id: 'Manutenção', label: 'Manutenção', icon: Wrench, color: 'text-amber-400', badgeBg: 'bg-amber-500/15', badgeBorder: 'border-amber-500/40', badgeText: 'text-amber-400' },
   { id: 'Outro', label: 'Outro', icon: Tag, color: 'text-slate-400', badgeBg: 'bg-slate-500/15', badgeBorder: 'border-slate-500/40', badgeText: 'text-slate-300' },
 ];
+
+export const CLIMATE_CONFIG: Record<string, { label: string; icon: typeof Sun; color: string; bg: string; border: string }> = {
+  sun: { label: 'CÉU LIMPO', icon: Sun, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+  rain: { label: 'CHUVA', icon: CloudRain, color: 'text-sky-400', bg: 'bg-sky-500/10', border: 'border-sky-500/20' },
+  cloud: { label: 'NUBLADO', icon: Cloud, color: 'text-slate-300', bg: 'bg-slate-500/10', border: 'border-slate-500/20' },
+  zap: { label: 'TEMPESTADE', icon: Zap, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+  moon: { label: 'NOITE', icon: Moon, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20' },
+};
 
 export interface LogEntry {
   id: string;
@@ -641,33 +649,43 @@ export function Logbook() {
     if (cameraTripTarget && cameraTripTarget.id) {
       // Adicionando fotos da câmera a uma viagem já concluída
       const targetId = cameraTripTarget.id;
+      const targetTrip = logs.find(l => l.id === targetId);
+      
+      const currentProofs = targetTrip?.documentaryProofs || [];
+      const mergedProofs = [...currentProofs, ...newProofs];
+      const newPhotoUrls = newProofs.map((p) => p.url);
+      const currentPhotos = (targetTrip?.photos || [targetTrip?.image || '']).filter(p => p && !p.includes('images.unsplash.com'));
+      const mergedPhotos = Array.from(new Set([...newPhotoUrls, ...currentPhotos, ...(targetTrip?.photos || [])])).filter(Boolean);
+      const isStockCover = !targetTrip?.image || targetTrip.image.includes('images.unsplash.com');
+      
+      const updatedTrip: LogEntry = {
+        ...(targetTrip || ({} as LogEntry)),
+        id: targetId,
+        documentaryProofs: mergedProofs,
+        photos: mergedPhotos,
+        // Se a capa era genérica/Unsplash, a nova foto real do usuário torna-se a capa
+        image: isStockCover && newPhotoUrls.length > 0 ? newPhotoUrls[0] : (targetTrip?.image || newPhotoUrls[0])
+      };
+
       setLogs((prev) => {
-        const updated = prev.map((log) => {
-          if (log.id === targetId) {
-            const currentProofs = log.documentaryProofs || [];
-            const mergedProofs = [...currentProofs, ...newProofs];
-            const currentPhotos = log.photos || [log.image];
-            const newPhotos = newProofs.map((p) => p.url);
-            const mergedPhotos = Array.from(new Set([...currentPhotos, ...newPhotos]));
-            return {
-              ...log,
-              documentaryProofs: mergedProofs,
-              photos: mergedPhotos
-            };
-          }
-          return log;
-        });
+        const updated = prev.map((log) => (log.id === targetId ? updatedTrip : log));
         localStorage.setItem('motolegado_logs', JSON.stringify(updated));
         window.dispatchEvent(new CustomEvent('motolegado_logs_updated', { detail: updated }));
         window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
         window.dispatchEvent(new Event('storage'));
         return updated;
       });
+
+      // Sincroniza imediatamente com o banco de dados MySQL da Hostinger
+      saveLogsToStorage(updatedTrip, true).catch(err => {
+        console.warn('Erro ao sincronizar nova prova documental no MySQL:', err);
+      });
       setCameraTripTarget(null);
     } else {
       // Adicionando fotos ao formulário atual
       setDocumentaryProofs((prev) => [...prev, ...newProofs]);
-      if (!image && newProofs.length > 0) {
+      // A foto enviada pelo usuário TEM PRIORIDADE TOTAL como capa da viagem
+      if (newProofs.length > 0) {
         setImage(newProofs[0].url);
       }
     }
@@ -695,6 +713,8 @@ export function Logbook() {
           location: title || destination || undefined,
           hasWatermark: false
         };
+        // A foto tirada pelo usuário se torna a capa principal imediatamente
+        setImage(result.url);
         handleAttachProofs([newProof]);
       } else {
         alert(result.error || 'Erro ao processar imagem.');
@@ -709,20 +729,45 @@ export function Logbook() {
   };
 
   const handleTripPhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setIsUploadingPhoto(true);
-    try {
-      const result = await uploadImageToStorage(file, {
-        folder: 'trips',
-        userId: user?.id || 'pilot',
-      });
+    const addedProofs: DocumentaryProof[] = [];
+    let firstUploadedUrl = '';
 
-      if (result.success && result.url) {
-        setImage(result.url);
+    try {
+      for (const file of Array.from(files)) {
+        const result = await uploadImageToStorage(file, {
+          folder: 'trips',
+          userId: user?.id || 'pilot',
+        });
+
+        if (result.success && result.url) {
+          if (!firstUploadedUrl) firstUploadedUrl = result.url;
+          const now = new Date();
+          const cleanFileName = file.name ? file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ') : '';
+          addedProofs.push({
+            id: `proof_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            url: result.url,
+            type: 'arrival',
+            caption: cleanFileName ? `Foto: ${cleanFileName}` : 'Foto anexada da galeria',
+            timestamp: `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+            location: title || destination || undefined,
+            hasWatermark: false
+          });
+        }
+      }
+
+      if (firstUploadedUrl) {
+        // A foto real enviada pelo usuário se torna a capa principal
+        setImage(firstUploadedUrl);
+      }
+
+      if (addedProofs.length > 0) {
+        handleAttachProofs(addedProofs);
       } else {
-        alert(result.error || 'Erro ao fazer upload da imagem.');
+        alert('Não foi possível processar a foto selecionada.');
       }
     } catch (err) {
       console.error('Erro no upload da foto da viagem:', err);
@@ -750,7 +795,7 @@ export function Logbook() {
     }
 
     // Carregar e sincronizar viagens diretamente do MySQL da Hostinger
-    getTripsFromHostinger(user?.id)
+    getTripsFromHostinger(user?.id || profile?.id)
       .then((res) => {
         if (res && res.trips && res.trips.length > 0) {
           const mappedLogs: LogEntry[] = res.trips.map((t: any) => {
@@ -768,48 +813,92 @@ export function Logbook() {
               photos = t.photos;
             }
 
+            const isStockUrl = (u?: string) => !u || u.includes('images.unsplash.com');
+            const realUserPhoto = photos.find(p => !isStockUrl(p));
+            const realProofPhoto = Array.isArray(checklist?.documentaryProofs)
+              ? checklist.documentaryProofs.find((p: any) => !isStockUrl(p?.url))?.url
+              : null;
+            const resolvedCover = (!isStockUrl(checklist?.image) ? checklist?.image : null) || realUserPhoto || realProofPhoto || checklist?.image || photos[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800';
+
+            // Formata data do MySQL (YYYY-MM-DD) de forma amigável para exibição brasileira (DD/MM/AAAA)
+            let rawDate = t.start_date ? String(t.start_date).split('T')[0] : (t.date || '');
+            let displayDate = rawDate;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+              const [y, m, d] = rawDate.split('-');
+              displayDate = `${d}/${m}/${y}`;
+            }
+
             return {
-              id: t.id,
-              title: t.title,
+              id: String(t.id),
+              title: t.title || 'Viagem Registrada',
               category: checklist?.category || t.category || 'Viagem',
-              date: (t.start_date ? String(t.start_date).split('T')[0] : '') || t.date || new Date().toISOString().split('T')[0],
+              date: displayDate || new Date().toLocaleDateString('pt-BR'),
               origin: t.start_location || t.origin || '',
               destination: t.destination || '',
-              distance: String(Math.round(t.distance_km || 0)),
-              duration: checklist?.duration || '2h 30min',
+              distance: String(Math.round(parseFloat(t.distance_km) || 0)),
+              duration: checklist?.duration || t.duration || '2h 30min',
               bike: t.motorcycle_used || t.bike_model || profile?.motorcycle || 'Motocicleta',
-              climate: checklist?.climate || 'sun',
-              road: checklist?.road || 'Tapete (Perfeita)',
+              climate: checklist?.climate || t.climate || 'sun',
+              road: checklist?.road || t.road || 'Tapete (Perfeita)',
               rating: checklist?.rating || t.rating || 5,
               content: t.description || checklist?.content || t.notes || '',
-              image: photos[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800',
+              image: resolvedCover,
               stages: Array.isArray(checklist?.stages) ? checklist.stages : (Array.isArray(t.stages) ? t.stages : []),
               mapsUrl: checklist?.mapsUrl || t.maps_url || undefined,
-              photos: photos.length > 0 ? photos : [],
+              photos: photos.length > 0 ? photos : (resolvedCover ? [resolvedCover] : []),
               documentaryProofs: Array.isArray(checklist?.documentaryProofs) ? checklist.documentaryProofs : []
             };
           });
 
-          // Mescla sem perda de dados e evitando duplicações
+          // Mescla sem perda de dados e evitando duplicações por ID
           const merged: LogEntry[] = [];
-          const seenKeys = new Set<string>();
+          const seenIds = new Set<string>();
 
           mappedLogs.forEach(ml => {
-            const cleanTitle = (ml.title || '').trim().toLowerCase();
-            const distKey = (ml.distance || '').replace(/\D/g, '');
-            const key = `${cleanTitle}_${distKey}`;
-            seenKeys.add(ml.id);
-            if (key && cleanTitle) seenKeys.add(key);
-            merged.push(ml);
+            seenIds.add(ml.id);
+
+            // Tenta localizar versão local correspondente para enriquecer dados
+            const localMatch = localLogs.find(l => l.id === ml.id);
+            if (localMatch) {
+              const combinedPhotos = Array.from(new Set([...(ml.photos || []), ...(localMatch.photos || [])]));
+              const combinedProofs = (ml.documentaryProofs && ml.documentaryProofs.length > 0)
+                ? ml.documentaryProofs
+                : (localMatch.documentaryProofs || []);
+              const isStock = (u?: string) => !u || u.includes('images.unsplash.com');
+              const combinedCover = (!isStock(ml.image) ? ml.image : null) 
+                || (!isStock(localMatch.image) ? localMatch.image : null)
+                || ml.image 
+                || localMatch.image;
+
+              // Preserva dados preenchidos localmente caso o banco tenha campos nulos/vazios
+              merged.push({
+                ...ml,
+                title: ml.title || localMatch.title,
+                origin: ml.origin || localMatch.origin,
+                destination: ml.destination || localMatch.destination,
+                content: ml.content || localMatch.content,
+                bike: (ml.bike && ml.bike !== 'Motocicleta') ? ml.bike : (localMatch.bike || ml.bike),
+                distance: (ml.distance && ml.distance !== '0') ? ml.distance : (localMatch.distance || ml.distance),
+                category: ml.category || localMatch.category,
+                duration: ml.duration || localMatch.duration,
+                climate: ml.climate || localMatch.climate,
+                road: ml.road || localMatch.road,
+                rating: ml.rating || localMatch.rating,
+                photos: combinedPhotos.length > 0 ? combinedPhotos : (ml.photos || []),
+                documentaryProofs: combinedProofs,
+                image: combinedCover,
+                stages: (ml.stages && ml.stages.length > 0) ? ml.stages : (localMatch.stages || []),
+                mapsUrl: ml.mapsUrl || localMatch.mapsUrl
+              });
+            } else {
+              merged.push(ml);
+            }
           });
 
+          // Preserva registros locais que ainda não foram sincronizados com o banco
           localLogs.forEach(ll => {
-            const cleanTitle = (ll.title || '').trim().toLowerCase();
-            const distKey = (ll.distance || '').replace(/\D/g, '');
-            const key = `${cleanTitle}_${distKey}`;
-            if (!seenKeys.has(ll.id) && (!key || !seenKeys.has(key))) {
-              seenKeys.add(ll.id);
-              if (key && cleanTitle) seenKeys.add(key);
+            if (!seenIds.has(ll.id)) {
+              seenIds.add(ll.id);
               merged.push(ll);
             }
           });
@@ -830,14 +919,27 @@ export function Logbook() {
         console.warn('Sincronização offline ou aguardando resposta da Hostinger:', err);
         if (localLogs.length > 0) setLogs(localLogs);
       });
-  }, [user]);
+  }, [user, profile]);
 
   const saveLogsToStorage = async (entry: LogEntry, isEdit: boolean = false) => {
+    // Carrega registros locais atuais para evitar qualquer perda por closure desatualizada
+    let baseLogs: LogEntry[] = [];
+    try {
+      const saved = localStorage.getItem('motolegado_logs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) baseLogs = parsed;
+      }
+    } catch {}
+    if (baseLogs.length === 0) {
+      baseLogs = logs;
+    }
+
     let updated: LogEntry[];
     if (isEdit) {
-      updated = logs.map((l) => (l.id === entry.id ? entry : l));
+      updated = baseLogs.map((l) => (l.id === entry.id ? entry : l));
     } else {
-      updated = [entry, ...logs.filter(l => l.id !== entry.id)];
+      updated = [entry, ...baseLogs.filter(l => l.id !== entry.id)];
     }
     setLogs(updated);
     localStorage.setItem('motolegado_logs', JSON.stringify(updated));
@@ -845,26 +947,53 @@ export function Logbook() {
     window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
     window.dispatchEvent(new Event('storage'));
 
-    // Sincronização direta e resiliente com o MySQL da Hostinger
+    // Sincronização direta e resiliente com o MySQL da Hostinger com mapeamento completo de colunas
     try {
-      const parsedDate = parseLogDate(entry.date) || new Date();
-      const sqlDate = parsedDate.toISOString().split('T')[0];
+      // Converte data para formato SQL YYYY-MM-DD sem erro de timezone
+      let sqlDate = '';
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(entry.date)) {
+        const parts = entry.date.split('/');
+        const day = parts[0].padStart(2, '0');
+        const month = parts[1].padStart(2, '0');
+        const year = parts[2].slice(0, 4);
+        sqlDate = `${year}-${month}-${day}`;
+      } else if (/^\d{4}-\d{1,2}-\d{1,2}/.test(entry.date)) {
+        sqlDate = entry.date.slice(0, 10);
+      } else {
+        const d = parseLogDate(entry.date) || new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        sqlDate = `${year}-${month}-${day}`;
+      }
 
       await syncTripToHostinger({
         id: entry.id,
-        pilot_id: user?.id || 'pilot',
+        pilot_id: user?.id || profile?.id || user?.email || 'pilot',
         title: entry.title,
         origin: entry.origin,
         start_location: entry.origin,
         destination: entry.destination,
-        distance_km: parseInt(entry.distance, 10) || 0,
+        distance_km: parseFloat(entry.distance?.replace(/[^\d.]/g, '') || '0') || 0,
         start_date: sqlDate,
         motorcycle_used: entry.bike,
-        photos: entry.photos || [entry.image],
+        description: entry.content,
+        content: entry.content,
+        image: entry.image,
+        photos: entry.photos || (entry.image ? [entry.image] : []),
+        category: entry.category,
+        duration: entry.duration,
+        climate: entry.climate,
+        road: entry.road,
+        rating: entry.rating,
+        stages: entry.stages,
+        mapsUrl: entry.mapsUrl,
+        documentaryProofs: entry.documentaryProofs,
         checklist_data: {
           stages: entry.stages,
           mapsUrl: entry.mapsUrl,
           documentaryProofs: entry.documentaryProofs,
+          image: entry.image,
           category: entry.category,
           duration: entry.duration,
           climate: entry.climate,
@@ -879,6 +1008,11 @@ export function Logbook() {
   };
 
   const handleFinish = async () => {
+    if (isUploadingPhoto) {
+      alert('Aguarde o envio da foto ser concluído antes de salvar o lançamento.');
+      return;
+    }
+
     let cleanTitle = title.trim();
     if (!cleanTitle) {
       if (origin && destination) {
@@ -904,8 +1038,23 @@ export function Logbook() {
       }
 
       const validStages = stages.filter(s => s.name && s.name.trim().length > 0);
-      const finalCover = image || (documentaryProofs.length > 0 ? documentaryProofs[0].url : 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800');
-      const allPhotos = Array.from(new Set([finalCover, ...documentaryProofs.map(p => p.url)]));
+      
+      const isStockUrl = (url?: string) => !url || url.includes('images.unsplash.com');
+
+      // Foto enviada pelo usuário em Provas Documentais ou na Capa tem prioridade MÁXIMA
+      const userProofPhoto = documentaryProofs.find(p => p.url && !isStockUrl(p.url))?.url;
+      const userDirectCover = image && !isStockUrl(image) ? image : null;
+
+      // Se o usuário enviou uma foto, ela DEVE ser a capa principal do card
+      const finalCover = userProofPhoto 
+        || userDirectCover 
+        || (documentaryProofs.length > 0 ? documentaryProofs[0].url : null) 
+        || image 
+        || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800';
+
+      // Organiza fotos para que as fotos reais do usuário sempre fiquem em primeiro lugar
+      const proofUrls = documentaryProofs.map(p => p.url).filter(Boolean);
+      const allPhotos = Array.from(new Set([finalCover, ...proofUrls].filter(Boolean)));
 
       const entryId = editingLogId || Date.now().toString();
 
@@ -932,11 +1081,12 @@ export function Logbook() {
 
       await saveLogsToStorage(entryToSave, Boolean(editingLogId));
 
-      // Se havia um filtro de data ativo e a viagem salva ficou fora do período selecionado,
-      // reseta os filtros para que a viagem recém-registrada apareça imediatamente no topo da lista!
-      if (isDateFilterActive && !isDateWithinRange(entryToSave.date, startDateFilter, endDateFilter)) {
-        handleClearDateFilters();
-      }
+      // Reseta quaisquer filtros de data ou categoria para garantir que a viagem recém-registrada apareça imediatamente no topo da lista!
+      handleClearDateFilters();
+      setSelectedCategoryFilter('all');
+
+      // Pequena pausa para garantir feedback visual agradável da gravação
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       setSuccessToast(editingLogId ? 'Lançamento atualizado com sucesso no Diário de Bordo!' : 'Registro cadastrado com sucesso no seu Diário de Bordo!');
 
@@ -956,6 +1106,9 @@ export function Logbook() {
       setSelectedRouteId('');
       setFormError(null);
       setIsFormOpen(false);
+    } catch (err: any) {
+      console.error('Erro ao salvar no Diário de Bordo:', err);
+      setFormError('Falha ao processar o salvamento do registro. Por favor, tente novamente.');
     } finally {
       setIsSaving(false);
     }
@@ -970,9 +1123,80 @@ export function Logbook() {
     setContent(`Diário de bordo: "${t}". Partida ao amanhecer em ${o} com destino a ${d}. O trecho de ${km}km surpreendeu pela excelente fluidez do tráfego e trechos de curvas envolventes. Parada estratégica no mirante para fotos e um café quente. A moto manteve desempenho exemplar durante toda a travessia, consolidando mais um registro memorável no diário de bordo do MotoLegado.`);
   };
 
+  // Indicador visual de carregamento durante salvamento no diário
+  const savingIndicatorOverlay = (
+    <AnimatePresence>
+      {isSaving && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[120] bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center"
+        >
+          <motion.div 
+            initial={{ scale: 0.9, y: 10 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 10 }}
+            className="relative p-8 rounded-3xl bg-slate-900 border border-orange-500/40 shadow-2xl shadow-orange-500/20 flex flex-col items-center max-w-sm w-full space-y-4"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-500 shadow-inner">
+              <Loader2 size={32} className="animate-spin text-orange-500" />
+            </div>
+            <div className="space-y-1.5">
+              <h4 className="text-base font-black text-white uppercase tracking-wider">
+                {editingLogId ? 'Atualizando Diário' : 'Salvando no Diário'}
+              </h4>
+              <p className="text-xs text-slate-400">
+                Sincronizando telemetria, fotos e dados com o banco de dados...
+              </p>
+            </div>
+            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <motion.div
+                className="bg-gradient-to-r from-orange-500 to-amber-400 h-full rounded-full"
+                animate={{ x: ['-100%', '100%'] }}
+                transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
+              />
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  // Toast flutuante de sucesso
+  const floatingSuccessToast = (
+    <AnimatePresence>
+      {successToast && (
+        <motion.div
+          initial={{ opacity: 0, y: -20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -20, scale: 0.95 }}
+          className="fixed top-6 right-6 z-[110] flex items-center gap-3 px-5 py-4 bg-emerald-950/95 border border-emerald-500/50 rounded-2xl shadow-2xl backdrop-blur-md text-emerald-200 max-w-md"
+        >
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+            <CheckCircle2 size={20} className="text-emerald-400" />
+          </div>
+          <div className="flex-1 pr-2">
+            <p className="text-xs font-black uppercase tracking-wider text-white">Diário de Bordo</p>
+            <p className="text-[11px] text-emerald-300 font-medium">{successToast}</p>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setSuccessToast(null)} 
+            className="text-emerald-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+          >
+            <X size={16} />
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
   if (isFormOpen) {
     return (
       <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8 bg-slate-950 min-h-screen">
+        {savingIndicatorOverlay}
+        {floatingSuccessToast}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <button
@@ -1443,6 +1667,7 @@ export function Logbook() {
                   ref={tripPhotoInputRef}
                   className="hidden"
                   accept="image/*"
+                  multiple
                   onChange={handleTripPhotoUpload}
                 />
                 <input
@@ -1526,10 +1751,13 @@ export function Logbook() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setDocumentaryProofs((prev) => prev.filter((p) => p.id !== proof.id));
-                                    if (image === proof.url) {
-                                      setImage('');
-                                    }
+                                    setDocumentaryProofs((prev) => {
+                                      const remaining = prev.filter((p) => p.id !== proof.id);
+                                      if (image === proof.url) {
+                                        setImage(remaining.length > 0 ? remaining[0].url : '');
+                                      }
+                                      return remaining;
+                                    });
                                   }}
                                   className="text-[10px] font-bold text-red-400 hover:text-red-300 ml-auto flex items-center gap-1"
                                 >
@@ -1702,6 +1930,8 @@ export function Logbook() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-12 bg-slate-950 min-h-screen">
+      {savingIndicatorOverlay}
+      {floatingSuccessToast}
       {/* Header Section */}
       <header className="border-b border-slate-800/60 pb-6 sm:pb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
         <div>

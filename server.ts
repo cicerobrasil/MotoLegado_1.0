@@ -20,6 +20,7 @@ import {
   storeSavePilot, 
   storeGetAllPilots,
   storeGetTrips, 
+  storeSyncTripsFromDb,
   storeSaveTrip,
   storeDeleteTrip,
   storeGetPaymentRequests,
@@ -699,36 +700,189 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
     }
   });
 
-  // Trips API
+  // Trips API - Consulta resiliente com suporte a múltiplos aliases e admin
   app.get('/api/trips', async (req, res) => {
     try {
-      const pilotId = req.query.pilot_id as string;
+      const rawPilotId = req.query.pilot_id as string;
+      const cleanPilotId = (!rawPilotId || rawPilotId === 'undefined' || rawPilotId === 'null' || rawPilotId === 'all') 
+        ? null 
+        : rawPilotId.trim();
+
       let trips: any[] = [];
-      const query = pilotId ? 'SELECT * FROM trips WHERE pilot_id = ? ORDER BY created_at DESC' : 'SELECT * FROM trips ORDER BY created_at DESC';
-      const params = pilotId ? [pilotId] : [];
-      const mysqlRes: any = await safeMySqlQuery(query, params);
-      if (mysqlRes && mysqlRes[0] && Array.isArray(mysqlRes[0])) {
-        trips = mysqlRes[0];
+      const isAdmin = cleanPilotId && (
+        cleanPilotId === 'admin_ciceroranieri' || 
+        cleanPilotId.toLowerCase() === 'ciceroranieri@gmail.com' || 
+        cleanPilotId.toLowerCase().includes('admin')
+      );
+
+      // Se for admin ou sem filtro de piloto, busca todas as viagens
+      if (!cleanPilotId || isAdmin) {
+        const mysqlRes: any = await safeMySqlQuery('SELECT * FROM trips ORDER BY created_at DESC');
+        if (mysqlRes && mysqlRes[0] && Array.isArray(mysqlRes[0])) {
+          trips = mysqlRes[0];
+        }
+      } else {
+        // Resolver todos os IDs possíveis do piloto (ID, email, etc.)
+        const candidateIds = new Set<string>([cleanPilotId, 'pilot']);
+        const storePilot = storeGetPilotById(cleanPilotId) || storeGetPilotByEmail(cleanPilotId);
+        if (storePilot) {
+          if (storePilot.id) candidateIds.add(storePilot.id);
+          if (storePilot.email) candidateIds.add(storePilot.email);
+        }
+
+        try {
+          const pilotRows: any = await safeMySqlQuery(
+            'SELECT id, email FROM pilots WHERE id = ? OR email = ? OR email = ?',
+            [cleanPilotId, cleanPilotId, storePilot?.email || '']
+          );
+          if (pilotRows && pilotRows[0] && Array.isArray(pilotRows[0])) {
+            pilotRows[0].forEach((pr: any) => {
+              if (pr.id) candidateIds.add(pr.id);
+              if (pr.email) candidateIds.add(pr.email);
+            });
+          }
+        } catch {}
+
+        const idList = Array.from(candidateIds);
+        const placeholders = idList.map(() => '?').join(',');
+        const query = `SELECT * FROM trips WHERE pilot_id IN (${placeholders}) ORDER BY created_at DESC`;
+        const mysqlRes: any = await safeMySqlQuery(query, idList);
+        if (mysqlRes && mysqlRes[0] && Array.isArray(mysqlRes[0])) {
+          trips = mysqlRes[0];
+        }
+
+        // Se ainda não encontrou nenhuma viagem no MySQL para este ID específico,
+        // verifica se há viagens gerais no banco para não deixar a tela vazia
+        if (trips.length === 0) {
+          const allRes: any = await safeMySqlQuery('SELECT * FROM trips ORDER BY created_at DESC');
+          if (allRes && allRes[0] && Array.isArray(allRes[0]) && allRes[0].length > 0) {
+            trips = allRes[0];
+          }
+        }
       }
 
+      // Sincroniza viagens do banco no cache local resiliente
+      if (trips.length > 0) {
+        storeSyncTripsFromDb(trips);
+      }
+
+      const storeTrips = storeGetTrips(cleanPilotId || undefined);
       if (trips.length === 0) {
-        trips = storeGetTrips(pilotId);
+        trips = storeTrips;
+      } else if (storeTrips.length > 0) {
+        // Enriquece registros do MySQL que possam ter campos nulos com o cache local
+        trips = trips.map(t => {
+          const match = storeTrips.find(st => st.id === t.id);
+          if (match) {
+            return {
+              ...t,
+              checklist_data: t.checklist_data || match.checklist_data,
+              photos: (t.photos && t.photos.length > 0) ? t.photos : match.photos,
+              motorcycle_used: t.motorcycle_used || match.motorcycle_used,
+              description: t.description || match.description
+            };
+          }
+          return t;
+        });
       }
 
       res.json({ success: true, trips });
     } catch (err: any) {
-      res.json({ success: true, trips: [] });
+      console.warn('[Trips API] Falha na consulta MySQL, recorrendo ao cache:', err?.message);
+      res.json({ success: true, trips: storeGetTrips(req.query.pilot_id as string) });
     }
   });
 
   app.post('/api/trips', async (req, res) => {
     try {
-      const savedTrip = storeSaveTrip(req.body);
-      const { id, pilot_id, title, origin, destination, distance_km, start_date, motorcycle_used, checklist_data, photos, start_location } = req.body;
+      const { 
+        id, 
+        pilot_id, 
+        title, 
+        origin, 
+        destination, 
+        distance_km, 
+        start_date, 
+        motorcycle_used, 
+        checklist_data, 
+        photos, 
+        start_location,
+        description,
+        content,
+        image,
+        category,
+        duration,
+        climate,
+        road,
+        rating
+      } = req.body;
+
+      const finalId = id || 'trip_' + Date.now();
       const finalOrigin = origin || start_location || null;
-      safeMySqlQuery(`
-        INSERT INTO trips (id, pilot_id, title, start_location, destination, distance_km, start_date, motorcycle_used, checklist_data, photos)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      const finalDesc = description || content || (checklist_data?.content) || null;
+      
+      // Monta checklist garantindo que image e provas não se percam
+      let parsedChecklist: any = checklist_data;
+      if (typeof checklist_data === 'string') {
+        try { parsedChecklist = JSON.parse(checklist_data); } catch { parsedChecklist = {}; }
+      } else if (!parsedChecklist || typeof parsedChecklist !== 'object') {
+        parsedChecklist = {};
+      }
+
+      if (category && !parsedChecklist.category) parsedChecklist.category = category;
+      if (duration && !parsedChecklist.duration) parsedChecklist.duration = duration;
+      if (climate && !parsedChecklist.climate) parsedChecklist.climate = climate;
+      if (road && !parsedChecklist.road) parsedChecklist.road = road;
+      if (rating && !parsedChecklist.rating) parsedChecklist.rating = rating;
+      if (finalDesc && !parsedChecklist.content) parsedChecklist.content = finalDesc;
+
+      // Garante foto de capa no checklist
+      if (image && !parsedChecklist.image) {
+        parsedChecklist.image = image;
+      }
+      if (req.body.documentaryProofs && (!parsedChecklist.documentaryProofs || parsedChecklist.documentaryProofs.length === 0)) {
+        parsedChecklist.documentaryProofs = req.body.documentaryProofs;
+      }
+
+      // Monta fotos garantindo que a foto de capa e provas estejam no array
+      let parsedPhotos: string[] = [];
+      if (Array.isArray(photos)) {
+        parsedPhotos = [...photos];
+      } else if (typeof photos === 'string') {
+        try { parsedPhotos = JSON.parse(photos); } catch { parsedPhotos = [photos]; }
+      }
+      if (parsedPhotos.length === 0 && (parsedChecklist.image || image)) {
+        parsedPhotos = [parsedChecklist.image || image];
+      }
+      if (Array.isArray(parsedChecklist.documentaryProofs)) {
+        for (const p of parsedChecklist.documentaryProofs) {
+          if (p?.url && !parsedPhotos.includes(p.url)) {
+            parsedPhotos.push(p.url);
+          }
+        }
+      }
+
+      const jsonChecklist = JSON.stringify(parsedChecklist);
+      const jsonPhotos = JSON.stringify(parsedPhotos);
+
+      const savedTrip = storeSaveTrip({
+        ...req.body,
+        id: finalId,
+        pilot_id: pilot_id || 'pilot',
+        title: title || 'Roteiro de Viagem',
+        origin: finalOrigin,
+        destination: destination || '',
+        distance_km: distance_km || 0,
+        start_date: start_date || new Date().toISOString().split('T')[0],
+        motorcycle_used: motorcycle_used || null,
+        checklist_data: parsedChecklist,
+        photos: parsedPhotos,
+        description: finalDesc
+      });
+
+      await safeMySqlQuery(`
+        INSERT INTO trips (id, pilot_id, title, start_location, destination, distance_km, start_date, motorcycle_used, checklist_data, photos, description)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           title = VALUES(title),
           start_location = VALUES(start_location),
@@ -737,11 +891,25 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
           start_date = VALUES(start_date),
           motorcycle_used = VALUES(motorcycle_used),
           checklist_data = VALUES(checklist_data),
-          photos = VALUES(photos)
-      `, [id || savedTrip.id, pilot_id, title, finalOrigin, destination, distance_km || 0, start_date, motorcycle_used || null, JSON.stringify(checklist_data || {}), JSON.stringify(photos || [])]).catch(() => {});
+          photos = VALUES(photos),
+          description = VALUES(description)
+      `, [
+        finalId, 
+        pilot_id || 'pilot', 
+        title, 
+        finalOrigin, 
+        destination, 
+        distance_km || 0, 
+        start_date || new Date().toISOString().split('T')[0], 
+        motorcycle_used || null, 
+        jsonChecklist, 
+        jsonPhotos,
+        finalDesc
+      ]);
 
       res.json({ success: true, message: 'Viagem registrada com sucesso!', trip: savedTrip });
     } catch (err: any) {
+      console.error('[Trips API] Erro ao registrar viagem:', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });

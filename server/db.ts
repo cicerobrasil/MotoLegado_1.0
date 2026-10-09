@@ -18,9 +18,9 @@ export const dbConfig = {
 
 let pool: mysql.Pool | null = null;
 
-let isMysqlOnline = false;
+let isMysqlOnline = true;
 let lastCheckTime = 0;
-const CHECK_INTERVAL = 30000; // 30 segundos
+const CHECK_INTERVAL = 10000; // 10 segundos
 
 export function getDbPool(): mysql.Pool {
   if (!pool) {
@@ -30,23 +30,19 @@ export function getDbPool(): mysql.Pool {
 }
 
 export async function safeMySqlQuery<T = any>(sql: string, params: any[] = []): Promise<T | null> {
-  const now = Date.now();
-  if (!isMysqlOnline && (now - lastCheckTime < CHECK_INTERVAL)) {
-    return null;
-  }
-
   try {
     const p = getDbPool();
     const result: any = await Promise.race([
       p.query(sql, params),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
     ]);
     isMysqlOnline = true;
-    lastCheckTime = now;
+    lastCheckTime = Date.now();
     return result;
   } catch (err: any) {
+    console.warn('[Hostinger MySQL] Aviso na execução da query:', err?.message || err);
     isMysqlOnline = false;
-    lastCheckTime = now;
+    lastCheckTime = Date.now();
     return null;
   }
 }

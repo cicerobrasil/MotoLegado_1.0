@@ -68,6 +68,7 @@ export function DocumentaryCameraModal({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fallbackInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   // Inicializa geolocalização para certidão documental
   useEffect(() => {
@@ -358,6 +359,14 @@ export function DocumentaryCameraModal({
         className="hidden"
         onChange={handleNativeCameraCapture}
       />
+      {/* Input para carregar foto da galeria do aparelho */}
+      <input
+        type="file"
+        ref={galleryInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handleNativeCameraCapture}
+      />
 
       {/* Efeito flash de obturador */}
       {shutterFlash && (
@@ -505,15 +514,25 @@ export function DocumentaryCameraModal({
                 <span>Tirar Foto</span>
               </button>
 
-              {/* Botão Câmera Nativa do Celular */}
-              <button
-                type="button"
-                onClick={() => fallbackInputRef.current?.click()}
-                className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors flex items-center justify-center"
-                title="Usar Câmera Nativa do Celular / Carregar da Galeria"
-              >
-                <ImageIcon size={20} />
-              </button>
+              {/* Botões de Mídia: Galeria e Câmera Nativa */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors flex items-center justify-center"
+                  title="Escolher foto da Galeria do Celular/PC"
+                >
+                  <ImageIcon size={20} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fallbackInputRef.current?.click()}
+                  className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors flex items-center justify-center"
+                  title="Abrir Câmera Nativa do Celular"
+                >
+                  <Camera size={20} className="text-orange-500" />
+                </button>
+              </div>
             </div>
           ) : (
             /* Formulário de Classificação da Prova Documental */

@@ -66,6 +66,8 @@ export function ProfileDashboard() {
       }
 
       // 2. Carregar e sincronizar viagens do MySQL na Hostinger
+      const isStockUrl = (u?: string) => !u || u.includes('images.unsplash.com');
+
       getTripsFromHostinger(user?.id)
         .then((res) => {
           if (res && res.trips && res.trips.length > 0) {
@@ -84,11 +86,24 @@ export function ProfileDashboard() {
                 photos = t.photos;
               }
 
+              const realPhoto = photos.find((p: string) => !isStockUrl(p));
+              const realProofPhoto = Array.isArray(checklist?.documentaryProofs)
+                ? checklist.documentaryProofs.find((p: any) => !isStockUrl(p?.url))?.url
+                : null;
+              const finalImage = (!isStockUrl(checklist?.image) ? checklist?.image : null) || realPhoto || realProofPhoto || checklist?.image || photos[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800';
+
+              let rawDate = t.start_date ? String(t.start_date).split('T')[0] : (t.date || '');
+              let displayDate = rawDate;
+              if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+                const [y, m, d] = rawDate.split('-');
+                displayDate = `${d}/${m}/${y}`;
+              }
+
               return {
-                id: t.id,
-                date: (t.start_date ? String(t.start_date).split('T')[0] : '') || t.date || new Date().toISOString().split('T')[0],
+                id: String(t.id),
+                date: displayDate || new Date().toLocaleDateString('pt-BR'),
                 title: t.title || 'Viagem Registrada',
-                distance: String(Math.round(t.distance_km || 0)),
+                distance: String(Math.round(parseFloat(t.distance_km) || 0)),
                 bike: t.motorcycle_used || t.bike_model || pilotMotorcycle,
                 origin: t.start_location || t.origin || 'Origem',
                 destination: t.destination || 'Destino',
@@ -97,29 +112,56 @@ export function ProfileDashboard() {
                 road: checklist?.road || 'Tapete (Perfeita)',
                 content: t.description || checklist?.content || t.notes || '',
                 rating: checklist?.rating || t.rating || 5,
-                image: photos[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800'
+                image: finalImage,
+                category: checklist?.category || t.category || 'Viagem',
+                photos: photos.length > 0 ? photos : (Array.isArray(t.photos) ? t.photos : []),
+                documentaryProofs: Array.isArray(checklist?.documentaryProofs) ? checklist.documentaryProofs : [],
+                stages: Array.isArray(checklist?.stages) ? checklist.stages : (Array.isArray(t.stages) ? t.stages : []),
+                mapsUrl: checklist?.mapsUrl || t.maps_url || undefined
               };
             });
-            // Mescla de forma segura sem perdas nem duplicações
+            // Mescla de forma segura sem perdas nem duplicações por ID
             const merged: LogEntry[] = [];
-            const seenKeys = new Set<string>();
+            const seenIds = new Set<string>();
 
             mappedLogs.forEach(ml => {
-              const cleanTitle = (ml.title || '').trim().toLowerCase();
-              const distKey = (ml.distance || '').replace(/\D/g, '');
-              const key = `${cleanTitle}_${distKey}`;
-              seenKeys.add(ml.id);
-              if (key && cleanTitle) seenKeys.add(key);
-              merged.push(ml);
+              seenIds.add(ml.id);
+
+              // Tenta localizar versão local correspondente para enriquecer dados
+              const localMatch = localLogs.find(l => l.id === ml.id);
+              if (localMatch) {
+                const combinedPhotos = Array.from(new Set([...(ml.photos || []), ...(localMatch.photos || [])]));
+                const combinedProofs = (ml.documentaryProofs && ml.documentaryProofs.length > 0)
+                  ? ml.documentaryProofs
+                  : (localMatch.documentaryProofs || []);
+                const combinedCover = (!isStockUrl(ml.image) ? ml.image : null) 
+                  || (!isStockUrl(localMatch.image) ? localMatch.image : null)
+                  || ml.image 
+                  || localMatch.image;
+
+                merged.push({
+                  ...ml,
+                  title: ml.title || localMatch.title,
+                  origin: ml.origin || localMatch.origin,
+                  destination: ml.destination || localMatch.destination,
+                  content: ml.content || localMatch.content,
+                  bike: (ml.bike && ml.bike !== 'Motocicleta') ? ml.bike : (localMatch.bike || ml.bike),
+                  distance: (ml.distance && ml.distance !== '0') ? ml.distance : (localMatch.distance || ml.distance),
+                  category: ml.category || localMatch.category,
+                  photos: combinedPhotos.length > 0 ? combinedPhotos : (ml.photos || []),
+                  documentaryProofs: combinedProofs,
+                  image: combinedCover,
+                  stages: (ml.stages && ml.stages.length > 0) ? ml.stages : (localMatch.stages || []),
+                  mapsUrl: ml.mapsUrl || localMatch.mapsUrl
+                });
+              } else {
+                merged.push(ml);
+              }
             });
 
             localLogs.forEach(ll => {
-              const cleanTitle = (ll.title || '').trim().toLowerCase();
-              const distKey = (ll.distance || '').replace(/\D/g, '');
-              const key = `${cleanTitle}_${distKey}`;
-              if (!seenKeys.has(ll.id) && (!key || !seenKeys.has(key))) {
-                seenKeys.add(ll.id);
-                if (key && cleanTitle) seenKeys.add(key);
+              if (!seenIds.has(ll.id)) {
+                seenIds.add(ll.id);
                 merged.push(ll);
               }
             });

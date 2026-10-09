@@ -38,10 +38,15 @@ export interface StoredTrip {
   id: string;
   pilot_id: string;
   title: string;
+  origin?: string;
+  start_location?: string;
   destination: string;
   distance_km?: number;
   start_date: string;
   end_date?: string;
+  description?: string;
+  image?: string;
+  status?: string;
   motorcycle_used?: string;
   checklist_data?: any;
   photos?: any;
@@ -226,12 +231,66 @@ export function storeGetAllPilots(): StoredPilot[] {
   return list;
 }
 
-// Obter viagens
+// Obter viagens com suporte a múltiplos aliases e admin
 export function storeGetTrips(pilotId?: string): StoredTrip[] {
   const store = loadStore();
-  if (!pilotId) return store.trips;
-  const target = pilotId.toLowerCase();
-  return store.trips.filter(t => t.pilot_id && t.pilot_id.toLowerCase() === target);
+  if (!pilotId || pilotId === 'all' || pilotId === 'undefined' || pilotId === 'null') {
+    return store.trips;
+  }
+  const clean = pilotId.trim().toLowerCase();
+
+  // Se for admin, pode visualizar todas as viagens
+  if (clean === 'admin_ciceroranieri' || clean === 'ciceroranieri@gmail.com' || clean.includes('admin')) {
+    return store.trips;
+  }
+
+  // Obter possíveis identificadores do piloto (id, email, etc.)
+  const candidateIds = new Set<string>([clean, 'pilot']);
+  const pilot = store.pilots[clean] || store.pilots[pilotId];
+  if (pilot) {
+    if (pilot.id) candidateIds.add(pilot.id.toLowerCase());
+    if (pilot.email) candidateIds.add(pilot.email.toLowerCase());
+  }
+
+  const matched = store.trips.filter(t => {
+    if (!t.pilot_id) return true;
+    const pid = t.pilot_id.toLowerCase();
+    return candidateIds.has(pid);
+  });
+
+  // Se não encontrou nenhuma viagem específica mas existem viagens no sistema,
+  // retorna as viagens gerais ou todas para não deixar a tela em branco
+  return matched.length > 0 ? matched : store.trips;
+}
+
+// Sincronizar lote de viagens do MySQL no cache local
+export function storeSyncTripsFromDb(trips: StoredTrip[]) {
+  if (!Array.isArray(trips) || trips.length === 0) return;
+  const store = loadStore();
+  let changed = false;
+
+  for (const t of trips) {
+    const idx = store.trips.findIndex(st => st.id === t.id);
+    if (idx >= 0) {
+      // Mescla preservando campos não vazios
+      store.trips[idx] = {
+        ...store.trips[idx],
+        ...t,
+        checklist_data: t.checklist_data || store.trips[idx].checklist_data,
+        photos: (t.photos && t.photos.length > 0) ? t.photos : store.trips[idx].photos,
+        motorcycle_used: t.motorcycle_used || store.trips[idx].motorcycle_used,
+        description: t.description || store.trips[idx].description
+      };
+      changed = true;
+    } else {
+      store.trips.push(t);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    saveStore(store);
+  }
 }
 
 // Excluir viagem
