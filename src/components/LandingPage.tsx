@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Shield, 
+  ShieldCheck, 
   Map, 
   Calendar, 
   Store, 
@@ -1838,39 +1839,39 @@ export function LandingPage() {
       {/* MODAL DE CONTRATAÇÃO DE PACOTE DE MOTO CLUBE */}
       <AnimatePresence>
         {showClubCheckoutModal && selectedClubPackage && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative my-8"
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl max-w-4xl xl:max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl relative overflow-hidden my-auto"
             >
               <button
                 onClick={() => setShowClubCheckoutModal(false)}
-                className="absolute top-6 right-6 text-slate-400 hover:text-white p-2"
+                className="absolute top-3 right-3 sm:top-4 sm:right-4 text-slate-400 hover:text-white p-2 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 transition-all z-50 cursor-pointer shadow-lg active:scale-95"
                 aria-label="Fechar modal"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
 
               {checkoutSuccess ? (
-                <div className="text-center space-y-6 py-4">
+                <div className="text-center space-y-4 p-6 sm:p-8 my-auto">
                   <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
                     <CheckCircle2 size={36} />
                   </div>
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400">
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400 block">
                       MOTO CLUBE HOMOLOGADO COM SUCESSO!
                     </span>
-                    <h3 className="text-2xl font-black italic uppercase text-white">
+                    <h3 className="text-xl sm:text-2xl font-black italic uppercase text-white">
                       Parabéns, Comandante {checkoutLeaderName}!
                     </h3>
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-md mx-auto">
+                    <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
                       O Moto Clube <strong className="text-white">"{checkoutClubName}"</strong> foi cadastrado e ativado com o <strong className="text-orange-400">{selectedClubPackage.name}</strong>.
                     </p>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-left space-y-2.5 text-xs">
+                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-left space-y-2 text-xs max-w-md mx-auto">
                     <div className="flex items-center justify-between text-slate-300">
                       <span>Vagas Pro para Membros:</span>
                       <strong className="text-white font-mono">{selectedClubPackage.members} vagas ativas</strong>
@@ -1879,13 +1880,13 @@ export function LandingPage() {
                       <span className="flex items-center gap-1.5"><Crown size={14} /> Benefício do Líder:</span>
                       <span>100% Isento & Bonificado Vitalício</span>
                     </div>
-                    <div className="flex items-center justify-between text-slate-300 border-t border-slate-800/80 pt-2">
+                    <div className="flex items-center justify-between text-slate-300 border-t border-slate-800/80 pt-1.5">
                       <span>Vagas utilizadas até o momento:</span>
                       <span className="text-slate-400 font-mono">0 / {selectedClubPackage.members}</span>
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-slate-400 italic">
+                  <p className="text-[11px] text-slate-400 italic max-w-md mx-auto">
                     Como Líder, você já pode acessar o painel do seu clube para aprovar candidaturas e emitir comunicados no mural restrito!
                   </p>
 
@@ -1894,7 +1895,7 @@ export function LandingPage() {
                       setShowClubCheckoutModal(false);
                       navigate('/motoclub');
                     }}
-                    className="w-full btn-primary py-4 text-xs font-black uppercase tracking-wider"
+                    className="max-w-md mx-auto w-full btn-primary py-3.5 text-xs font-black uppercase tracking-wider cursor-pointer flex items-center justify-center gap-2"
                   >
                     <span>Ir para o Painel do Meu Moto Clube</span>
                     <ArrowRight size={14} />
@@ -1902,221 +1903,246 @@ export function LandingPage() {
                 </div>
               ) : (
                 <>
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-600/15 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase tracking-wider">
-                      <Users size={12} />
+                  {/* Header Compacto */}
+                  <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800/80 shrink-0 relative z-10 pr-12">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-600/15 border border-orange-500/30 text-orange-400 text-[10px] font-black uppercase tracking-wider mb-1">
+                      <Users size={11} />
                       <span>Contratação Coletiva de Moto Clube</span>
                     </div>
-                    <h3 className="text-2xl font-black italic uppercase text-white">
+                    <h3 className="text-lg sm:text-xl font-black italic uppercase text-white">
                       Cadastrar & Ativar Moto Clube
                     </h3>
-                    <p className="text-xs text-slate-300">
+                    <p className="text-[11px] sm:text-xs text-slate-300">
                       Preencha os dados da irmandade para ativar o pacote e se tornar o Comandante oficial.
                     </p>
                   </div>
 
-                  {/* Resumo do Pacote Selecionado */}
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-orange-500/30 flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-orange-400 block tracking-wider">
-                        {selectedClubPackage.name}
-                      </span>
-                      <p className="text-xs text-slate-200 font-bold">
-                        {selectedClubPackage.members} Vagas Pro para Membros
-                      </p>
-                      <p className="text-[10px] text-emerald-400 font-medium flex items-center gap-1 mt-0.5">
-                        <Crown size={11} /> Líder 100% Isento & Bonificado
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xl font-black italic text-white block">
-                        {selectedClubPackage.priceMonthly}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-bold">/mês unificado</span>
-                    </div>
-                  </div>
-
-                  {/* Formulário */}
-                  <form onSubmit={(e) => { e.preventDefault(); handleProcessClubCheckout(); }} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Nome do Moto Clube *</label>
-                        <input
-                          type="text"
-                          required
-                          value={checkoutClubName}
-                          onChange={(e) => setCheckoutClubName(e.target.value)}
-                          placeholder="Ex: Falcões da Noite MC"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Cidade / Estado *</label>
-                        <input
-                          type="text"
-                          required
-                          value={checkoutClubCity}
-                          onChange={(e) => setCheckoutClubCity(e.target.value)}
-                          placeholder="Ex: Curitiba / PR"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Nome do Presidente / Líder *</label>
-                        <input
-                          type="text"
-                          required
-                          value={checkoutLeaderName}
-                          onChange={(e) => setCheckoutLeaderName(e.target.value)}
-                          placeholder="Seu nome completo"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">WhatsApp do Líder *</label>
-                        <input
-                          type="text"
-                          required
-                          value={checkoutLeaderPhone}
-                          onChange={(e) => setCheckoutLeaderPhone(e.target.value)}
-                          placeholder="(00) 00000-0000"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">E-mail para Recibos & Faturamento *</label>
-                      <input
-                        type="email"
-                        required
-                        value={checkoutLeaderEmail}
-                        onChange={(e) => setCheckoutLeaderEmail(e.target.value)}
-                        placeholder="tesouraria@motoclube.com"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
-                      />
-                    </div>
-
-                    {/* Forma de Pagamento */}
-                    <div className="space-y-2 pt-2">
-                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block">
-                        Forma de Pagamento da Tesouraria
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setCheckoutPaymentMethod('pix')}
-                          className={cn(
-                            "p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer",
-                            checkoutPaymentMethod === 'pix'
-                              ? "bg-orange-600/20 border-orange-500 text-white"
-                              : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
-                          )}
-                        >
-                          <QrCode size={16} className="text-emerald-400" />
-                          <span>PIX Instantâneo</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCheckoutPaymentMethod('card')}
-                          className={cn(
-                            "p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer",
-                            checkoutPaymentMethod === 'card'
-                              ? "bg-orange-600/20 border-orange-500 text-white"
-                              : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
-                          )}
-                        >
-                          <CreditCard size={16} className="text-amber-400" />
-                          <span>Cartão de Crédito</span>
-                        </button>
-                      </div>
-
-                      {checkoutPaymentMethod === 'pix' ? (() => {
-                        const clubPixCode = generateBacenPixPayload({ 
-                          amount: selectedClubPackage.priceMonthlyNumber,
-                          txid: `CLUBE${selectedClubPackage.id.toUpperCase()}`
-                        });
-                        return (
-                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-400 text-[11px]">Chave PIX (Celular):</span>
-                              <strong className="text-orange-400 font-mono text-[11px]">(47) 99136-2628</strong>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-400 text-[11px]">Titular:</span>
-                              <span className="text-white font-bold text-[11px]">Cicero Ranieri Brasil</span>
-                            </div>
-                            <div className="flex items-center justify-between pt-1">
-                              <span className="text-slate-400 text-[11px]">Código Copia e Cola:</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(clubPixCode);
-                                  setCopiedPixKey(true);
-                                  setTimeout(() => setCopiedPixKey(false), 2000);
-                                }}
-                                className="text-orange-400 hover:text-orange-300 font-bold flex items-center gap-1 text-[11px] cursor-pointer"
-                              >
-                                {copiedPixKey ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                                <span>{copiedPixKey ? 'Copiado!' : 'Copiar Código'}</span>
-                              </button>
-                            </div>
-                            <div className="p-2 rounded-lg bg-slate-900 font-mono text-[10px] text-slate-300 truncate select-all">
-                              {clubPixCode}
-                            </div>
-                            <p className="text-[10px] text-slate-500 italic">
-                              Pagamento direto sem intermediários. Ativação imediata da tesouraria do clube.
+                  {/* Corpo em 2 Colunas */}
+                  <div className="p-4 sm:p-5 overflow-y-auto flex-1 relative z-10 custom-scrollbar">
+                    <form onSubmit={(e) => { e.preventDefault(); handleProcessClubCheckout(); }} className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:gap-6 items-start">
+                      {/* COLUNA ESQUERDA: Pacote & Pagamento (5 colunas) */}
+                      <div className="md:col-span-5 space-y-3">
+                        {/* Resumo do Pacote Selecionado */}
+                        <div className="p-3.5 rounded-2xl bg-slate-950 border border-orange-500/30 flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] font-black uppercase text-orange-400 block tracking-wider">
+                              {selectedClubPackage.name}
+                            </span>
+                            <p className="text-xs text-slate-200 font-bold">
+                              {selectedClubPackage.members} Vagas Pro para Membros
+                            </p>
+                            <p className="text-[10px] text-emerald-400 font-medium flex items-center gap-1 mt-0.5">
+                              <Crown size={11} /> Líder 100% Isento & Bonificado
                             </p>
                           </div>
-                        );
-                      })() : (
-                        <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
-                          <input
-                            type="text"
-                            placeholder="Número do Cartão da Tesouraria"
-                            className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-white outline-none"
-                            defaultValue="4532 •••• •••• 8842"
-                          />
+                          <div className="text-right">
+                            <span className="text-lg font-black italic text-white block">
+                              {selectedClubPackage.priceMonthly}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-bold">/mês unificado</span>
+                          </div>
+                        </div>
+
+                        {/* Forma de Pagamento */}
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                            Forma de Pagamento da Tesouraria:
+                          </label>
                           <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setCheckoutPaymentMethod('pix')}
+                              className={cn(
+                                "py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer",
+                                checkoutPaymentMethod === 'pix'
+                                  ? "bg-orange-600/20 border-orange-500 text-white shadow-sm"
+                                  : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                              )}
+                            >
+                              <QrCode size={15} className="text-emerald-400" />
+                              <span>PIX Instantâneo</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCheckoutPaymentMethod('card')}
+                              className={cn(
+                                "py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer",
+                                checkoutPaymentMethod === 'card'
+                                  ? "bg-orange-600/20 border-orange-500 text-white shadow-sm"
+                                  : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                              )}
+                            >
+                              <CreditCard size={15} className="text-amber-400" />
+                              <span>Cartão de Crédito</span>
+                            </button>
+                          </div>
+
+                          {checkoutPaymentMethod === 'pix' ? (() => {
+                            const clubPixCode = generateBacenPixPayload({ 
+                              amount: selectedClubPackage.priceMonthlyNumber,
+                              txid: `CLUBE${selectedClubPackage.id.toUpperCase()}`
+                            });
+                            return (
+                              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-400">Chave PIX (Celular):</span>
+                                  <strong className="text-orange-400 font-mono">(47) 99136-2628</strong>
+                                </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-400">Titular:</span>
+                                  <span className="text-white font-bold">Cicero Ranieri Brasil</span>
+                                </div>
+                                <div className="flex items-center justify-between pt-0.5">
+                                  <span className="text-slate-400 text-[10px]">Copia e Cola:</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(clubPixCode);
+                                      setCopiedPixKey(true);
+                                      setTimeout(() => setCopiedPixKey(false), 2000);
+                                    }}
+                                    className="text-orange-400 hover:text-orange-300 font-bold flex items-center gap-1 text-[10px] cursor-pointer"
+                                  >
+                                    {copiedPixKey ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                                    <span>{copiedPixKey ? 'Copiado!' : 'Copiar Código'}</span>
+                                  </button>
+                                </div>
+                                <div className="p-1.5 rounded-lg bg-slate-900 font-mono text-[9px] text-slate-300 truncate select-all">
+                                  {clubPixCode}
+                                </div>
+                                <p className="text-[9px] text-slate-500 italic">
+                                  Ativação imediata da tesouraria do clube.
+                                </p>
+                              </div>
+                            );
+                          })() : (
+                            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                              <input
+                                type="text"
+                                placeholder="Número do Cartão da Tesouraria"
+                                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none"
+                                defaultValue="4532 •••• •••• 8842"
+                              />
+                              <div className="grid grid-cols-2 gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Validade (MM/AA)"
+                                  className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none"
+                                  defaultValue="12/28"
+                                />
+                                <input
+                                  type="password"
+                                  maxLength={4}
+                                  placeholder="CVV"
+                                  className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white outline-none"
+                                  defaultValue="884"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* COLUNA DIREITA: Dados do Clube & Finalização (7 colunas) */}
+                      <div className="md:col-span-7 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Nome do Moto Clube *</label>
                             <input
                               type="text"
-                              placeholder="Validade (MM/AA)"
-                              className="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-white outline-none"
-                              defaultValue="12/28"
+                              required
+                              value={checkoutClubName}
+                              onChange={(e) => setCheckoutClubName(e.target.value)}
+                              placeholder="Ex: Falcões da Noite MC"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
                             />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Cidade / Estado *</label>
                             <input
-                              type="password"
-                              maxLength={4}
-                              placeholder="CVV"
-                              className="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-white outline-none"
-                              defaultValue="884"
+                              type="text"
+                              required
+                              value={checkoutClubCity}
+                              onChange={(e) => setCheckoutClubCity(e.target.value)}
+                              placeholder="Ex: Curitiba / PR"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
                             />
                           </div>
                         </div>
-                      )}
-                    </div>
 
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Nome do Presidente / Líder *</label>
+                            <input
+                              type="text"
+                              required
+                              value={checkoutLeaderName}
+                              onChange={(e) => setCheckoutLeaderName(e.target.value)}
+                              placeholder="Seu nome completo"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">WhatsApp do Líder *</label>
+                            <input
+                              type="text"
+                              required
+                              value={checkoutLeaderPhone}
+                              onChange={(e) => setCheckoutLeaderPhone(e.target.value)}
+                              placeholder="(00) 00000-0000"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">E-mail para Recibos & Faturamento *</label>
+                          <input
+                            type="email"
+                            required
+                            value={checkoutLeaderEmail}
+                            onChange={(e) => setCheckoutLeaderEmail(e.target.value)}
+                            placeholder="tesouraria@motoclube.com"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={checkoutProcessing}
+                          className="w-full btn-primary py-3.5 text-xs font-black uppercase tracking-wider mt-2 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-orange-600/20"
+                        >
+                          {checkoutProcessing ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" />
+                              <span>Ativando Pacote e Homologando Clube...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>Confirmar e Fundar Clube ({selectedClubPackage.priceMonthly})</span>
+                              <ArrowRight size={14} />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Rodapé Compacto */}
+                  <div className="px-4 py-2.5 sm:px-6 bg-slate-950/70 border-t border-slate-800/80 shrink-0 flex items-center justify-between text-[10px] text-slate-500">
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck size={13} className="text-emerald-500" />
+                      Pagamento seguro da tesouraria do Moto Clube
+                    </span>
                     <button
-                      type="submit"
-                      disabled={checkoutProcessing}
-                      className="w-full btn-primary py-4 text-xs font-black uppercase tracking-wider mt-4 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                      type="button"
+                      onClick={() => setShowClubCheckoutModal(false)}
+                      className="text-slate-400 hover:text-white font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1"
                     >
-                      {checkoutProcessing ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          <span>Ativando Pacote e Homologando Clube...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Confirmar e Fundar Clube ({selectedClubPackage.priceMonthly})</span>
-                          <ArrowRight size={14} />
-                        </>
-                      )}
+                      <X size={12} />
+                      <span>Fechar</span>
                     </button>
-                  </form>
+                  </div>
                 </>
               )}
             </motion.div>

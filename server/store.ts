@@ -231,36 +231,27 @@ export function storeGetAllPilots(): StoredPilot[] {
   return list;
 }
 
-// Obter viagens com suporte a múltiplos aliases e admin
-export function storeGetTrips(pilotId?: string): StoredTrip[] {
+// Obter viagens com filtro estrito de piloto para isolamento de dados
+export function storeGetTrips(pilotId?: string, allowAll: boolean = false): StoredTrip[] {
   const store = loadStore();
   if (!pilotId || pilotId === 'all' || pilotId === 'undefined' || pilotId === 'null') {
-    return store.trips;
+    return allowAll ? store.trips : [];
   }
   const clean = pilotId.trim().toLowerCase();
 
-  // Se for admin, pode visualizar todas as viagens
-  if (clean === 'admin_ciceroranieri' || clean === 'ciceroranieri@gmail.com' || clean.includes('admin')) {
-    return store.trips;
-  }
-
-  // Obter possíveis identificadores do piloto (id, email, etc.)
-  const candidateIds = new Set<string>([clean, 'pilot']);
+  // Obter identificadores específicos deste piloto (id, email)
+  const candidateIds = new Set<string>([clean]);
   const pilot = store.pilots[clean] || store.pilots[pilotId];
   if (pilot) {
     if (pilot.id) candidateIds.add(pilot.id.toLowerCase());
     if (pilot.email) candidateIds.add(pilot.email.toLowerCase());
   }
 
-  const matched = store.trips.filter(t => {
-    if (!t.pilot_id) return true;
+  return store.trips.filter(t => {
+    if (!t.pilot_id) return false;
     const pid = t.pilot_id.toLowerCase();
     return candidateIds.has(pid);
   });
-
-  // Se não encontrou nenhuma viagem específica mas existem viagens no sistema,
-  // retorna as viagens gerais ou todas para não deixar a tela em branco
-  return matched.length > 0 ? matched : store.trips;
 }
 
 // Sincronizar lote de viagens do MySQL no cache local

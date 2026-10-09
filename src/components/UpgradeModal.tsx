@@ -336,14 +336,14 @@ export function UpgradeModal({ isOpen, onClose, feature = 'geral', onSuccess }: 
     <AnimatePresence>
       <div 
         onClick={handleBackdropClick}
-        className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+        className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
+          initial={{ opacity: 0, scale: 0.96, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 15 }}
+          exit={{ opacity: 0, scale: 0.96, y: 10 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-slate-900 border border-orange-500/40 rounded-[2.5rem] p-6 sm:p-8 max-w-2xl w-full shadow-2xl relative my-8 overflow-hidden"
+          className="bg-slate-900 border border-orange-500/40 rounded-2xl sm:rounded-3xl max-w-4xl xl:max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl relative overflow-hidden my-auto"
         >
           {/* Subtle Ambient Glow */}
           <div className="absolute top-0 right-0 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
@@ -357,28 +357,33 @@ export function UpgradeModal({ isOpen, onClose, feature = 'geral', onSuccess }: 
               onClose();
             }}
             aria-label="Fechar checkout"
-            className="absolute top-5 right-5 text-slate-400 hover:text-white p-2.5 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 transition-all z-50 cursor-pointer shadow-lg active:scale-95"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 text-slate-400 hover:text-white p-2 rounded-full bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 transition-all z-50 cursor-pointer shadow-lg active:scale-95"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
 
-          {/* Header */}
-          <div className="space-y-3 relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/40 text-orange-400 text-[10px] font-black uppercase rounded-full tracking-widest">
-              <Crown size={12} className="text-amber-400" />
-              <span>UPGRADE DE ACESSO VIP</span>
+          {/* Header Compacto */}
+          <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800/80 shrink-0 relative z-10 pr-12">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/40 text-orange-400 text-[10px] font-black uppercase rounded-full tracking-wider">
+                <Crown size={11} className="text-amber-400" />
+                <span>UPGRADE DE ACESSO VIP</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
+                • Checkout Seguro MotoLegado
+              </span>
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tighter text-white">
+            <h2 className="text-lg sm:text-xl font-black italic uppercase tracking-tight text-white">
               {currentTrigger.title}
             </h2>
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-[11px] sm:text-xs text-slate-300 leading-snug line-clamp-2 mt-0.5">
               {currentTrigger.desc}
             </p>
           </div>
 
           {paymentSuccess ? (
-            <div className="py-12 text-center space-y-4">
+            <div className="py-12 px-6 text-center space-y-4 my-auto">
               <div className="w-16 h-16 bg-emerald-950 border border-emerald-500/40 rounded-full flex items-center justify-center mx-auto text-emerald-400 shadow-xl">
                 <Check size={32} />
               </div>
@@ -386,507 +391,487 @@ export function UpgradeModal({ isOpen, onClose, feature = 'geral', onSuccess }: 
               <p className="text-xs text-slate-300">Todas as limitações foram liberadas na sua conta. Aproveite a estrada!</p>
             </div>
           ) : (
-            <div className="mt-6 space-y-6 relative z-10">
-              {/* Plan Comparison Summary */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs">
-                <div className="space-y-2 border-b sm:border-b-0 sm:border-r border-slate-800/80 pb-3 sm:pb-0 sm:pr-3">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block">
-                    🟢 SEU MODO GRATUITO (ASFALTO)
-                  </span>
-                  <ul className="space-y-1 text-[11px] text-slate-400">
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> Dashboard e Feed de Notícias</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> Diário: Até 5 viagens / mês</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> Ver Eventos e Roteiros Públicos</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> Perfil com Gamificação Básica</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> Suporte Comunitário Aberto</li>
-                  </ul>
-                </div>
-
-                <div className="space-y-2 sm:pl-3">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-orange-400 block flex items-center gap-1">
-                    <Sparkles size={11} className="text-amber-400" /> MOTOLEGADO VIP PRO
-                  </span>
-                  <ul className="space-y-1 text-[11px] text-slate-200 font-medium">
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Diário de Bordo ILIMITADO</strong></li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Fundar e Gerenciar Moto Clube</strong></li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Ingresso & Candidatura a Moto Clubes</strong></li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Criar & Agendar Eventos Oficiais</strong></li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Criar & Publicar Roteiros</strong></li>
-                    <li className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-orange-500 shrink-0" /> <strong>Exportação de Relatórios de Viagem</strong></li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Billing Toggle */}
-              <div className="flex items-center justify-between bg-slate-950 p-2 rounded-2xl border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBillingCycle('monthly');
-                    if (paymentMethod === 'pix') {
-                      setPaymentMethod('card');
-                    }
-                  }}
-                  className={cn(
-                    "flex-1 py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
-                    billingCycle === 'monthly'
-                      ? "bg-slate-800 text-white shadow-md"
-                      : "text-slate-400 hover:text-white"
-                  )}
-                >
-                  Mensal (R$ 29,90)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBillingCycle('yearly')}
-                  className={cn(
-                    "flex-1 py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all relative cursor-pointer",
-                    billingCycle === 'yearly'
-                      ? "bg-gradient-to-r from-orange-600 to-amber-500 text-white shadow-md"
-                      : "text-slate-400 hover:text-white"
-                  )}
-                >
-                  Anual (R$ 299,00)
-                  <span className="ml-1 text-[9px] bg-black/40 px-1.5 py-0.5 rounded-full text-amber-300">
-                    -16%
-                  </span>
-                </button>
-              </div>
-
-              {/* Payment Methods Selection */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between flex-wrap gap-1">
-                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                    Escolha a forma de pagamento:
-                  </label>
-                  <span className="text-[9px] font-black uppercase text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1">
-                    <QrCode size={10} /> PIX apenas no Plano Anual
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (billingCycle === 'monthly') {
-                        setBillingCycle('yearly');
-                      }
-                      setPaymentMethod('pix');
-                    }}
-                    className={cn(
-                      "p-3 rounded-2xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer relative",
-                      paymentMethod === 'pix'
-                        ? "bg-orange-500/10 border-orange-500 text-orange-400 shadow-md"
-                        : "bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white"
-                    )}
-                  >
-                    <span className="absolute -top-2.5 right-2 text-[8px] font-black uppercase tracking-wider bg-orange-600 text-white px-2 py-0.5 rounded-full shadow">
-                      Apenas Anual
-                    </span>
-                    <QrCode size={18} />
-                    <span>PIX Instantâneo</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('card')}
-                    className={cn(
-                      "p-3 rounded-2xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer",
-                      paymentMethod === 'card'
-                        ? "bg-orange-500/10 border-orange-500 text-orange-400 shadow-md"
-                        : "bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white"
-                    )}
-                  >
-                    <CreditCard size={18} />
-                    <span>Cartão de Crédito</span>
-                  </button>
-                </div>
-
-                {/* Banner Informativo Explícito sobre a regra do PIX */}
-                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-start gap-2.5 text-xs text-slate-300">
-                  <Sparkles size={16} className="text-orange-400 shrink-0 mt-0.5" />
-                  <p className="leading-relaxed text-[11px]">
-                    <strong className="text-orange-400 uppercase tracking-wide">Regra de Pagamento:</strong> O <strong>PIX só é aceito para pagamento anual</strong> (R$ 299,00 com 16% de economia). Para o plano mensal (R$ 29,90/mês), o pagamento é aceito exclusivamente via <strong>Cartão de Crédito</strong>.
-                  </p>
-                </div>
-              </div>
-
-              {/* METHOD 1: PIX (HÍBRIDO) */}
-              {paymentMethod === 'pix' && (
-                <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
-                  {/* Header do PIX */}
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-white block">PIX Oficial MotoLegado • Plano Anual</span>
-                        <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-bold">
-                          16% OFF
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-slate-400">Total a pagar: <strong className="text-amber-400 font-mono text-xs">R$ 299,00</strong> / ano (2 meses grátis)</span>
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 relative z-10 custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:gap-6 items-start">
+                {/* COLUNA ESQUERDA: Benefícios & Faturamento (5 colunas) */}
+                <div className="md:col-span-5 space-y-3.5 flex flex-col justify-between">
+                  {/* Benefícios Inclusos */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+                        <Sparkles size={12} className="text-amber-400" /> MOTOLEGADO VIP PRO
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        {price}
+                      </span>
                     </div>
 
-                    {/* Seletor do Modelo Híbrido */}
-                    <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                    <ul className="space-y-1.5 text-[11px] text-slate-200">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 size={13} className="text-orange-500 shrink-0" />
+                        <span><strong>Diário de Bordo ILIMITADO</strong></span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 size={13} className="text-orange-500 shrink-0" />
+                        <span><strong>Fundar & Gerenciar Moto Clube</strong></span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 size={13} className="text-orange-500 shrink-0" />
+                        <span><strong>Candidatura & Ingresso em MCs</strong></span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 size={13} className="text-orange-500 shrink-0" />
+                        <span><strong>Criar Eventos & Roteiros Oficiais</strong></span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 size={13} className="text-orange-500 shrink-0" />
+                        <span><strong>Relatórios em PDF e Planilhas CSV</strong></span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 size={13} className="text-orange-500 shrink-0" />
+                        <span>Descontos VIP de até 20% na rede</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Seletor Mensal / Anual */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                      Ciclo de Faturamento:
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
                       <button
                         type="button"
-                        onClick={() => setPixTab('direto')}
+                        onClick={() => {
+                          setBillingCycle('monthly');
+                          if (paymentMethod === 'pix') {
+                            setPaymentMethod('card');
+                          }
+                        }}
                         className={cn(
-                          "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1",
-                          pixTab === 'direto'
-                            ? "bg-orange-600 text-white shadow-sm"
-                            : "text-slate-400 hover:text-white"
-                        )}
-                      >
-                        <Sparkles size={11} className={pixTab === 'direto' ? 'text-amber-300' : 'text-slate-500'} />
-                        <span>Chave Direta</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPixTab('automatico')}
-                        className={cn(
-                          "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1",
-                          pixTab === 'automatico'
+                          "py-2 px-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer text-center",
+                          billingCycle === 'monthly'
                             ? "bg-slate-800 text-white shadow-sm"
                             : "text-slate-400 hover:text-white"
                         )}
                       >
-                        <Zap size={11} className={pixTab === 'automatico' ? 'text-blue-400' : 'text-slate-500'} />
-                        <span>Mercado Pago</span>
+                        Mensal
+                        <span className="block text-[10px] font-normal text-slate-400 font-mono">R$ 29,90</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBillingCycle('yearly')}
+                        className={cn(
+                          "py-2 px-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer relative text-center",
+                          billingCycle === 'yearly'
+                            ? "bg-gradient-to-r from-orange-600 to-amber-500 text-white shadow-sm"
+                            : "text-slate-400 hover:text-white"
+                        )}
+                      >
+                        Anual (-16%)
+                        <span className="block text-[10px] font-normal text-amber-200 font-mono">R$ 299,00</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* Informações Oficiais do Titular Recebedor */}
-                  <div className="p-3 rounded-xl bg-orange-500/5 border border-orange-500/20 grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-[10px]">
-                    <div>
-                      <span className="text-slate-500 block uppercase font-black text-[8px] tracking-wider">Titular Recebedor</span>
-                      <strong className="text-white font-bold truncate block">Cicero Ranieri Brasil</strong>
+                  {/* Garantia & Segurança */}
+                  <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center gap-2.5 text-[10px] text-slate-400">
+                    <ShieldCheck size={16} className="text-emerald-400 shrink-0" />
+                    <span>Ambiente criptografado. Cancele a qualquer momento sem fidelidade.</span>
+                  </div>
+                </div>
+
+                {/* COLUNA DIREITA: Forma de Pagamento & Confirmação (7 colunas) */}
+                <div className="md:col-span-7 space-y-3">
+                  {/* Seletor do Método de Pagamento */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Forma de Pagamento:
+                      </label>
+                      <span className="text-[9px] font-bold text-amber-400 flex items-center gap-1">
+                        <QrCode size={10} /> PIX no Anual (16% OFF)
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-slate-500 block uppercase font-black text-[8px] tracking-wider">Chave Pix (Celular)</span>
-                      <strong className="text-orange-400 font-mono font-bold block">(47) 99136-2628</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block uppercase font-black text-[8px] tracking-wider">Cidade / Base</span>
-                      <strong className="text-slate-300 block">Itajaí - SC</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block uppercase font-black text-[8px] tracking-wider">Valor Exato</span>
-                      <strong className="text-emerald-400 font-mono font-bold block">R$ 299,00</strong>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (billingCycle === 'monthly') {
+                            setBillingCycle('yearly');
+                          }
+                          setPaymentMethod('pix');
+                        }}
+                        className={cn(
+                          "py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer",
+                          paymentMethod === 'pix'
+                            ? "bg-orange-500/15 border-orange-500 text-orange-400 shadow-sm"
+                            : "bg-slate-950/70 border-slate-800 text-slate-400 hover:text-white"
+                        )}
+                      >
+                        <QrCode size={15} />
+                        <span>PIX Instantâneo</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('card')}
+                        className={cn(
+                          "py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer",
+                          paymentMethod === 'card'
+                            ? "bg-orange-500/15 border-orange-500 text-orange-400 shadow-sm"
+                            : "bg-slate-950/70 border-slate-800 text-slate-400 hover:text-white"
+                        )}
+                      >
+                        <CreditCard size={15} />
+                        <span>Cartão de Crédito</span>
+                      </button>
                     </div>
                   </div>
 
-                  {/* QR Code e Ações de Cópia */}
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
-                    {/* Visual QR Code box escaneável */}
-                    <div className="w-32 h-32 bg-white p-2 rounded-2xl flex items-center justify-center shrink-0 shadow-xl relative overflow-hidden border border-slate-700/50">
-                      {loadingPix && pixTab === 'automatico' ? (
-                        <div className="flex flex-col items-center justify-center text-slate-700 text-center p-1">
-                          <Loader2 size={24} className="animate-spin text-orange-600 mb-1" />
-                          <span className="text-[8px] font-bold">Gerando PIX...</span>
+                  {/* CONTEÚDO PIX */}
+                  {paymentMethod === 'pix' && (
+                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-3">
+                      {/* Switcher Chave Direta / Mercado Pago & Header */}
+                      <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800/80 pb-2">
+                        <div>
+                          <span className="text-xs font-bold text-white block">PIX Anual MotoLegado</span>
+                          <span className="text-[10px] text-slate-400">Total: <strong className="text-amber-400 font-mono">R$ 299,00</strong> / ano</span>
                         </div>
-                      ) : (
-                        <img 
-                          src={activeQrCodeUrl} 
-                          alt="QR Code PIX Banco Central Oficial" 
-                          className="w-full h-full object-contain"
-                        />
-                      )}
-                    </div>
 
-                    <div className="flex-1 w-full space-y-2.5">
-                      {/* Código Copia e Cola */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Código Copia e Cola (BR Code):</label>
-                          <span className="text-[9px] text-slate-500">Padrão Banco Central</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            readOnly
-                            value={activePixCode}
-                            className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-[10px] font-mono text-slate-300 outline-none select-all"
-                          />
+                        <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
                           <button
                             type="button"
-                            onClick={handleCopyPix}
-                            className="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer shadow-md"
+                            onClick={() => setPixTab('direto')}
+                            className={cn(
+                              "px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1",
+                              pixTab === 'direto'
+                                ? "bg-orange-600 text-white shadow-sm"
+                                : "text-slate-400 hover:text-white"
+                            )}
                           >
-                            {copiedPix ? <Check size={14} className="text-white" /> : <Copy size={14} />}
-                            <span>{copiedPix ? 'Copiado!' : 'Copiar'}</span>
+                            <Sparkles size={10} className={pixTab === 'direto' ? 'text-amber-300' : 'text-slate-500'} />
+                            <span>Chave Direta</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPixTab('automatico')}
+                            className={cn(
+                              "px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1",
+                              pixTab === 'automatico'
+                                ? "bg-slate-800 text-white shadow-sm"
+                                : "text-slate-400 hover:text-white"
+                            )}
+                          >
+                            <Zap size={10} className={pixTab === 'automatico' ? 'text-blue-400' : 'text-slate-500'} />
+                            <span>Mercado Pago</span>
                           </button>
                         </div>
                       </div>
 
-                      {/* Botões Rápidos de Suporte e Comprovante */}
-                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {/* Dados do Recebedor em Linha Compacta */}
+                      <div className="p-2 rounded-xl bg-orange-500/5 border border-orange-500/20 grid grid-cols-3 gap-2 text-[10px]">
+                        <div>
+                          <span className="text-slate-500 block text-[8px] uppercase font-black">Titular</span>
+                          <strong className="text-white truncate block">Cicero Ranieri</strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block text-[8px] uppercase font-black">Chave (Celular)</span>
+                          <strong className="text-orange-400 font-mono truncate block">(47) 99136-2628</strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block text-[8px] uppercase font-black">Valor</span>
+                          <strong className="text-emerald-400 font-mono block">R$ 299,00</strong>
+                        </div>
+                      </div>
+
+                      {/* QR Code + Copia e Cola */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-24 h-24 sm:w-28 sm:h-28 bg-white p-1.5 rounded-xl flex items-center justify-center shrink-0 shadow-md border border-slate-700/50">
+                          {loadingPix && pixTab === 'automatico' ? (
+                            <div className="flex flex-col items-center justify-center text-slate-700 text-center p-1">
+                              <Loader2 size={20} className="animate-spin text-orange-600 mb-1" />
+                              <span className="text-[8px] font-bold">Gerando...</span>
+                            </div>
+                          ) : (
+                            <img 
+                              src={activeQrCodeUrl} 
+                              alt="QR Code PIX Banco Central Oficial" 
+                              className="w-full h-full object-contain"
+                            />
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Copia e Cola (BR Code):</label>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                readOnly
+                                value={activePixCode}
+                                className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-slate-300 outline-none select-all min-w-0"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleCopyPix}
+                                className="px-2.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 transition-colors shrink-0 cursor-pointer shadow-sm"
+                              >
+                                {copiedPix ? <Check size={12} className="text-white" /> : <Copy size={12} />}
+                                <span>{copiedPix ? 'Copiado!' : 'Copiar'}</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Ações Rápidas */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={handleCopyPhoneKey}
+                              className="px-2 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-[10px] font-bold text-slate-300 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              {copiedPhoneKey ? <Check size={11} className="text-emerald-400" /> : <Phone size={11} className="text-orange-400" />}
+                              <span>{copiedPhoneKey ? 'Chave Copiada!' : 'Copiar Chave'}</span>
+                            </button>
+
+                            <a
+                              href={whatsAppReceiptUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1 bg-emerald-600/15 hover:bg-emerald-600/25 border border-emerald-500/30 rounded-lg text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <MessageCircle size={11} className="text-emerald-400" />
+                              <span>Enviar Comprovante</span>
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status Bancário & Verificação */}
+                      <div className={cn(
+                        "p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all",
+                        isPaymentApproved 
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                          : "bg-slate-900/90 border-slate-800 text-slate-300"
+                      )}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          {isCheckingPayment ? (
+                            <Loader2 size={15} className="animate-spin text-orange-400 shrink-0" />
+                          ) : isPaymentApproved ? (
+                            <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />
+                          ) : (
+                            <Clock size={15} className="text-amber-400 shrink-0 animate-pulse" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold text-white truncate">
+                              {isPaymentApproved 
+                                ? "Pagamento Aprovado com Sucesso!" 
+                                : pixTab === 'direto'
+                                  ? "Aguardando conferência no extrato"
+                                  : "Aguardando compensação bancária..."}
+                            </p>
+                          </div>
+                        </div>
+
+                        {!isPaymentApproved && (
+                          <button
+                            type="button"
+                            disabled={isCheckingPayment}
+                            onClick={() => checkPaymentStatus(false)}
+                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 border border-slate-700 shadow-sm"
+                          >
+                            {isCheckingPayment ? <Loader2 size={10} className="animate-spin text-orange-400" /> : <RefreshCw size={10} />}
+                            <span>Verificar</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {statusFeedback && (
+                        <div className={cn(
+                          "p-2 rounded-xl border text-[10px] flex items-start gap-1.5 animate-in fade-in duration-200",
+                          isPaymentApproved
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                            : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                        )}>
+                          {isPaymentApproved ? (
+                            <CheckCircle2 size={13} className="shrink-0 mt-0.5 text-emerald-400" />
+                          ) : (
+                            <AlertCircle size={13} className="shrink-0 mt-0.5 text-amber-400" />
+                          )}
+                          <span className="leading-snug">{statusFeedback}</span>
+                        </div>
+                      )}
+
+                      {pixTab === 'direto' && !isPaymentApproved && !directNotified && (
                         <button
                           type="button"
-                          onClick={handleCopyPhoneKey}
-                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-bold text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                          onClick={handleNotifyDirectTransfer}
+                          className="w-full py-1.5 px-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-slate-300 hover:text-white text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                         >
-                          {copiedPhoneKey ? <Check size={13} className="text-emerald-400" /> : <Phone size={13} className="text-orange-400" />}
-                          <span>{copiedPhoneKey ? 'Chave Copiada!' : 'Copiar Chave Celular: (47) 99136-2628'}</span>
+                          <Send size={11} className="text-orange-400" />
+                          <span>Notificar Cícero que já fiz o PIX</span>
                         </button>
-
-                        <a
-                          href={whatsAppReceiptUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 bg-emerald-600/15 hover:bg-emerald-600/25 border border-emerald-500/30 rounded-xl text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <MessageCircle size={13} className="text-emerald-400" />
-                          <span>Enviar Comprovante via WhatsApp</span>
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Status da Compensação Bancária em Tempo Real */}
-                  <div className={cn(
-                    "p-3.5 rounded-xl border flex items-center justify-between gap-3 transition-all",
-                    isPaymentApproved 
-                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                      : "bg-slate-900 border-slate-800 text-slate-300"
-                  )}>
-                    <div className="flex items-center gap-2.5">
-                      {isCheckingPayment ? (
-                        <Loader2 size={18} className="animate-spin text-orange-400 shrink-0" />
-                      ) : isPaymentApproved ? (
-                        <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
-                      ) : (
-                        <Clock size={18} className="text-amber-400 shrink-0 animate-pulse" />
                       )}
-                      <div>
-                        <p className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <span>
-                            {isPaymentApproved 
-                              ? "Pagamento Aprovado com Sucesso!" 
-                              : pixTab === 'direto'
-                                ? "Aguardando conferência no extrato bancário"
-                                : "Aguardando compensação bancária..."}
-                          </span>
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {isPaymentApproved
-                            ? "Crédito de R$ 299,00 validado. Seu acesso VIP Pro está liberado!"
-                            : pixTab === 'direto'
-                              ? "Envie o comprovante no WhatsApp do administrador para liberação."
-                              : "O sistema detecta a transferência bancária automaticamente."}
-                        </p>
-                      </div>
-                    </div>
 
-                    {!isPaymentApproved && (
+                      {/* Botão de Ativação / Confirmação */}
                       <button
                         type="button"
-                        disabled={isCheckingPayment}
-                        onClick={() => checkPaymentStatus(false)}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 disabled:opacity-50 border border-slate-700 shadow-sm"
-                        title="Checar se o pagamento já foi recebido"
+                        disabled={!isPaymentApproved || isProcessing}
+                        onClick={() => {
+                          if (!isPaymentApproved) {
+                            checkPaymentStatus(false);
+                            return;
+                          }
+                          handleConfirmPayment('pago');
+                        }}
+                        className={cn(
+                          "w-full py-3 rounded-xl font-black uppercase text-xs tracking-wider transition-all flex items-center justify-center gap-2",
+                          isPaymentApproved
+                            ? "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-600/30 cursor-pointer animate-pulse"
+                            : "bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed select-none opacity-60"
+                        )}
                       >
-                        {isCheckingPayment ? <Loader2 size={12} className="animate-spin text-orange-400" /> : <RefreshCw size={12} />}
-                        <span>Verificar Agora</span>
+                        {isProcessing ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin text-white" />
+                            <span>Ativando sua Patente VIP Pro...</span>
+                          </>
+                        ) : isPaymentApproved ? (
+                          <>
+                            <CheckCircle2 size={16} className="text-white" />
+                            <span>Pagamento Confirmado • Ativar Acesso Agora</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={13} className="text-slate-500" />
+                            <span>Aguardando Pagamento • Botão Bloqueado</span>
+                          </>
+                        )}
                       </button>
-                    )}
-                  </div>
-
-                  {/* Feedback da Verificação */}
-                  {statusFeedback && (
-                    <div className={cn(
-                      "p-3 rounded-xl border text-xs flex items-start gap-2 animate-in fade-in duration-300",
-                      isPaymentApproved
-                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                        : "bg-amber-500/10 border-amber-500/30 text-amber-300"
-                    )}>
-                      {isPaymentApproved ? (
-                        <CheckCircle2 size={15} className="shrink-0 mt-0.5 text-emerald-400" />
-                      ) : (
-                        <AlertCircle size={15} className="shrink-0 mt-0.5 text-amber-400" />
-                      )}
-                      <span className="text-[11px] leading-relaxed">{statusFeedback}</span>
                     </div>
                   )}
 
-                  {/* Ação Auxiliar para PIX Direto: Notificar transferência */}
-                  {pixTab === 'direto' && !isPaymentApproved && !directNotified && (
-                    <button
-                      type="button"
-                      onClick={handleNotifyDirectTransfer}
-                      className="w-full py-2 px-3 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 hover:text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                    >
-                      <Send size={13} className="text-orange-400" />
-                      <span>Notificar o Administrador que já fiz o PIX</span>
-                    </button>
+                  {/* CONTEÚDO CARTÃO */}
+                  {paymentMethod === 'card' && (
+                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2.5">
+                      <div className="flex justify-between items-center border-b border-slate-800/80 pb-2">
+                        <div>
+                          <span className="text-xs font-bold text-white block">Cartão de Crédito</span>
+                          <span className="text-[10px] text-blue-400">Processamento via Mercado Pago</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-mono font-bold text-amber-400">{price}</span>
+                          <span className="text-[9px] text-slate-400 block">{periodLabel}</span>
+                        </div>
+                      </div>
+
+                      {/* Botão Cartão Teste */}
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCardNumber('5031 7557 3450 1000');
+                            setCardHolder((profile?.name || 'PILOTO TESTE').toUpperCase());
+                            setCardExpiry('12/28');
+                            setCardCvv('123');
+                          }}
+                          className="text-[10px] text-orange-400 hover:text-orange-300 font-semibold cursor-pointer underline flex items-center gap-1"
+                        >
+                          <Sparkles size={10} /> Preencher Cartão de Teste MP
+                        </button>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold uppercase text-slate-400">Número do Cartão</label>
+                        <input
+                          type="text"
+                          maxLength={19}
+                          placeholder="0000 0000 0000 0000"
+                          value={cardNumber}
+                          onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').replace(/(\d{4})/g, '$1 ').trim())}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-orange-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold uppercase text-slate-400">Nome no Cartão</label>
+                        <input
+                          type="text"
+                          placeholder="NOME COMO NO CARTÃO"
+                          value={cardHolder}
+                          onChange={(e) => setCardHolder(e.target.value.toUpperCase())}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white uppercase outline-none focus:border-orange-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold uppercase text-slate-400">Validade</label>
+                          <input
+                            type="text"
+                            maxLength={5}
+                            placeholder="MM/AA"
+                            value={cardExpiry}
+                            onChange={(e) => setCardExpiry(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-orange-500"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold uppercase text-slate-400">CVV</label>
+                          <input
+                            type="password"
+                            maxLength={4}
+                            placeholder="123"
+                            value={cardCvv}
+                            onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ''))}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-orange-500"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isProcessing || !cardNumber}
+                        onClick={() => handleConfirmPayment('pago')}
+                        className="w-full btn-primary py-3 text-xs font-black uppercase tracking-wider mt-1 cursor-pointer disabled:opacity-50"
+                      >
+                        {isProcessing ? (
+                          <>
+                            <Loader2 size={15} className="animate-spin" />
+                            <span>Processando no Mercado Pago...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={13} />
+                            <span>Confirmar e Assinar por {price}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
-
-                  {/* Botão de Confirmação e Ativação - BLOQUEADO ATÉ PAGAMENTO REAL */}
-                  <div className="space-y-2 pt-1">
-                    <button
-                      type="button"
-                      disabled={!isPaymentApproved || isProcessing}
-                      onClick={() => {
-                        if (!isPaymentApproved) {
-                          checkPaymentStatus(false);
-                          return;
-                        }
-                        handleConfirmPayment('pago');
-                      }}
-                      className={cn(
-                        "w-full py-4 rounded-xl font-black uppercase text-xs tracking-widest transition-all flex items-center justify-center gap-2",
-                        isPaymentApproved
-                          ? "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-600/30 cursor-pointer animate-pulse"
-                          : "bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed select-none opacity-60"
-                      )}
-                    >
-                      {isProcessing ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin text-white" />
-                          <span>Ativando sua Patente VIP Pro...</span>
-                        </>
-                      ) : isPaymentApproved ? (
-                        <>
-                          <CheckCircle2 size={18} className="text-white" />
-                          <span>Pagamento Confirmado • Ativar Acesso Agora</span>
-                        </>
-                      ) : (
-                        <>
-                          <Lock size={15} className="text-slate-500" />
-                          <span>Aguardando Pagamento • Botão Bloqueado</span>
-                        </>
-                      )}
-                    </button>
-
-                    {!isPaymentApproved && (
-                      <p className="text-[10px] text-center text-slate-500 flex items-center justify-center gap-1 font-medium">
-                        <Lock size={11} className="text-slate-500" />
-                        <span>Este botão só é liberado após a confirmação do pagamento pelo banco ou administrador.</span>
-                      </p>
-                    )}
-                  </div>
                 </div>
-              )}
-
-              {/* METHOD 2: CARTÃO */}
-              {paymentMethod === 'card' && (
-                <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-3.5">
-                  <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
-                    <div>
-                      <span className="text-xs font-bold text-white block">Dados do Cartão de Crédito</span>
-                      <span className="text-[10px] text-blue-400 font-medium">Processamento seguro Mercado Pago</span>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-amber-400">{price} {periodLabel}</span>
-                  </div>
-
-                  {/* Preencher Cartão de Teste rápido */}
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCardNumber('5031 7557 3450 1000');
-                        setCardHolder((profile?.name || 'PILOTO TESTE').toUpperCase());
-                        setCardExpiry('12/28');
-                        setCardCvv('123');
-                      }}
-                      className="text-[10px] text-orange-400 hover:text-orange-300 font-semibold cursor-pointer underline flex items-center gap-1"
-                    >
-                      <Sparkles size={11} /> Usar dados de Cartão de Teste MP
-                    </button>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase text-slate-400">Número do Cartão</label>
-                    <input
-                      type="text"
-                      maxLength={19}
-                      placeholder="0000 0000 0000 0000"
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').replace(/(\d{4})/g, '$1 ').trim())}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase text-slate-400">Nome no Cartão</label>
-                    <input
-                      type="text"
-                      placeholder="NOME COMO NO CARTÃO"
-                      value={cardHolder}
-                      onChange={(e) => setCardHolder(e.target.value.toUpperCase())}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white uppercase outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase text-slate-400">Validade</label>
-                      <input
-                        type="text"
-                        maxLength={5}
-                        placeholder="MM/AA"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white outline-none focus:border-orange-500"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase text-slate-400">CVV</label>
-                      <input
-                        type="password"
-                        maxLength={4}
-                        placeholder="123"
-                        value={cardCvv}
-                        onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ''))}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white outline-none focus:border-orange-500"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={isProcessing || !cardNumber}
-                    onClick={() => handleConfirmPayment('pago')}
-                    className="w-full btn-primary py-3.5 disabled:opacity-50"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span>Processando no Mercado Pago...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Lock size={15} />
-                        <span>Confirmar e Assinar por {price}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-
-              {/* Secure Footer */}
-              <div className="flex items-center justify-between text-[10px] text-slate-500 pt-2 border-t border-slate-800/60">
-                <span className="flex items-center gap-1">
-                  <ShieldCheck size={12} className="text-emerald-500" />
-                  Ambiente seguro e criptografado
-                </span>
-                <span>Cancele a qualquer momento sem fidelidade</span>
-              </div>
-
-              {/* Botão de Fechar no Rodapé */}
-              <div className="pt-2 flex justify-center">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="text-xs text-slate-400 hover:text-white font-bold uppercase tracking-wider py-2 px-5 rounded-xl hover:bg-slate-800/80 transition-colors cursor-pointer flex items-center gap-2 border border-slate-800"
-                >
-                  <X size={14} />
-                  <span>Fechar Checkout</span>
-                </button>
               </div>
             </div>
           )}
+
+          {/* Rodapé Compacto */}
+          <div className="px-4 py-2.5 sm:px-6 bg-slate-950/70 border-t border-slate-800/80 shrink-0 flex items-center justify-between text-[10px] text-slate-500">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck size={13} className="text-emerald-500" />
+              Ambiente certificado e seguro
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-slate-400 hover:text-white font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <X size={12} />
+              <span>Fechar</span>
+            </button>
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>

@@ -50,27 +50,55 @@ export function ProfileDashboard() {
 
   useEffect(() => {
     const loadProfileDashboardData = () => {
-      // 1. Carregar diários de bordo reais do localStorage de forma imediata
+      const currentPilotKey = user?.id || profile?.id || user?.email || 'guest';
+      const userStorageKey = `motolegado_logs_${currentPilotKey}`;
+      const currentPilotSet = new Set<string>([
+        user?.id,
+        profile?.id,
+        user?.email,
+        profile?.email
+      ].filter(Boolean).map(s => String(s).toLowerCase()));
+
+      const isMyLog = (log: any) => {
+        if (!log) return false;
+        if (!log.pilot_id) return true;
+        return currentPilotSet.has(String(log.pilot_id).toLowerCase());
+      };
+
+      // 1. Carregar diários de bordo reais do piloto ativo
       let localLogs: LogEntry[] = [];
-      const savedLogs = localStorage.getItem('motolegado_logs');
-      if (savedLogs) {
+      const savedUserLogs = localStorage.getItem(userStorageKey);
+      if (savedUserLogs) {
         try {
-          const parsed = JSON.parse(savedLogs);
+          const parsed = JSON.parse(savedUserLogs);
           if (Array.isArray(parsed)) {
-            localLogs = parsed;
-            setLogs(parsed);
+            localLogs = parsed.filter(isMyLog);
+            setLogs(localLogs);
           }
         } catch (e) {
           console.error(e);
         }
+      } else {
+        const savedLogs = localStorage.getItem('motolegado_logs');
+        if (savedLogs) {
+          try {
+            const parsed = JSON.parse(savedLogs);
+            if (Array.isArray(parsed)) {
+              localLogs = parsed.filter(isMyLog);
+              setLogs(localLogs);
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
       }
 
-      // 2. Carregar e sincronizar viagens do MySQL na Hostinger
+      // 2. Carregar e sincronizar viagens do MySQL na Hostinger estritamente para o piloto ativo
       const isStockUrl = (u?: string) => !u || u.includes('images.unsplash.com');
 
-      getTripsFromHostinger(user?.id)
+      getTripsFromHostinger(user?.id || profile?.id || user?.email)
         .then((res) => {
-          if (res && res.trips && res.trips.length > 0) {
+          if (res && res.trips && Array.isArray(res.trips)) {
             const mappedLogs: LogEntry[] = res.trips.map((t: any) => {
               let checklist: any = {};
               if (typeof t.checklist_data === 'string') {
@@ -167,15 +195,14 @@ export function ProfileDashboard() {
             });
 
             setLogs(merged);
-            localStorage.setItem('motolegado_logs', JSON.stringify(merged));
-          } else if (localLogs.length > 0) {
+            localStorage.setItem(userStorageKey, JSON.stringify(merged));
+          } else {
             setLogs(localLogs);
+            localStorage.setItem(userStorageKey, JSON.stringify(localLogs));
           }
         })
         .catch(() => {
-          if (localLogs.length > 0) {
-            setLogs(localLogs);
-          }
+          setLogs(localLogs);
         });
 
       // 3. Load events

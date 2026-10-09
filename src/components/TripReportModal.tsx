@@ -25,7 +25,8 @@ import {
   Fuel,
   UtensilsCrossed,
   Bed,
-  Layers
+  Layers,
+  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
@@ -42,6 +43,8 @@ export interface TripReportModalProps {
   pilotMotorcycle?: string;
   pilotId?: string;
   initialSelectedTripId?: string;
+  exclusiveTripMode?: boolean; // Se true, abre tela exclusiva com apenas a viagem selecionada
+  onOpenAllTrips?: () => void; // Ação para ir à página Diário & Checklist para ver todas
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -112,6 +115,8 @@ export function TripReportModal({
   pilotMotorcycle,
   pilotId,
   initialSelectedTripId,
+  exclusiveTripMode,
+  onOpenAllTrips,
 }: TripReportModalProps) {
   const [dateFilter, setDateFilter] = useState<'all' | 'year' | '6months' | '30days'>('all');
   const [selectedTripId, setSelectedTripId] = useState<string>('all');
@@ -124,10 +129,12 @@ export function TripReportModal({
   useEffect(() => {
     if (initialSelectedTripId) {
       setSelectedTripId(initialSelectedTripId);
+    } else if (exclusiveTripMode && logs.length > 0) {
+      setSelectedTripId(logs[0].id);
     } else {
       setSelectedTripId('all');
     }
-  }, [initialSelectedTripId, isOpen]);
+  }, [initialSelectedTripId, isOpen, exclusiveTripMode, logs]);
 
   // Filtrar logs de acordo com o período selecionado
   const filteredByDateLogs = useMemo(() => {
@@ -217,6 +224,7 @@ export function TripReportModal({
         'Distância (KM)',
         'Duração Estimada',
         'Motocicleta',
+        'Período',
         'Condição do Asfalto',
         'Clima',
         'Avaliação (1-5)',
@@ -231,6 +239,11 @@ export function TripReportModal({
               .map((st, i) => `${i + 1}. [OK] ${st.name} (${STAGE_LABELS[st.type] || st.type}${st.kmMark ? ` - KM ${st.kmMark}` : ''})`)
               .join(' | ');
 
+            const periodLabel = (log as any).period === 'night' ? 'De noite' : ((log as any).period === 'all_day' ? 'O dia todo' : 'De dia');
+            const climateLabel = Array.isArray((log as any).climates) && (log as any).climates.length > 0
+              ? (log as any).climates.join(', ')
+              : (log.climate || 'Sol');
+
             return [
               `"${log.date || ''}"`,
               `"${(log.title || '').replace(/"/g, '""')}"`,
@@ -239,8 +252,9 @@ export function TripReportModal({
               `"${String(log.distance || 0).replace(/"/g, '""')}"`,
               `"${(log.duration || '').replace(/"/g, '""')}"`,
               `"${(log.bike || pilotMotorcycle || '').replace(/"/g, '""')}"`,
+              `"${periodLabel}"`,
               `"${(log.road || '').replace(/"/g, '""')}"`,
-              `"${(log.climate || '').replace(/"/g, '""')}"`,
+              `"${climateLabel.replace(/"/g, '""')}"`,
               `"${log.rating || 5}"`,
               `"${log.stages?.length || 0}"`,
               `"${stagesSummary.replace(/"/g, '""')}"`,
@@ -463,7 +477,9 @@ export function TripReportModal({
           doc.setFontSize(7);
           doc.setTextColor(100, 116, 139);
           const roadClean = cleanPdfText(log.road || 'Normal');
-          doc.text(`Estrada: ${roadClean} | Avaliacao: ${log.rating || 5}/5.0 | Moto: ${cleanPdfText(log.bike || pilotMotorcycle || '')}`, 17, y + 8.5);
+          const periodPdf = cleanPdfText((log as any).period === 'night' ? 'De noite' : ((log as any).period === 'all_day' ? 'O dia todo' : 'De dia'));
+          const climatePdf = cleanPdfText(Array.isArray((log as any).climates) && (log as any).climates.length > 0 ? (log as any).climates.join(', ') : (log.climate || 'Sol'));
+          doc.text(`Estrada: ${roadClean} | Periodo: ${periodPdf} | Clima: ${climatePdf} | Avaliacao: ${log.rating || 5}/5.0`, 17, y + 8.5);
 
           // Renderização das Etapas Concluídas (Stages)
           if (stagesCount > 0) {
@@ -677,25 +693,43 @@ export function TripReportModal({
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg sm:text-xl font-black italic uppercase text-white tracking-tight">
-                    EXPORTAR DIÁRIO DE BORDO
+                    {exclusiveTripMode ? 'VISUALIZAR ROTEIRO COMPLETO' : 'EXPORTAR DIÁRIO DE BORDO'}
                   </h2>
                   <span className="px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[9px] font-black uppercase tracking-wider font-mono">
-                    PDF & Impressão
+                    {exclusiveTripMode ? 'VIAGEM SELECIONADA' : 'PDF & Impressão'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Salve seus roteiros e etapas concluídas em formato PDF para impressão física ou arquivamento digital.
+                  {exclusiveTripMode 
+                    ? 'Exibição detalhada e exclusiva da viagem selecionada com telemetria, paradas e provas documentais.'
+                    : 'Salve seus roteiros e etapas concluídas em formato PDF para impressão física ou arquivamento digital.'}
                 </p>
               </div>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Fechar"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex items-center gap-2">
+              {exclusiveTripMode && onOpenAllTrips && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAllTrips();
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-orange-500/40 text-orange-400 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+                  title="Abrir página Diário & Checklist para ver todas as viagens"
+                >
+                  <BookOpen size={13} />
+                  <span className="hidden sm:inline">Ver Todos os Roteiros</span>
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Fechar"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Status Message / Notification Toast */}
@@ -725,27 +759,51 @@ export function TripReportModal({
             
             {/* Seletor de Roteiro Individual ou Todos */}
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Route size={14} className="text-orange-500" />
-                  Roteiro:
-                </span>
-                <select
-                  value={selectedTripId}
-                  onChange={(e) => setSelectedTripId(e.target.value)}
-                  className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-orange-500/60 max-w-[220px] sm:max-w-xs"
-                >
-                  <option value="all">Todos os Roteiros ({filteredByDateLogs.length})</option>
-                  {logs.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.title || 'Roteiro sem título'} {l.stages?.length ? `(${l.stages.length} etapas)` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {exclusiveTripMode ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Route size={14} className="text-orange-500" />
+                    Viagem Exclusiva:
+                  </span>
+                  <span className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-bold text-white max-w-[280px] sm:max-w-md truncate">
+                    {displayLogs[0]?.title || 'Roteiro Selecionado'}
+                  </span>
+                  {onOpenAllTrips && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenAllTrips();
+                      }}
+                      className="text-[10px] text-slate-400 hover:text-orange-400 uppercase font-bold underline transition-colors cursor-pointer ml-1"
+                    >
+                      (Ver todas no Diário)
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Route size={14} className="text-orange-500" />
+                    Roteiro:
+                  </span>
+                  <select
+                    value={selectedTripId}
+                    onChange={(e) => setSelectedTripId(e.target.value)}
+                    className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-orange-500/60 max-w-[220px] sm:max-w-xs"
+                  >
+                    <option value="all">Todos os Roteiros ({filteredByDateLogs.length})</option>
+                    {logs.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.title || 'Roteiro sem título'} {l.stages?.length ? `(${l.stages.length} etapas)` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Período (apenas quando vendo todos) */}
-              {selectedTripId === 'all' && (
+              {!exclusiveTripMode && selectedTripId === 'all' && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Período:</span>
                   <div className="inline-flex p-0.5 bg-slate-900 rounded-xl border border-slate-800 text-xs font-bold">
@@ -959,6 +1017,23 @@ export function TripReportModal({
                               ⭐ {log.rating || 5}/5
                             </span>
                           </div>
+                        </div>
+
+                        {/* Informações Cadastradas no Diário (Período, Clima e Estrada) */}
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] print-card">
+                          <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 font-bold uppercase print-badge">
+                            {(log as any).period === 'night' ? '🌙 De noite' : ((log as any).period === 'all_day' ? '⏳ O dia todo' : '☀️ De dia')}
+                          </span>
+                          <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 font-bold uppercase print-badge">
+                            🌤️ {Array.isArray((log as any).climates) && (log as any).climates.length > 0
+                              ? (log as any).climates.map((c: string) => c === 'sun' ? 'Sol' : c === 'rain' ? 'Chuva' : c === 'cloud' ? 'Nublado' : c === 'zap' ? 'Tempestade' : c === 'fog' ? 'Neblina' : c === 'wind' ? 'Vento Forte' : c).join(' • ')
+                              : (log.climate || 'Sol')}
+                          </span>
+                          {log.road && (
+                            <span className="px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 font-bold uppercase print-badge">
+                              🛣️ {log.road}
+                            </span>
+                          )}
                         </div>
 
                         {/* Observações / Descrição */}

@@ -9,11 +9,24 @@ import {
   Tooltip, 
   ResponsiveContainer 
 } from 'recharts';
-import { Calendar, Store, Percent, Route, BookOpen, CheckCircle, Plus, MapPin, Trophy } from 'lucide-react';
+import { 
+  Calendar, Store, Percent, Route, BookOpen, CheckCircle, Plus, MapPin, Trophy,
+  Navigation, Clock, Sun, Moon, Star, CloudRain, Cloud, Zap, CloudFog, Wind,
+  ExternalLink, ShieldCheck, Bike
+} from 'lucide-react';
+import { cn } from '../lib/utils';
 import { MotoEvent } from './Events';
 import { Partner } from './Partners';
-import { LogEntry } from './Logbook';
+import { 
+  LogEntry, 
+  parseLogPeriod, 
+  parseLogClimates, 
+  TRIP_PERIOD_CONFIG, 
+  WEATHER_CONDITIONS, 
+  CLIMATE_CONFIG 
+} from './Logbook';
 import { RouteMetricsPanel } from './RouteMetricsPanel';
+import { TripReportModal } from './TripReportModal';
 import { useAuth } from '../context/AuthContext';
 import { getTripsFromHostinger } from '../lib/api';
 import { getPilotLiveGamification } from '../lib/gamification';
@@ -24,6 +37,7 @@ export function Dashboard() {
   const [events, setEvents] = useState<MotoEvent[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [selectedTripModal, setSelectedTripModal] = useState<LogEntry | null>(null);
 
   useEffect(() => {
     const loadDashboardData = () => {
@@ -47,27 +61,55 @@ export function Dashboard() {
         }
       }
 
-      // 3. Load Logbook - ALWAYS load localStorage first for instant feeding!
+      const currentPilotKey = user?.id || profile?.id || user?.email || 'guest';
+      const userStorageKey = `motolegado_logs_${currentPilotKey}`;
+      const currentPilotSet = new Set<string>([
+        user?.id,
+        profile?.id,
+        user?.email,
+        profile?.email
+      ].filter(Boolean).map(s => String(s).toLowerCase()));
+
+      const isMyLog = (log: any) => {
+        if (!log) return false;
+        if (!log.pilot_id) return true;
+        return currentPilotSet.has(String(log.pilot_id).toLowerCase());
+      };
+
+      // 3. Load Logbook - Carrega estritamente os registros do piloto ativo
       let currentLocalLogs: LogEntry[] = [];
-      const savedLogs = localStorage.getItem('motolegado_logs');
-      if (savedLogs) {
+      const savedUserLogs = localStorage.getItem(userStorageKey);
+      if (savedUserLogs) {
         try {
-          const parsed = JSON.parse(savedLogs);
+          const parsed = JSON.parse(savedUserLogs);
           if (Array.isArray(parsed)) {
-            currentLocalLogs = parsed;
-            setLogs(parsed);
+            currentLocalLogs = parsed.filter(isMyLog);
+            setLogs(currentLocalLogs);
           }
         } catch (e) {
-          console.error('Error reading motolegado_logs', e);
+          console.error('Error reading user logs', e);
+        }
+      } else {
+        const savedLogs = localStorage.getItem('motolegado_logs');
+        if (savedLogs) {
+          try {
+            const parsed = JSON.parse(savedLogs);
+            if (Array.isArray(parsed)) {
+              currentLocalLogs = parsed.filter(isMyLog);
+              setLogs(currentLocalLogs);
+            }
+          } catch (e) {
+            console.error('Error reading motolegado_logs', e);
+          }
         }
       }
 
-      // 4. Carregar e sincronizar viagens do MySQL na Hostinger
+      // 4. Carregar e sincronizar viagens do MySQL na Hostinger estritamente para o piloto ativo
       const isStockUrl = (u?: string) => !u || u.includes('images.unsplash.com');
 
-      getTripsFromHostinger(user?.id)
+      getTripsFromHostinger(user?.id || profile?.id || user?.email)
         .then((res) => {
-          if (res && res.trips && res.trips.length > 0) {
+          if (res && res.trips && Array.isArray(res.trips)) {
             const mappedLogs: LogEntry[] = res.trips.map((t: any) => {
               let checklist: any = {};
               if (typeof t.checklist_data === 'string') {
@@ -165,15 +207,14 @@ export function Dashboard() {
             });
 
             setLogs(merged);
-            localStorage.setItem('motolegado_logs', JSON.stringify(merged));
-          } else if (currentLocalLogs.length > 0) {
+            localStorage.setItem(userStorageKey, JSON.stringify(merged));
+          } else {
             setLogs(currentLocalLogs);
+            localStorage.setItem(userStorageKey, JSON.stringify(currentLocalLogs));
           }
         })
         .catch(() => {
-          if (currentLocalLogs.length > 0) {
-            setLogs(currentLocalLogs);
-          }
+          setLogs(currentLocalLogs);
         });
     };
 
@@ -206,6 +247,28 @@ export function Dashboard() {
 
   // Active or latest trip
   const latestLog = logs.length > 0 ? logs[0] : null;
+
+  // Métricas exclusivas da última rota registrada (evita duplicidade com painel de telemetria acumulada)
+  const latestRouteMetrics = useMemo(() => {
+    if (!latestLog) return null;
+    const distNum = parseFloat(latestLog.distance?.replace(/[^\d.]/g, '') || '0') || 0;
+    const periodKey = parseLogPeriod(latestLog);
+    const periodConfig = TRIP_PERIOD_CONFIG[periodKey] || TRIP_PERIOD_CONFIG.day;
+    const weatherList = parseLogClimates(latestLog);
+    const stagesList = Array.isArray(latestLog.stages) ? latestLog.stages : [];
+
+    return {
+      distance: distNum,
+      duration: latestLog.duration || '—',
+      road: latestLog.road || 'Tapete (Perfeita)',
+      rating: latestLog.rating || 5,
+      bike: latestLog.bike || profile?.motorcycle || 'Motocicleta',
+      periodKey,
+      periodConfig,
+      weatherList,
+      stagesList,
+    };
+  }, [latestLog, profile]);
 
   // Dynamic telemetry chart data reflecting actual trips
   const chartKmData = useMemo(() => {
@@ -277,96 +340,268 @@ export function Dashboard() {
       <main className="grid grid-cols-12 gap-4 sm:gap-6">
         {/* Active Route Main Box */}
         <div data-tour="dashboard-telemetry" className="col-span-12 lg:col-span-8 bg-slate-900/40 border border-slate-800/60 rounded-2xl sm:rounded-3xl lg:rounded-[2.5rem] p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col relative overflow-hidden group">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-5">
             <div>
-              <span className="px-3.5 py-1 bg-orange-600/20 text-orange-400 text-[9px] sm:text-[10px] font-black uppercase italic rounded-full border border-orange-500/30">
-                ÚLTIMA ROTA REGISTRADA
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-3.5 py-1 bg-orange-600/20 text-orange-400 text-[9px] sm:text-[10px] font-black uppercase italic rounded-full border border-orange-500/30">
+                  ÚLTIMA ROTA REGISTRADA
+                </span>
+                {latestLog?.date && (
+                  <span className="text-[10px] font-mono text-slate-400 font-bold px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800">
+                    {latestLog.date}
+                  </span>
+                )}
+                {latestLog?.category && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[9px] font-black uppercase border border-slate-700">
+                    {latestLog.category}
+                  </span>
+                )}
+
+                {/* CONDIÇÕES MANTIDAS NA PARTE DE CIMA DO CARD */}
+                {latestRouteMetrics && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider ml-1">
+                      CONDIÇÕES:
+                    </span>
+                    {/* Período (De dia / De noite / O dia todo) */}
+                    {(() => {
+                      const PIcon = latestRouteMetrics.periodConfig.icon;
+                      return (
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black uppercase tracking-wider",
+                            latestRouteMetrics.periodConfig.bg,
+                            latestRouteMetrics.periodConfig.border,
+                            latestRouteMetrics.periodConfig.color
+                          )}
+                          title={`Período do Roteiro: ${latestRouteMetrics.periodConfig.label}`}
+                        >
+                          <PIcon size={11} />
+                          <span>{latestRouteMetrics.periodConfig.label}</span>
+                        </span>
+                      );
+                    })()}
+
+                    {/* Climas Enfrentados nesta rota */}
+                    {latestRouteMetrics.weatherList.map(cId => {
+                      const found = WEATHER_CONDITIONS.find(w => w.id === cId);
+                      const legacy = CLIMATE_CONFIG[cId];
+                      const label = found?.label || legacy?.label || cId.toUpperCase();
+                      const CIcon = found?.icon || legacy?.icon || Sun;
+                      const color = found?.color || legacy?.color || 'text-amber-400';
+                      const bg = found?.bg || legacy?.bg || 'bg-amber-500/10';
+                      const border = found?.border || legacy?.border || 'border-amber-500/20';
+
+                      return (
+                        <span
+                          key={cId}
+                          className={cn(
+                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black uppercase tracking-wider shadow-xs",
+                            bg, border, color
+                          )}
+                          title={`Clima enfrentado: ${label}`}
+                        >
+                          <CIcon size={11} />
+                          <span>{label}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <h2 className="text-xl sm:text-3xl md:text-4xl font-black italic uppercase mt-2 sm:mt-3 tracking-tighter text-white">
                 {latestLog ? latestLog.title : 'Nenhuma Viagem Registrada'}
               </h2>
-              <p className="text-slate-400 mt-1 flex items-center gap-2 sm:gap-3 font-black text-[9px] sm:text-[10px] uppercase tracking-[0.15em] sm:tracking-[0.2em]">
-                <MapPin size={12} className="text-orange-500 shrink-0" />
-                {latestLog ? `${latestLog.origin} ➔ ${latestLog.destination}` : 'Inicie seu primeiro roteiro no diário de bordo'}
-              </p>
             </div>
 
-            <button
-              data-tour="dashboard-logbook"
-              onClick={() => navigate('/logbook')}
-              className="btn-primary w-full sm:w-auto self-start sm:self-center"
-            >
-              <Plus size={15} />
-              <span>NOVO REGISTRO</span>
-            </button>
-          </div>
-
-          {/* Quick Telemetry Metric Badges */}
-          <div className="grid grid-cols-3 gap-2.5 sm:gap-4 mb-4">
-            <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-orange-600/20 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0 font-bold text-xs">
-                KM
-              </div>
-              <div className="min-w-0">
-                <span className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-wider block">Odômetro</span>
-                <span className="text-xs sm:text-sm font-black text-white font-mono truncate block">
-                  {loggedKm > 0 ? `${loggedKm.toLocaleString()} KM` : '0 KM'}
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 font-bold text-xs">
-                RT
-              </div>
-              <div className="min-w-0">
-                <span className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-wider block">Viagens Diário</span>
-                <span className="text-xs sm:text-sm font-black text-emerald-400 font-mono truncate block">
-                  {logs.length} no Diário
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 font-bold text-xs">
-                {rankInfo.currentTier.icon}
-              </div>
-              <div className="min-w-0">
-                <span className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-wider block">Patente Piloto</span>
-                <span className="text-xs sm:text-sm font-black text-amber-400 truncate block">
-                  {rankInfo.currentTier.title}
-                </span>
-              </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+              {latestLog && (
+                <button
+                  onClick={() => navigate('/logbook')}
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+                  title="Abrir no Diário de Bordo"
+                >
+                  <BookOpen size={14} className="text-orange-400" />
+                  <span className="hidden sm:inline">Ver no Diário</span>
+                </button>
+              )}
+              <button
+                data-tour="dashboard-logbook"
+                onClick={() => navigate('/logbook')}
+                className="btn-primary w-full sm:w-auto self-start sm:self-center"
+              >
+                <Plus size={15} />
+                <span>NOVO REGISTRO</span>
+              </button>
             </div>
           </div>
 
-          <div className="flex-1 min-h-[220px] bg-slate-950/60 rounded-2xl border border-slate-800/50 p-4 relative overflow-hidden backdrop-blur-sm flex flex-col justify-between">
-             <div className="h-44 w-full">
-               <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartKmData}>
-                    <defs>
-                      <linearGradient id="colorKm" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ff5500" stopOpacity={0.25}/>
-                        <stop offset="95%" stopColor="#ff5500" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="5 5" stroke="#1e293b" vertical={false} />
-                    <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} />
-                    <YAxis hide />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}
-                      itemStyle={{ color: '#ff5500' }}
-                    />
-                    <Area type="monotone" dataKey="km" stroke="#ff5500" strokeWidth={3} fill="url(#colorKm)" />
-                  </AreaChart>
-               </ResponsiveContainer>
-             </div>
-             
-             <div className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase tracking-widest pt-2 border-t border-slate-900">
-               <span>TELEMETRIA DE QUILOMETRAGEM ACUMULADA</span>
-               <span className="text-orange-500">{loggedKm} KM REGISTRADOS NO DIÁRIO</span>
-             </div>
-          </div>
+          {latestLog && latestRouteMetrics ? (
+            <div className="space-y-3.5">
+              {/* 1. LINHA INDIVIDUAL: ORIGEM DESTINO */}
+              <div className="w-full bg-slate-950/70 border border-slate-800/80 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-600/20 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0">
+                  <MapPin size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 block">
+                    ORIGEM & DESTINO
+                  </span>
+                  <div className="text-xs sm:text-sm md:text-base font-black text-white uppercase tracking-tight flex flex-wrap items-center gap-2 mt-0.5">
+                    <span className="text-slate-100">{latestLog.origin || 'Origem não informada'}</span>
+                    <span className="text-orange-500 font-black text-sm sm:text-base">➔</span>
+                    <span className="text-slate-100">{latestLog.destination || 'Destino não informado'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. LINHA ABAIXO DE ORIGEM DESTINO: DISTÂNCIA TOTAL, TEMPO ESTIMADO, ESTADO DA ESTRADA */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
+                {/* 1. Distância Total */}
+                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl sm:rounded-2xl p-3.5 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-orange-600/20 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0">
+                    <Navigation size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-wider block">
+                      Distância Total
+                    </span>
+                    <span className="text-xs sm:text-sm md:text-base font-black text-white font-mono truncate block">
+                      {latestRouteMetrics.distance} KM
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Tempo Estimado */}
+                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl sm:rounded-2xl p-3.5 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-sky-600/20 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+                    <Clock size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-wider block">
+                      Tempo Estimado
+                    </span>
+                    <span className="text-xs sm:text-sm md:text-base font-black text-white truncate block">
+                      {latestRouteMetrics.duration}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Estado da Estrada */}
+                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl sm:rounded-2xl p-3.5 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                    <Route size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[8px] sm:text-[9px] font-black uppercase text-slate-400 tracking-wider block">
+                      Estado da Estrada
+                    </span>
+                    <span className="text-xs sm:text-sm md:text-base font-black text-amber-400 truncate block" title={latestRouteMetrics.road}>
+                      {latestRouteMetrics.road}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. PAINEL DE DETALHES DA ROTA: Condições excluídas da parte de baixo para evitar duplicidade */}
+              <div className="bg-slate-950/60 rounded-2xl border border-slate-800/70 p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/70 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                      DETALHES DO REGISTRO
+                    </span>
+                  </div>
+
+                  {/* Avaliação e Moto */}
+                  <div className="flex items-center gap-3 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] font-black text-slate-500 uppercase">Avaliação:</span>
+                      <div className="flex items-center gap-1 text-amber-400 font-bold">
+                        <Star size={14} className="fill-amber-400 text-amber-400" />
+                        <span>{latestRouteMetrics.rating}.0</span>
+                      </div>
+                    </div>
+                    <span className="text-slate-700">|</span>
+                    <div className="flex items-center gap-1 text-slate-300 font-bold truncate max-w-[180px]">
+                      <Bike size={14} className="text-orange-500 shrink-0" />
+                      <span className="truncate">{latestRouteMetrics.bike}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Trajeto com Etapas & Paradas (se houver) ou Relato */}
+                {latestRouteMetrics.stagesList.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+                        <Navigation size={12} className="text-orange-500" />
+                        Etapas e Paradas da Rota ({latestRouteMetrics.stagesList.length})
+                      </span>
+                      {latestLog.mapsUrl && (
+                        <a
+                          href={latestLog.mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] font-bold text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors"
+                        >
+                          <ExternalLink size={11} />
+                          <span>Abrir Rota no Google Maps</span>
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin">
+                      <span className="text-[10px] font-bold text-slate-300 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 shrink-0">
+                        🏁 {latestLog.origin.split('/')[0]}
+                      </span>
+                      {latestRouteMetrics.stagesList.map((st, idx) => (
+                        <div key={st.id || idx} className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-orange-500 font-bold text-xs">➔</span>
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-orange-500/10 text-orange-300 border border-orange-500/30">
+                            {st.name}
+                          </span>
+                        </div>
+                      ))}
+                      <span className="text-orange-500 font-bold text-xs shrink-0">➔</span>
+                      <span className="text-[10px] font-bold text-slate-300 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 shrink-0">
+                        🚩 {latestLog.destination.split('/')[0]}
+                      </span>
+                    </div>
+                  </div>
+                ) : latestLog.content ? (
+                  <p className="text-xs text-slate-300 italic line-clamp-2 leading-relaxed">
+                    "{latestLog.content}"
+                  </p>
+                ) : null}
+
+                {/* Footer da Rota com foto de capa e status */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-900 text-[10px]">
+                  <div className="flex items-center gap-2">
+                    {latestLog.image && (
+                      <div className="w-7 h-7 rounded-lg overflow-hidden border border-slate-800 shrink-0">
+                        <img src={latestLog.image} alt={latestLog.title} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <span className="text-slate-400">
+                      Registro certificado no Diário de Bordo
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedTripModal(latestLog)}
+                    className="text-orange-400 hover:text-orange-300 font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer bg-orange-500/10 hover:bg-orange-500/20 px-3 py-1.5 rounded-xl border border-orange-500/30 text-xs shadow-sm active:scale-95"
+                    title="Abrir tela exclusiva para visualizar todos os detalhes deste roteiro"
+                  >
+                    <span>Visualizar Roteiro Completo</span>
+                    <span>➔</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 text-center border border-dashed border-slate-800 rounded-2xl text-slate-500 text-xs">
+              Nenhuma viagem registrada ainda. Clique em "NOVO REGISTRO" para cadastrar seu primeiro roteiro!
+            </div>
+          )}
         </div>
 
         {/* Adventures & Logbook Sidebar Box */}
@@ -389,8 +624,9 @@ export function Dashboard() {
               {logs.slice(0, 3).map((log) => (
                 <div 
                   key={log.id} 
-                  onClick={() => navigate('/logbook')}
+                  onClick={() => setSelectedTripModal(log)}
                   className="flex gap-4 items-center group cursor-pointer p-3 rounded-2xl bg-slate-950/60 hover:bg-slate-800/50 transition-all border border-slate-800/80 hover:border-orange-500/40"
+                  title="Clique para visualizar tela exclusiva desta viagem"
                 >
                   <div className="w-12 h-12 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shrink-0 group-hover:border-orange-500 transition-colors">
                     <img src={log.image} alt={log.title} className="w-full h-full object-cover" />
@@ -399,8 +635,14 @@ export function Dashboard() {
                     <p className="text-xs font-black uppercase italic tracking-tight text-white group-hover:text-orange-400 transition-colors truncate">
                       {log.title}
                     </p>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 truncate">
-                      {log.date} • {log.distance} KM
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 truncate flex items-center gap-1.5">
+                      <span>{log.date}</span>
+                      <span>•</span>
+                      <span>{log.distance} KM</span>
+                      <span>•</span>
+                      <span className="text-orange-400 font-black">
+                        {(log as any).period === 'night' ? '🌙 Noite' : ((log as any).period === 'all_day' ? '⏳ Dia Todo' : '☀️ Dia')}
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -603,6 +845,22 @@ export function Dashboard() {
           © 2026 MOTOLEGADO ENGINEERING SYSTEMS
         </div>
       </footer>
+
+      {/* Tela Exclusiva com apenas a Viagem Selecionada */}
+      {selectedTripModal && (
+        <TripReportModal
+          isOpen={!!selectedTripModal}
+          onClose={() => setSelectedTripModal(null)}
+          logs={[selectedTripModal]}
+          pilotName={profile?.name || user?.user_metadata?.full_name || 'Piloto MotoLegado'}
+          pilotClub={profile?.club_name || 'Piloto Independente'}
+          pilotMotorcycle={profile?.motorcycle || selectedTripModal.bike || 'Motocicleta Cadastrada'}
+          pilotId={profile?.id || user?.id}
+          initialSelectedTripId={selectedTripModal.id}
+          exclusiveTripMode={true}
+          onOpenAllTrips={() => navigate('/logbook')}
+        />
+      )}
     </div>
   );
 }

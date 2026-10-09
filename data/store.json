@@ -197,6 +197,22 @@
         "/uploads/trips/test.jpg"
       ],
       "created_at": "2026-10-08T15:25:31.000Z"
+    },
+    {
+      "id": "1791565629257",
+      "pilot_id": "pilot_1790945958715_56947f",
+      "title": "SERRA DA MACACA",
+      "description": null,
+      "start_location": "Av. Paulista, 820 - Bela Vista, São Paulo - SP, 01310-100",
+      "destination": "Serra da Macaca ROTA 139, Rod. Nequinho Fogaça, km 91,5, Sete Barras - SP, 18230-000",
+      "distance_km": "85.00",
+      "start_date": "2026-10-09T00:00:00.000Z",
+      "end_date": null,
+      "status": "completed",
+      "motorcycle_used": null,
+      "checklist_data": null,
+      "photos": null,
+      "created_at": "2026-10-09T17:06:44.000Z"
     }
   ]
 }

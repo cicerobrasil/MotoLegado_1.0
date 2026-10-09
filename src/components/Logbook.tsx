@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, ChangeEvent } from 'react';
-import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown, Navigation, ExternalLink, Share2, ShieldCheck, Eye, Layers, CheckCircle2, Filter, RotateCcw, TrendingUp, SlidersHorizontal, Pencil, Check, Wrench, Users, Tag, ChevronDown } from 'lucide-react';
+import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown, Navigation, ExternalLink, Share2, ShieldCheck, Eye, Layers, CheckCircle2, Filter, RotateCcw, TrendingUp, SlidersHorizontal, Pencil, Check, Wrench, Users, Tag, ChevronDown, CloudFog, Wind } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -38,16 +38,169 @@ export const LOGBOOK_CATEGORIES: LogbookCategoryConfig[] = [
   { id: 'Outro', label: 'Outro', icon: Tag, color: 'text-slate-400', badgeBg: 'bg-slate-500/15', badgeBorder: 'border-slate-500/40', badgeText: 'text-slate-300' },
 ];
 
+export type TripPeriod = 'day' | 'night' | 'all_day';
+
+export interface TripPeriodConfig {
+  id: TripPeriod;
+  label: string;
+  badgeLabel: string;
+  subLabel: string;
+  icon: typeof Sun;
+  color: string;
+  bg: string;
+  border: string;
+  activeBorder: string;
+}
+
+export const TRIP_PERIOD_CONFIG: Record<TripPeriod, TripPeriodConfig> = {
+  day: { 
+    id: 'day', 
+    label: 'De dia', 
+    badgeLabel: 'DE DIA',
+    subLabel: 'Roteiro diurno', 
+    icon: Sun, 
+    color: 'text-amber-400', 
+    bg: 'bg-amber-500/10', 
+    border: 'border-amber-500/30',
+    activeBorder: 'border-amber-500'
+  },
+  night: { 
+    id: 'night', 
+    label: 'De noite', 
+    badgeLabel: 'DE NOITE',
+    subLabel: 'Roteiro noturno', 
+    icon: Moon, 
+    color: 'text-indigo-400', 
+    bg: 'bg-indigo-500/10', 
+    border: 'border-indigo-500/30',
+    activeBorder: 'border-indigo-500'
+  },
+  all_day: { 
+    id: 'all_day', 
+    label: 'O dia todo', 
+    badgeLabel: 'O DIA TODO',
+    subLabel: 'Integral (dia e noite)', 
+    icon: Clock, 
+    color: 'text-emerald-400', 
+    bg: 'bg-emerald-500/10', 
+    border: 'border-emerald-500/30',
+    activeBorder: 'border-emerald-500'
+  },
+};
+
+export interface WeatherConditionConfig {
+  id: string;
+  label: string;
+  shortLabel: string;
+  icon: typeof Sun;
+  color: string;
+  bg: string;
+  border: string;
+  activeBg: string;
+  activeBorder: string;
+}
+
+export const WEATHER_CONDITIONS: WeatherConditionConfig[] = [
+  { 
+    id: 'sun', 
+    label: 'Sol / Céu Limpo', 
+    shortLabel: 'SOL', 
+    icon: Sun, 
+    color: 'text-amber-400', 
+    bg: 'bg-amber-500/10', 
+    border: 'border-amber-500/30',
+    activeBg: 'bg-amber-500/20 text-amber-300',
+    activeBorder: 'border-amber-500 shadow-amber-500/20'
+  },
+  { 
+    id: 'rain', 
+    label: 'Chuva', 
+    shortLabel: 'CHUVA', 
+    icon: CloudRain, 
+    color: 'text-sky-400', 
+    bg: 'bg-sky-500/10', 
+    border: 'border-sky-500/30',
+    activeBg: 'bg-sky-500/20 text-sky-300',
+    activeBorder: 'border-sky-500 shadow-sky-500/20'
+  },
+  { 
+    id: 'cloud', 
+    label: 'Nublado', 
+    shortLabel: 'NUBLADO', 
+    icon: Cloud, 
+    color: 'text-slate-300', 
+    bg: 'bg-slate-500/10', 
+    border: 'border-slate-500/30',
+    activeBg: 'bg-slate-700/50 text-slate-200',
+    activeBorder: 'border-slate-400 shadow-slate-500/20'
+  },
+  { 
+    id: 'zap', 
+    label: 'Tempestade / Raios', 
+    shortLabel: 'TEMPESTADE', 
+    icon: Zap, 
+    color: 'text-yellow-400', 
+    bg: 'bg-yellow-500/10', 
+    border: 'border-yellow-500/30',
+    activeBg: 'bg-yellow-500/20 text-yellow-300',
+    activeBorder: 'border-yellow-500 shadow-yellow-500/20'
+  },
+  { 
+    id: 'fog', 
+    label: 'Neblina / Nevoeiro', 
+    shortLabel: 'NEBLINA', 
+    icon: CloudFog, 
+    color: 'text-teal-400', 
+    bg: 'bg-teal-500/10', 
+    border: 'border-teal-500/30',
+    activeBg: 'bg-teal-500/20 text-teal-300',
+    activeBorder: 'border-teal-500 shadow-teal-500/20'
+  },
+  { 
+    id: 'wind', 
+    label: 'Vento Forte', 
+    shortLabel: 'VENTO FORTE', 
+    icon: Wind, 
+    color: 'text-cyan-400', 
+    bg: 'bg-cyan-500/10', 
+    border: 'border-cyan-500/30',
+    activeBg: 'bg-cyan-500/20 text-cyan-300',
+    activeBorder: 'border-cyan-500 shadow-cyan-500/20'
+  },
+];
+
 export const CLIMATE_CONFIG: Record<string, { label: string; icon: typeof Sun; color: string; bg: string; border: string }> = {
-  sun: { label: 'CÉU LIMPO', icon: Sun, color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+  sun: { label: 'CÉU LIMPO', icon: Sun, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
   rain: { label: 'CHUVA', icon: CloudRain, color: 'text-sky-400', bg: 'bg-sky-500/10', border: 'border-sky-500/20' },
   cloud: { label: 'NUBLADO', icon: Cloud, color: 'text-slate-300', bg: 'bg-slate-500/10', border: 'border-slate-500/20' },
-  zap: { label: 'TEMPESTADE', icon: Zap, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+  zap: { label: 'TEMPESTADE', icon: Zap, color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' },
+  fog: { label: 'NEBLINA', icon: CloudFog, color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
+  wind: { label: 'VENTO FORTE', icon: Wind, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
   moon: { label: 'NOITE', icon: Moon, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20' },
 };
 
+export function parseLogPeriod(log?: Partial<LogEntry>): TripPeriod {
+  if (log?.period === 'day' || log?.period === 'night' || log?.period === 'all_day') {
+    return log.period;
+  }
+  if (log?.climate === 'moon') return 'night';
+  return 'day';
+}
+
+export function parseLogClimates(log?: Partial<LogEntry>): string[] {
+  if (Array.isArray(log?.climates) && log.climates.length > 0) {
+    return log.climates;
+  }
+  if (typeof log?.climate === 'string' && log.climate.trim()) {
+    const list = log.climate.split(',').map(s => s.trim().toLowerCase()).filter(s => s && s !== 'moon');
+    if (list.length > 0) return list;
+  }
+  return ['sun'];
+}
+
 export interface LogEntry {
   id: string;
+  pilot_id?: string;
   title: string;
   category?: string;
   date: string;
@@ -56,6 +209,8 @@ export interface LogEntry {
   distance: string;
   duration: string;
   bike: string;
+  period?: TripPeriod;
+  climates?: string[];
   climate: string;
   road: string;
   rating: number;
@@ -218,6 +373,26 @@ export function Logbook() {
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Identificador único do piloto ativo para isolamento estrito de dados no diário
+  const currentPilotKey = user?.id || profile?.id || user?.email || 'guest';
+  const currentPilotSet = useMemo(() => {
+    return new Set<string>([
+      user?.id,
+      profile?.id,
+      user?.email,
+      profile?.email
+    ].filter(Boolean).map(s => String(s).toLowerCase()));
+  }, [user?.id, profile?.id, user?.email, profile?.email]);
+
+  const userStorageKey = `motolegado_logs_${currentPilotKey}`;
+
+  // Valida se o registro pertence estritamente ao piloto ativo
+  const belongsToCurrentPilot = (log: LogEntry): boolean => {
+    if (!log) return false;
+    if (!log.pilot_id) return true;
+    return currentPilotSet.has(log.pilot_id.toLowerCase());
+  };
+
   useEffect(() => {
     if (successToast) {
       const timer = setTimeout(() => setSuccessToast(null), 4500);
@@ -366,6 +541,8 @@ export function Logbook() {
   const [bike, setBike] = useState(profile?.motorcycle || '');
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
+  const [period, setPeriod] = useState<TripPeriod>('day');
+  const [climates, setClimates] = useState<string[]>(['sun']);
   const [climate, setClimate] = useState('sun');
   const [road, setRoad] = useState('Tapete (Perfeita)');
   const [rating, setRating] = useState(5);
@@ -379,6 +556,17 @@ export function Logbook() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const tripPhotoInputRef = useRef<HTMLInputElement>(null);
   const directCaptureInputRef = useRef<HTMLInputElement>(null);
+
+  const handleToggleClimate = (climateId: string) => {
+    setClimates(prev => {
+      if (prev.includes(climateId)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter(c => c !== climateId);
+      } else {
+        return [...prev, climateId];
+      }
+    });
+  };
 
   // Roteiros cadastrados para seleção direta no Diário de Bordo
   const [availableRoutes, setAvailableRoutes] = useState<Route[]>([]);
@@ -590,6 +778,8 @@ export function Logbook() {
     setBike(profile?.motorcycle || '');
     setDistance('');
     setDuration('');
+    setPeriod('day');
+    setClimates(['sun']);
     setClimate('sun');
     setRoad('Tapete (Perfeita)');
     setRating(5);
@@ -613,7 +803,11 @@ export function Logbook() {
     setBike(log.bike || profile?.motorcycle || '');
     setDistance(log.distance ? log.distance.replace(/\D/g, '') : '');
     setDuration(log.duration || '');
-    setClimate(log.climate || 'sun');
+    const parsedPeriod = parseLogPeriod(log);
+    const parsedClimates = parseLogClimates(log);
+    setPeriod(parsedPeriod);
+    setClimates(parsedClimates);
+    setClimate(parsedClimates.join(', '));
     setRoad(log.road || 'Tapete (Perfeita)');
     setRating(log.rating ?? 5);
     setContent(log.content || '');
@@ -627,8 +821,9 @@ export function Logbook() {
   const handleDeleteLog = async (targetId: string) => {
     const updated = logs.filter((l) => l.id !== targetId);
     setLogs(updated);
+    localStorage.setItem(userStorageKey, JSON.stringify(updated));
     localStorage.setItem('motolegado_logs', JSON.stringify(updated));
-    window.dispatchEvent(new CustomEvent('motolegado_logs_updated', { detail: updated }));
+    window.dispatchEvent(new CustomEvent('motolegado_logs_updated', { detail: { pilotId: currentPilotKey, logs: updated } }));
     window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
     window.dispatchEvent(new Event('storage'));
 
@@ -661,6 +856,7 @@ export function Logbook() {
       const updatedTrip: LogEntry = {
         ...(targetTrip || ({} as LogEntry)),
         id: targetId,
+        pilot_id: targetTrip?.pilot_id || currentPilotKey,
         documentaryProofs: mergedProofs,
         photos: mergedPhotos,
         // Se a capa era genérica/Unsplash, a nova foto real do usuário torna-se a capa
@@ -669,8 +865,9 @@ export function Logbook() {
 
       setLogs((prev) => {
         const updated = prev.map((log) => (log.id === targetId ? updatedTrip : log));
+        localStorage.setItem(userStorageKey, JSON.stringify(updated));
         localStorage.setItem('motolegado_logs', JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent('motolegado_logs_updated', { detail: updated }));
+        window.dispatchEvent(new CustomEvent('motolegado_logs_updated', { detail: { pilotId: currentPilotKey, logs: updated } }));
         window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
         window.dispatchEvent(new Event('storage'));
         return updated;
@@ -778,172 +975,205 @@ export function Logbook() {
     }
   };
 
-  // Load logs on mount / auth change
+  // Carregamento estritamente isolado para o piloto ativo
   useEffect(() => {
+    // 1. Limpa o estado imediatamente ao trocar de usuário para NUNCA exibir registros de outro piloto
+    setLogs([]);
+
+    // 2. Carrega estritamente os logs locais do piloto atual
     let localLogs: LogEntry[] = [];
-    const saved = localStorage.getItem('motolegado_logs');
-    if (saved) {
+    const savedUserLogs = localStorage.getItem(userStorageKey);
+    if (savedUserLogs) {
       try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          localLogs = parsed;
-          setLogs(parsed);
+        const parsed = JSON.parse(savedUserLogs);
+        if (Array.isArray(parsed)) {
+          localLogs = parsed.filter(belongsToCurrentPilot);
+          setLogs(localLogs);
         }
       } catch (e) {
-        console.error('Error loading logbook from localStorage', e);
+        console.error('Error loading logbook from user storage', e);
+      }
+    } else {
+      // Fallback para storage legado filtrando OBRIGATORIAMENTE pelo piloto atual
+      const legacySaved = localStorage.getItem('motolegado_logs');
+      if (legacySaved) {
+        try {
+          const parsed = JSON.parse(legacySaved);
+          if (Array.isArray(parsed)) {
+            localLogs = parsed.filter(belongsToCurrentPilot);
+            setLogs(localLogs);
+          }
+        } catch {}
       }
     }
 
-    // Carregar e sincronizar viagens diretamente do MySQL da Hostinger
-    getTripsFromHostinger(user?.id || profile?.id)
-      .then((res) => {
-        if (res && res.trips && res.trips.length > 0) {
-          const mappedLogs: LogEntry[] = res.trips.map((t: any) => {
-            let checklist: any = {};
-            if (typeof t.checklist_data === 'string') {
-              try { checklist = JSON.parse(t.checklist_data); } catch {}
-            } else if (typeof t.checklist_data === 'object' && t.checklist_data) {
-              checklist = t.checklist_data;
-            }
+    // 3. Carregar e sincronizar viagens estritamente deste piloto no MySQL da Hostinger
+    const activePilotId = user?.id || profile?.id || user?.email;
+    if (activePilotId) {
+      getTripsFromHostinger(activePilotId)
+        .then((res) => {
+          if (res && res.trips && Array.isArray(res.trips)) {
+            const mappedLogs: LogEntry[] = res.trips.map((t: any) => {
+              let checklist: any = {};
+              if (typeof t.checklist_data === 'string') {
+                try { checklist = JSON.parse(t.checklist_data); } catch {}
+              } else if (typeof t.checklist_data === 'object' && t.checklist_data) {
+                checklist = t.checklist_data;
+              }
 
-            let photos: string[] = [];
-            if (typeof t.photos === 'string') {
-              try { photos = JSON.parse(t.photos); } catch {}
-            } else if (Array.isArray(t.photos)) {
-              photos = t.photos;
-            }
+              let photos: string[] = [];
+              if (typeof t.photos === 'string') {
+                try { photos = JSON.parse(t.photos); } catch {}
+              } else if (Array.isArray(t.photos)) {
+                photos = t.photos;
+              }
 
-            const isStockUrl = (u?: string) => !u || u.includes('images.unsplash.com');
-            const realUserPhoto = photos.find(p => !isStockUrl(p));
-            const realProofPhoto = Array.isArray(checklist?.documentaryProofs)
-              ? checklist.documentaryProofs.find((p: any) => !isStockUrl(p?.url))?.url
-              : null;
-            const resolvedCover = (!isStockUrl(checklist?.image) ? checklist?.image : null) || realUserPhoto || realProofPhoto || checklist?.image || photos[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800';
+              const isStockUrl = (u?: string) => !u || u.includes('images.unsplash.com');
+              const realUserPhoto = photos.find(p => !isStockUrl(p));
+              const realProofPhoto = Array.isArray(checklist?.documentaryProofs)
+                ? checklist.documentaryProofs.find((p: any) => !isStockUrl(p?.url))?.url
+                : null;
+              const resolvedCover = (!isStockUrl(checklist?.image) ? checklist?.image : null) || realUserPhoto || realProofPhoto || checklist?.image || photos[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800';
 
-            // Formata data do MySQL (YYYY-MM-DD) de forma amigável para exibição brasileira (DD/MM/AAAA)
-            let rawDate = t.start_date ? String(t.start_date).split('T')[0] : (t.date || '');
-            let displayDate = rawDate;
-            if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
-              const [y, m, d] = rawDate.split('-');
-              displayDate = `${d}/${m}/${y}`;
-            }
+              // Formata data do MySQL (YYYY-MM-DD) de forma amigável para exibição brasileira (DD/MM/AAAA)
+              let rawDate = t.start_date ? String(t.start_date).split('T')[0] : (t.date || '');
+              let displayDate = rawDate;
+              if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+                const [y, m, d] = rawDate.split('-');
+                displayDate = `${d}/${m}/${y}`;
+              }
 
-            return {
-              id: String(t.id),
-              title: t.title || 'Viagem Registrada',
-              category: checklist?.category || t.category || 'Viagem',
-              date: displayDate || new Date().toLocaleDateString('pt-BR'),
-              origin: t.start_location || t.origin || '',
-              destination: t.destination || '',
-              distance: String(Math.round(parseFloat(t.distance_km) || 0)),
-              duration: checklist?.duration || t.duration || '2h 30min',
-              bike: t.motorcycle_used || t.bike_model || profile?.motorcycle || 'Motocicleta',
-              climate: checklist?.climate || t.climate || 'sun',
-              road: checklist?.road || t.road || 'Tapete (Perfeita)',
-              rating: checklist?.rating || t.rating || 5,
-              content: t.description || checklist?.content || t.notes || '',
-              image: resolvedCover,
-              stages: Array.isArray(checklist?.stages) ? checklist.stages : (Array.isArray(t.stages) ? t.stages : []),
-              mapsUrl: checklist?.mapsUrl || t.maps_url || undefined,
-              photos: photos.length > 0 ? photos : (resolvedCover ? [resolvedCover] : []),
-              documentaryProofs: Array.isArray(checklist?.documentaryProofs) ? checklist.documentaryProofs : []
-            };
-          });
+              return {
+                id: String(t.id),
+                pilot_id: t.pilot_id ? String(t.pilot_id) : currentPilotKey,
+                title: t.title || 'Viagem Registrada',
+                category: checklist?.category || t.category || 'Viagem',
+                date: displayDate || new Date().toLocaleDateString('pt-BR'),
+                origin: t.start_location || t.origin || '',
+                destination: t.destination || '',
+                distance: String(Math.round(parseFloat(t.distance_km) || 0)),
+                duration: checklist?.duration || t.duration || '2h 30min',
+                bike: t.motorcycle_used || t.bike_model || profile?.motorcycle || 'Motocicleta',
+                period: checklist?.period || t.period || (checklist?.climate === 'moon' || t.climate === 'moon' ? 'night' : 'day'),
+                climates: Array.isArray(checklist?.climates) ? checklist.climates : (Array.isArray(t.climates) ? t.climates : parseLogClimates({ climate: checklist?.climate || t.climate })),
+                climate: checklist?.climate || t.climate || 'sun',
+                road: checklist?.road || t.road || 'Tapete (Perfeita)',
+                rating: checklist?.rating || t.rating || 5,
+                content: t.description || checklist?.content || t.notes || '',
+                image: resolvedCover,
+                stages: Array.isArray(checklist?.stages) ? checklist.stages : (Array.isArray(t.stages) ? t.stages : []),
+                mapsUrl: checklist?.mapsUrl || t.maps_url || undefined,
+                photos: photos.length > 0 ? photos : (resolvedCover ? [resolvedCover] : []),
+                documentaryProofs: Array.isArray(checklist?.documentaryProofs) ? checklist.documentaryProofs : []
+              };
+            });
 
-          // Mescla sem perda de dados e evitando duplicações por ID
-          const merged: LogEntry[] = [];
-          const seenIds = new Set<string>();
+            // Mescla sem perda de dados e evitando duplicações por ID (apenas do piloto atual)
+            const merged: LogEntry[] = [];
+            const seenIds = new Set<string>();
 
-          mappedLogs.forEach(ml => {
-            seenIds.add(ml.id);
+            mappedLogs.forEach(ml => {
+              seenIds.add(ml.id);
 
-            // Tenta localizar versão local correspondente para enriquecer dados
-            const localMatch = localLogs.find(l => l.id === ml.id);
-            if (localMatch) {
-              const combinedPhotos = Array.from(new Set([...(ml.photos || []), ...(localMatch.photos || [])]));
-              const combinedProofs = (ml.documentaryProofs && ml.documentaryProofs.length > 0)
-                ? ml.documentaryProofs
-                : (localMatch.documentaryProofs || []);
-              const isStock = (u?: string) => !u || u.includes('images.unsplash.com');
-              const combinedCover = (!isStock(ml.image) ? ml.image : null) 
-                || (!isStock(localMatch.image) ? localMatch.image : null)
-                || ml.image 
-                || localMatch.image;
+              // Tenta localizar versão local correspondente para enriquecer dados
+              const localMatch = localLogs.find(l => l.id === ml.id);
+              if (localMatch) {
+                const combinedPhotos = Array.from(new Set([...(ml.photos || []), ...(localMatch.photos || [])]));
+                const combinedProofs = (ml.documentaryProofs && ml.documentaryProofs.length > 0)
+                  ? ml.documentaryProofs
+                  : (localMatch.documentaryProofs || []);
+                const isStock = (u?: string) => !u || u.includes('images.unsplash.com');
+                const combinedCover = (!isStock(ml.image) ? ml.image : null) 
+                  || (!isStock(localMatch.image) ? localMatch.image : null)
+                  || ml.image 
+                  || localMatch.image;
 
-              // Preserva dados preenchidos localmente caso o banco tenha campos nulos/vazios
-              merged.push({
-                ...ml,
-                title: ml.title || localMatch.title,
-                origin: ml.origin || localMatch.origin,
-                destination: ml.destination || localMatch.destination,
-                content: ml.content || localMatch.content,
-                bike: (ml.bike && ml.bike !== 'Motocicleta') ? ml.bike : (localMatch.bike || ml.bike),
-                distance: (ml.distance && ml.distance !== '0') ? ml.distance : (localMatch.distance || ml.distance),
-                category: ml.category || localMatch.category,
-                duration: ml.duration || localMatch.duration,
-                climate: ml.climate || localMatch.climate,
-                road: ml.road || localMatch.road,
-                rating: ml.rating || localMatch.rating,
-                photos: combinedPhotos.length > 0 ? combinedPhotos : (ml.photos || []),
-                documentaryProofs: combinedProofs,
-                image: combinedCover,
-                stages: (ml.stages && ml.stages.length > 0) ? ml.stages : (localMatch.stages || []),
-                mapsUrl: ml.mapsUrl || localMatch.mapsUrl
-              });
-            } else {
-              merged.push(ml);
-            }
-          });
+                // Preserva dados preenchidos localmente caso o banco tenha campos nulos/vazios
+                merged.push({
+                  ...ml,
+                  title: ml.title || localMatch.title,
+                  origin: ml.origin || localMatch.origin,
+                  destination: ml.destination || localMatch.destination,
+                  content: ml.content || localMatch.content,
+                  bike: (ml.bike && ml.bike !== 'Motocicleta') ? ml.bike : (localMatch.bike || ml.bike),
+                  distance: (ml.distance && ml.distance !== '0') ? ml.distance : (localMatch.distance || ml.distance),
+                  category: ml.category || localMatch.category,
+                  duration: ml.duration || localMatch.duration,
+                  period: ml.period || localMatch.period || 'day',
+                  climates: ml.climates || localMatch.climates || ['sun'],
+                  climate: ml.climate || localMatch.climate,
+                  road: ml.road || localMatch.road,
+                  rating: ml.rating || localMatch.rating,
+                  photos: combinedPhotos.length > 0 ? combinedPhotos : (ml.photos || []),
+                  documentaryProofs: combinedProofs,
+                  image: combinedCover,
+                  stages: (ml.stages && ml.stages.length > 0) ? ml.stages : (localMatch.stages || []),
+                  mapsUrl: ml.mapsUrl || localMatch.mapsUrl
+                });
+              } else {
+                merged.push(ml);
+              }
+            });
 
-          // Preserva registros locais que ainda não foram sincronizados com o banco
-          localLogs.forEach(ll => {
-            if (!seenIds.has(ll.id)) {
-              seenIds.add(ll.id);
-              merged.push(ll);
-            }
-          });
+            // Preserva registros locais que ainda não foram sincronizados com o banco
+            localLogs.forEach(ll => {
+              if (!seenIds.has(ll.id)) {
+                seenIds.add(ll.id);
+                merged.push(ll);
+              }
+            });
 
-          merged.sort((a, b) => {
-            const timeA = parseLogDate(a.date)?.getTime() || 0;
-            const timeB = parseLogDate(b.date)?.getTime() || 0;
-            return timeB - timeA;
-          });
+            merged.sort((a, b) => {
+              const timeA = parseLogDate(a.date)?.getTime() || 0;
+              const timeB = parseLogDate(b.date)?.getTime() || 0;
+              return timeB - timeA;
+            });
 
-          setLogs(merged);
-          localStorage.setItem('motolegado_logs', JSON.stringify(merged));
-        } else if (localLogs.length > 0) {
+            setLogs(merged);
+            localStorage.setItem(userStorageKey, JSON.stringify(merged));
+          } else {
+            setLogs(localLogs);
+            localStorage.setItem(userStorageKey, JSON.stringify(localLogs));
+          }
+        })
+        .catch((err) => {
+          console.warn('Sincronização offline ou aguardando resposta da Hostinger:', err);
           setLogs(localLogs);
-        }
-      })
-      .catch((err) => {
-        console.warn('Sincronização offline ou aguardando resposta da Hostinger:', err);
-        if (localLogs.length > 0) setLogs(localLogs);
-      });
-  }, [user, profile]);
+        });
+    } else {
+      setLogs(localLogs);
+    }
+  }, [user?.id, profile?.id, user?.email, profile?.email, currentPilotKey]);
 
   const saveLogsToStorage = async (entry: LogEntry, isEdit: boolean = false) => {
+    const finalEntry: LogEntry = {
+      ...entry,
+      pilot_id: entry.pilot_id || currentPilotKey
+    };
+
     // Carrega registros locais atuais para evitar qualquer perda por closure desatualizada
     let baseLogs: LogEntry[] = [];
     try {
-      const saved = localStorage.getItem('motolegado_logs');
+      const saved = localStorage.getItem(userStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) baseLogs = parsed;
+        if (Array.isArray(parsed)) baseLogs = parsed.filter(belongsToCurrentPilot);
       }
     } catch {}
     if (baseLogs.length === 0) {
-      baseLogs = logs;
+      baseLogs = logs.filter(belongsToCurrentPilot);
     }
 
     let updated: LogEntry[];
     if (isEdit) {
-      updated = baseLogs.map((l) => (l.id === entry.id ? entry : l));
+      updated = baseLogs.map((l) => (l.id === finalEntry.id ? finalEntry : l));
     } else {
-      updated = [entry, ...baseLogs.filter(l => l.id !== entry.id)];
+      updated = [finalEntry, ...baseLogs.filter(l => l.id !== finalEntry.id)];
     }
     setLogs(updated);
+    localStorage.setItem(userStorageKey, JSON.stringify(updated));
     localStorage.setItem('motolegado_logs', JSON.stringify(updated));
-    window.dispatchEvent(new CustomEvent('motolegado_logs_updated', { detail: updated }));
+    window.dispatchEvent(new CustomEvent('motolegado_logs_updated', { detail: { pilotId: currentPilotKey, logs: updated } }));
     window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
     window.dispatchEvent(new Event('storage'));
 
@@ -951,16 +1181,16 @@ export function Logbook() {
     try {
       // Converte data para formato SQL YYYY-MM-DD sem erro de timezone
       let sqlDate = '';
-      if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(entry.date)) {
-        const parts = entry.date.split('/');
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(finalEntry.date)) {
+        const parts = finalEntry.date.split('/');
         const day = parts[0].padStart(2, '0');
         const month = parts[1].padStart(2, '0');
         const year = parts[2].slice(0, 4);
         sqlDate = `${year}-${month}-${day}`;
-      } else if (/^\d{4}-\d{1,2}-\d{1,2}/.test(entry.date)) {
-        sqlDate = entry.date.slice(0, 10);
+      } else if (/^\d{4}-\d{1,2}-\d{1,2}/.test(finalEntry.date)) {
+        sqlDate = finalEntry.date.slice(0, 10);
       } else {
-        const d = parseLogDate(entry.date) || new Date();
+        const d = parseLogDate(finalEntry.date) || new Date();
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
@@ -968,38 +1198,40 @@ export function Logbook() {
       }
 
       await syncTripToHostinger({
-        id: entry.id,
-        pilot_id: user?.id || profile?.id || user?.email || 'pilot',
-        title: entry.title,
-        origin: entry.origin,
-        start_location: entry.origin,
-        destination: entry.destination,
-        distance_km: parseFloat(entry.distance?.replace(/[^\d.]/g, '') || '0') || 0,
+        id: finalEntry.id,
+        pilot_id: finalEntry.pilot_id || currentPilotKey,
+        title: finalEntry.title,
+        origin: finalEntry.origin,
+        start_location: finalEntry.origin,
+        destination: finalEntry.destination,
+        distance_km: parseFloat(finalEntry.distance?.replace(/[^\d.]/g, '') || '0') || 0,
         start_date: sqlDate,
-        motorcycle_used: entry.bike,
-        description: entry.content,
-        content: entry.content,
-        image: entry.image,
-        photos: entry.photos || (entry.image ? [entry.image] : []),
-        category: entry.category,
-        duration: entry.duration,
-        climate: entry.climate,
-        road: entry.road,
-        rating: entry.rating,
-        stages: entry.stages,
-        mapsUrl: entry.mapsUrl,
-        documentaryProofs: entry.documentaryProofs,
+        motorcycle_used: finalEntry.bike,
+        description: finalEntry.content,
+        content: finalEntry.content,
+        image: finalEntry.image,
+        photos: finalEntry.photos || (finalEntry.image ? [finalEntry.image] : []),
+        category: finalEntry.category,
+        duration: finalEntry.duration,
+        climate: finalEntry.climate,
+        road: finalEntry.road,
+        rating: finalEntry.rating,
+        stages: finalEntry.stages,
+        mapsUrl: finalEntry.mapsUrl,
+        documentaryProofs: finalEntry.documentaryProofs,
         checklist_data: {
-          stages: entry.stages,
-          mapsUrl: entry.mapsUrl,
-          documentaryProofs: entry.documentaryProofs,
-          image: entry.image,
-          category: entry.category,
-          duration: entry.duration,
-          climate: entry.climate,
-          road: entry.road,
-          rating: entry.rating,
-          content: entry.content
+          stages: finalEntry.stages,
+          mapsUrl: finalEntry.mapsUrl,
+          documentaryProofs: finalEntry.documentaryProofs,
+          image: finalEntry.image,
+          category: finalEntry.category,
+          duration: finalEntry.duration,
+          period: finalEntry.period,
+          climates: finalEntry.climates,
+          climate: finalEntry.climate,
+          road: finalEntry.road,
+          rating: finalEntry.rating,
+          content: finalEntry.content
         }
       });
     } catch (err) {
@@ -1058,8 +1290,12 @@ export function Logbook() {
 
       const entryId = editingLogId || Date.now().toString();
 
+      const finalClimates = climates.length > 0 ? climates : ['sun'];
+      const primaryClimateString = finalClimates.join(', ');
+
       const entryToSave: LogEntry = {
         id: entryId,
+        pilot_id: currentPilotKey,
         title: cleanTitle.toUpperCase(),
         category: category || 'Viagem',
         date: formattedDate || new Date().toLocaleDateString('pt-BR'),
@@ -1068,7 +1304,9 @@ export function Logbook() {
         distance: distance ? distance.replace(/\D/g, '') || '100' : '100',
         duration: duration || '2h 30min',
         bike: bike || profile?.motorcycle || 'Motocicleta',
-        climate,
+        period,
+        climates: finalClimates,
+        climate: primaryClimateString,
         road,
         rating,
         content: content || 'Viagem concluída com sucesso e registrada no diário de bordo com comprovação fotográfica.',
@@ -1100,6 +1338,9 @@ export function Logbook() {
       setMapsUrl('');
       setDistance('');
       setDuration('');
+      setPeriod('day');
+      setClimates(['sun']);
+      setClimate('sun');
       setContent('');
       setImage('');
       setDocumentaryProofs([]);
@@ -1541,36 +1782,126 @@ export function Logbook() {
               />
             </div>
 
-            {/* Condition Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">CONDIÇÃO CLIMÁTICA</label>
-                <div className="flex gap-3">
-                  {[
-                    { id: 'sun', icon: Sun },
-                    { id: 'rain', icon: CloudRain },
-                    { id: 'cloud', icon: Cloud },
-                    { id: 'zap', icon: Zap },
-                    { id: 'moon', icon: Moon },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setClimate(item.id)}
-                      className={cn(
-                        "w-10 h-10 rounded-full border flex items-center justify-center transition-all",
-                        climate === item.id 
-                          ? "bg-orange-500 border-orange-500 text-slate-900 shadow-lg shadow-orange-500/20" 
-                          : "border-slate-800 text-slate-600 hover:text-slate-300"
-                      )}
-                    >
-                      <item.icon size={16} />
-                    </button>
-                  ))}
+            {/* Bloco de Condições: Período do Roteiro e Clima (Múltipla Seleção) */}
+            <div className="p-5 sm:p-7 rounded-2xl sm:rounded-3xl bg-slate-950/60 border border-slate-800/80 shadow-inner space-y-6">
+              
+              {/* Opção 1: Período do Roteiro (De dia / De noite / O dia todo) */}
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                    1. Período do Roteiro
+                  </label>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    Quando o trajeto foi realizado
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {(Object.keys(TRIP_PERIOD_CONFIG) as TripPeriod[]).map((pKey) => {
+                    const pConfig = TRIP_PERIOD_CONFIG[pKey];
+                    const isSelected = period === pKey;
+                    const IconComp = pConfig.icon;
+
+                    return (
+                      <button
+                        key={pKey}
+                        type="button"
+                        onClick={() => setPeriod(pKey)}
+                        className={cn(
+                          "relative flex items-center sm:flex-col sm:justify-center p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer text-left sm:text-center group",
+                          isSelected
+                            ? "bg-slate-900 border-orange-500 ring-1 ring-orange-500/50 shadow-lg shadow-orange-500/10"
+                            : "bg-slate-950/40 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                        )}
+                      >
+                        {isSelected && (
+                          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-orange-500 hidden sm:block" />
+                        )}
+                        <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center mr-3 sm:mr-0 sm:mb-2 transition-transform group-hover:scale-105 shrink-0",
+                          isSelected ? pConfig.bg : "bg-slate-900"
+                        )}>
+                          <IconComp size={18} className={isSelected ? pConfig.color : "text-slate-500"} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className={cn(
+                            "block text-xs sm:text-sm font-black tracking-tight",
+                            isSelected ? "text-white" : "text-slate-300"
+                          )}>
+                            {pConfig.label}
+                          </span>
+                          <span className="block text-[10px] text-slate-500 mt-0.5 truncate">
+                            {pConfig.subLabel}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="space-y-4">
+              {/* Divisor */}
+              <div className="h-px bg-slate-800/80" />
+
+              {/* Opção 2: Clima da Viagem (Múltipla Seleção) */}
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-sky-400" />
+                    2. Condições Climáticas (Múltipla Escolha)
+                  </label>
+                  <span className="text-[11px] text-orange-400/95 font-bold flex items-center gap-1.5">
+                    <CheckCircle2 size={13} className="text-orange-500" />
+                    Pode marcar mais de um tipo de clima (ex: sol e chuva no mesmo dia)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                  {WEATHER_CONDITIONS.map((cond) => {
+                    const isSelected = climates.includes(cond.id);
+                    const CondIcon = cond.icon;
+
+                    return (
+                      <button
+                        key={cond.id}
+                        type="button"
+                        onClick={() => handleToggleClimate(cond.id)}
+                        className={cn(
+                          "relative flex flex-col items-center justify-center p-3 rounded-xl sm:rounded-2xl border transition-all text-center group cursor-pointer select-none",
+                          isSelected
+                            ? cn("border-2 shadow-md", cond.activeBorder, "bg-slate-900/90")
+                            : "bg-slate-950/40 border-slate-800/80 text-slate-500 hover:border-slate-700 hover:text-slate-300"
+                        )}
+                        title={`Clique para marcar/desmarcar ${cond.label}`}
+                      >
+                        {isSelected && (
+                          <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center shadow-xs">
+                            <Check size={10} className="text-slate-950 stroke-[3]" />
+                          </div>
+                        )}
+                        <div className={cn(
+                          "w-9 h-9 rounded-xl flex items-center justify-center mb-1.5 transition-transform group-hover:scale-110",
+                          isSelected ? cond.bg : "bg-slate-900/60"
+                        )}>
+                          <CondIcon size={18} className={isSelected ? cond.color : "text-slate-500"} />
+                        </div>
+                        <span className={cn(
+                          "text-[11px] sm:text-xs font-bold leading-tight",
+                          isSelected ? "text-white" : "text-slate-400"
+                        )}>
+                          {cond.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Linha com Estado da Estrada e Avaliação da Rota */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">ESTADO DA ESTRADA</label>
                 <select 
                   value={road}
@@ -1584,19 +1915,22 @@ export function Logbook() {
                 </select>
               </div>
 
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1 text-center">AVALIAÇÃO DA ROTA</label>
-                <div className="flex justify-center gap-2">
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1 text-center md:text-left">AVALIAÇÃO DA ROTA</label>
+                <div className="flex items-center justify-center md:justify-start gap-2 py-2">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <button
                       key={s}
                       type="button"
                       onClick={() => setRating(s)}
-                      className="p-1"
+                      className="p-1.5 transition-transform hover:scale-125 cursor-pointer"
                     >
-                      <Star size={20} className={cn(s <= rating ? "text-orange-500 fill-orange-500" : "text-slate-800")} />
+                      <Star size={22} className={cn(s <= rating ? "text-orange-500 fill-orange-500" : "text-slate-800")} />
                     </button>
                   ))}
+                  <span className="text-xs font-black text-orange-400 ml-2">
+                    {rating}/5.0
+                  </span>
                 </div>
               </div>
             </div>
@@ -2505,24 +2839,101 @@ export function Logbook() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 py-4 sm:py-6 border-y border-slate-800/30">
-                            <div>
-                              <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">DE / PARA</p>
-                              <p className="text-[10px] font-black text-white uppercase italic truncate">{log.origin.split('/')[0]} ➔ {log.destination.split('/')[0]}</p>
-                            </div>
-                            <div>
-                              <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">DISTÂNCIA</p>
-                              <p className="text-[10px] font-black text-white uppercase italic">{log.distance} KM</p>
-                            </div>
-                            <div>
-                              <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">TEMPO</p>
-                              <p className="text-[10px] font-black text-white uppercase italic">{log.duration}</p>
-                            </div>
-                            <div>
-                              <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">RODOVIA</p>
-                              <p className="text-[10px] font-black text-orange-500 uppercase italic truncate">{log.road.split(' ')[0]}</p>
-                            </div>
-                          </div>
+                          {/* Resumo de Telemetria e Condições da Viagem Cadastradas no Diário */}
+                          {(() => {
+                            const pKey = parseLogPeriod(log);
+                            const pCfg = TRIP_PERIOD_CONFIG[pKey] || TRIP_PERIOD_CONFIG.day;
+                            const PIcon = pCfg.icon;
+                            const cList = parseLogClimates(log);
+
+                            return (
+                              <div className="py-3 sm:py-4 px-3 sm:px-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+                                {/* Linha 1: ORIGEM ➔ DESTINO em linha individual para que apareça toda a informação */}
+                                <div className="w-full">
+                                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                                    <MapPin size={11} className="text-orange-500 shrink-0" />
+                                    <span>ORIGEM ➔ DESTINO</span>
+                                  </p>
+                                  <p className="text-xs sm:text-sm font-black text-white uppercase italic tracking-tight flex flex-wrap items-center gap-2" title={`${log.origin} ➔ ${log.destination}`}>
+                                    <span className="text-slate-100">{log.origin || 'Origem não informada'}</span>
+                                    <span className="text-orange-500 font-black">➔</span>
+                                    <span className="text-slate-100">{log.destination || 'Destino não informado'}</span>
+                                  </p>
+                                </div>
+
+                                {/* Linha 2: DISTÂNCIA TOTAL, TEMPO ESTIMADO, ESTADO DA ESTRADA numa linha abaixo de ORIGEM DESTINO */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 pt-2.5 border-t border-slate-800/50">
+                                  <div>
+                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">DISTÂNCIA TOTAL</p>
+                                    <p className="text-xs sm:text-sm font-black text-white uppercase italic font-mono">{log.distance} KM</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">TEMPO ESTIMADO</p>
+                                    <p className="text-xs sm:text-sm font-black text-white uppercase italic">{log.duration}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">ESTADO DA ESTRADA</p>
+                                    <p className="text-xs sm:text-sm font-black text-orange-400 uppercase italic truncate" title={log.road}>
+                                      {log.road}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Linha 3: Condições mantidas na parte de cima do card */}
+                                <div className="pt-2.5 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-2.5">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                                      CONDIÇÕES:
+                                    </span>
+
+                                    {/* Badge Período */}
+                                    <span 
+                                      className={cn(
+                                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase tracking-wider",
+                                        pCfg.bg, pCfg.border, pCfg.color
+                                      )}
+                                      title={`Turno do Roteiro: ${pCfg.label} (${pCfg.subLabel})`}
+                                    >
+                                      <PIcon size={12} />
+                                      <span>{pCfg.label}</span>
+                                    </span>
+
+                                    {/* Badges de Clima(s) Múltiplo(s) */}
+                                    {cList.map(cId => {
+                                      const found = WEATHER_CONDITIONS.find(w => w.id === cId);
+                                      const legacy = CLIMATE_CONFIG[cId];
+                                      const label = found?.label || legacy?.label || cId.toUpperCase();
+                                      const CIcon = found?.icon || legacy?.icon || Sun;
+                                      const color = found?.color || legacy?.color || 'text-amber-400';
+                                      const bg = found?.bg || legacy?.bg || 'bg-amber-500/10';
+                                      const border = found?.border || legacy?.border || 'border-amber-500/20';
+
+                                      return (
+                                        <span
+                                          key={cId}
+                                          className={cn(
+                                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase tracking-wider",
+                                            bg, border, color
+                                          )}
+                                          title={`Condição climática: ${label}`}
+                                        >
+                                          <CIcon size={12} />
+                                          <span>{label}</span>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <div className="flex items-center gap-1 text-[10px] font-black text-amber-400">
+                                    <span className="text-slate-500 uppercase text-[8px] tracking-wider">AVALIAÇÃO:</span>
+                                    <span className="font-mono text-white bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-[10px] font-bold">
+                                      {log.rating || 5}.0 ★
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
 
                           <p className="text-xs sm:text-sm font-medium text-slate-400 leading-relaxed italic">
                             "{log.content}"
@@ -2634,12 +3045,7 @@ export function Logbook() {
                               <FileDown size={13} className="text-orange-500" />
                               <span>Exportar Roteiro</span>
                             </button>
-                            <div className={cn(
-                              "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-widest",
-                              log.climate === 'sun' ? "bg-orange-500/10 border-orange-500/20 text-orange-500" : "bg-slate-800 border-slate-700 text-slate-400"
-                            )}>
-                              <Sun size={12} /> CÉU LIMPO
-                            </div>
+
                           </div>
                        </div>
                     </div>

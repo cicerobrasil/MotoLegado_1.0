@@ -612,11 +612,16 @@ export function getPilotLiveGamification(customLogs?: any[], customEvents?: any[
   const rainTripsCount = logs.filter(l => 
     l.climate === 'rain' || 
     l.climate === 'chuva' || 
+    (Array.isArray(l.climates) && (l.climates.includes('rain') || l.climates.includes('chuva'))) ||
+    (typeof l.climate === 'string' && (l.climate.toLowerCase().includes('rain') || l.climate.toLowerCase().includes('chuva'))) ||
     (typeof l.content === 'string' && l.content.toLowerCase().includes('chuva'))
   ).length;
 
   const nightTripsCount = logs.filter(l => 
+    l.period === 'night' ||
+    l.period === 'all_day' ||
     l.climate === 'night' || 
+    l.climate === 'moon' ||
     (typeof l.title === 'string' && l.title.toLowerCase().includes('noturn')) ||
     (typeof l.content === 'string' && l.content.toLowerCase().includes('noite'))
   ).length;

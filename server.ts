@@ -700,30 +700,29 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
     }
   });
 
-  // Trips API - Consulta resiliente com suporte a múltiplos aliases e admin
+  // Trips API - Consulta estrita por piloto para isolamento do Diário de Bordo
   app.get('/api/trips', async (req, res) => {
     try {
       const rawPilotId = req.query.pilot_id as string;
+      const wantAll = req.query.all === 'true' || rawPilotId === 'all';
       const cleanPilotId = (!rawPilotId || rawPilotId === 'undefined' || rawPilotId === 'null' || rawPilotId === 'all') 
         ? null 
         : rawPilotId.trim();
 
       let trips: any[] = [];
-      const isAdmin = cleanPilotId && (
-        cleanPilotId === 'admin_ciceroranieri' || 
-        cleanPilotId.toLowerCase() === 'ciceroranieri@gmail.com' || 
-        cleanPilotId.toLowerCase().includes('admin')
-      );
 
-      // Se for admin ou sem filtro de piloto, busca todas as viagens
-      if (!cleanPilotId || isAdmin) {
+      // Apenas se explicitamente solicitado 'all' ou sem identificador de piloto (para ranking/admin global)
+      if (wantAll || !cleanPilotId) {
         const mysqlRes: any = await safeMySqlQuery('SELECT * FROM trips ORDER BY created_at DESC');
         if (mysqlRes && mysqlRes[0] && Array.isArray(mysqlRes[0])) {
           trips = mysqlRes[0];
         }
+        if (trips.length === 0) {
+          trips = storeGetTrips('all', true);
+        }
       } else {
-        // Resolver todos os IDs possíveis do piloto (ID, email, etc.)
-        const candidateIds = new Set<string>([cleanPilotId, 'pilot']);
+        // Resolver estritamente os identificadores DESTE piloto específico (ID, email)
+        const candidateIds = new Set<string>([cleanPilotId]);
         const storePilot = storeGetPilotById(cleanPilotId) || storeGetPilotByEmail(cleanPilotId);
         if (storePilot) {
           if (storePilot.id) candidateIds.add(storePilot.id);
@@ -751,45 +750,36 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
           trips = mysqlRes[0];
         }
 
-        // Se ainda não encontrou nenhuma viagem no MySQL para este ID específico,
-        // verifica se há viagens gerais no banco para não deixar a tela vazia
+        // Se não houver viagens no MySQL para este piloto, consulta o cache local estritamente para ele
+        const storeTrips = storeGetTrips(cleanPilotId, false);
         if (trips.length === 0) {
-          const allRes: any = await safeMySqlQuery('SELECT * FROM trips ORDER BY created_at DESC');
-          if (allRes && allRes[0] && Array.isArray(allRes[0]) && allRes[0].length > 0) {
-            trips = allRes[0];
-          }
+          trips = storeTrips;
+        } else if (storeTrips.length > 0) {
+          trips = trips.map(t => {
+            const match = storeTrips.find(st => st.id === t.id);
+            if (match) {
+              return {
+                ...t,
+                checklist_data: t.checklist_data || match.checklist_data,
+                photos: (t.photos && t.photos.length > 0) ? t.photos : match.photos,
+                motorcycle_used: t.motorcycle_used || match.motorcycle_used,
+                description: t.description || match.description
+              };
+            }
+            return t;
+          });
         }
       }
 
-      // Sincroniza viagens do banco no cache local resiliente
+      // Sincroniza viagens do banco no cache local resiliente se encontrou registros
       if (trips.length > 0) {
         storeSyncTripsFromDb(trips);
       }
 
-      const storeTrips = storeGetTrips(cleanPilotId || undefined);
-      if (trips.length === 0) {
-        trips = storeTrips;
-      } else if (storeTrips.length > 0) {
-        // Enriquece registros do MySQL que possam ter campos nulos com o cache local
-        trips = trips.map(t => {
-          const match = storeTrips.find(st => st.id === t.id);
-          if (match) {
-            return {
-              ...t,
-              checklist_data: t.checklist_data || match.checklist_data,
-              photos: (t.photos && t.photos.length > 0) ? t.photos : match.photos,
-              motorcycle_used: t.motorcycle_used || match.motorcycle_used,
-              description: t.description || match.description
-            };
-          }
-          return t;
-        });
-      }
-
       res.json({ success: true, trips });
     } catch (err: any) {
-      console.warn('[Trips API] Falha na consulta MySQL, recorrendo ao cache:', err?.message);
-      res.json({ success: true, trips: storeGetTrips(req.query.pilot_id as string) });
+      console.warn('[Trips API] Falha na consulta MySQL, recorrendo ao cache estrito:', err?.message);
+      res.json({ success: true, trips: storeGetTrips(req.query.pilot_id as string, false) });
     }
   });
 
