@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import { 
   Calendar, 
   MapPin, 
@@ -30,6 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
 import { DateInput } from './DateInput';
+import { clientDbService } from '../lib/dbService';
 
 // Helper to format date cleanly
 function formatDisplayDate(dateStr?: string) {
@@ -39,6 +40,47 @@ function formatDisplayDate(dateStr?: string) {
     return `${d}/${m}/${y}`;
   }
   return dateStr;
+}
+
+// Helpers para filtro robusto de data
+function normalizeDateStr(d?: string): string {
+  if (!d) return '';
+  const trimmed = d.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+    const [day, month, year] = trimmed.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  return trimmed;
+}
+
+function matchesEventDate(evtDate?: string, evtEndDate?: string, filterDate?: string): boolean {
+  if (!filterDate || !filterDate.trim()) return true;
+  if (!evtDate) return false;
+
+  const target = normalizeDateStr(filterDate);
+  const start = normalizeDateStr(evtDate);
+  const end = normalizeDateStr(evtEndDate);
+
+  if (!target) return true;
+
+  // Match exato na data inicial
+  if (start === target) return true;
+
+  // Evento com intervalo de datas [start, end]
+  if (start && end && target >= start && target <= end) {
+    return true;
+  }
+
+  // Fallback para correspondência textual
+  const normFilter = filterDate.trim().toLowerCase();
+  if (evtDate.toLowerCase().includes(normFilter) || (evtEndDate && evtEndDate.toLowerCase().includes(normFilter))) {
+    return true;
+  }
+
+  return false;
 }
 
 // Core Event Interface
@@ -149,40 +191,6 @@ const DEFAULT_FALLBACK_IMAGE = generateCategorySvgCover("Geral");
 
 const CATEGORY_TAGS = ["Todos", "Geral", "Festas & Encontros", "On-Road", "Off-Road", "Misto"];
 
-// Curated photo suggestions organized strictly by group/category type (tipo de passeio)
-export const CATEGORY_COVER_SUGGESTIONS: Record<string, { title: string; url: string }[]> = {
-  Geral: [
-    { title: "Ilustração Vetorial - Geral", url: generateCategorySvgCover("Geral") },
-    { title: "Comboio Unificado (Todos os Estilos)", url: "https://images.unsplash.com/photo-1558981403-c5f91cbba527?auto=format&fit=crop&q=80&w=800" },
-    { title: "Encontro Multimarca & Passeio Urbano", url: "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&q=80&w=800" },
-    { title: "Grupo Aberto para Todas as Cilindradas", url: "https://images.unsplash.com/photo-1599819811279-d5ad9cccf838?auto=format&fit=crop&q=80&w=800" }
-  ],
-  "Festas & Encontros": [
-    { title: "Ilustração Vetorial - Festas & Encontros", url: generateCategorySvgCover("Festas & Encontros") },
-    { title: "Rock Show & Festival de Motociclistas", url: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=800" },
-    { title: "Churrasco & Aniversário de Moto Clube", url: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=800" },
-    { title: "Encontro Mensal & Exposição Custom", url: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80&w=800" }
-  ],
-  "On-Road": [
-    { title: "Ilustração Vetorial - On-Road", url: generateCategorySvgCover("On-Road") },
-    { title: "Serra Pavimentada & Curvas de Asfalto", url: "https://images.unsplash.com/photo-1458178401933-2046a546050b?auto=format&fit=crop&q=80&w=800" },
-    { title: "Rodovia Dupla & Viagem Longa", url: "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&q=80&w=800" },
-    { title: "Asfalto Liso & Curvas ao Sol", url: "https://images.unsplash.com/photo-1558981285-6f0c94958bb6?auto=format&fit=crop&q=80&w=800" }
-  ],
-  "Off-Road": [
-    { title: "Ilustração Vetorial - Off-Road", url: generateCategorySvgCover("Off-Road") },
-    { title: "Trilha de Terra & Lama Big Trail", url: "https://images.unsplash.com/photo-1599819811279-d5ad9cccf838?auto=format&fit=crop&q=80&w=800" },
-    { title: "Cânions & Rali em Terra Batida", url: "https://images.unsplash.com/photo-1517649763962-0c623266010b?auto=format&fit=crop&q=80&w=800" },
-    { title: "Estrada de Poeira & Desafio Off-Road", url: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&q=80&w=800" }
-  ],
-  Misto: [
-    { title: "Ilustração Vetorial - Misto", url: generateCategorySvgCover("Misto") },
-    { title: "Rodovia com Trechos de Terra Batida", url: "https://images.unsplash.com/photo-1502481851512-e9e2529bbbf9?auto=format&fit=crop&q=80&w=800" },
-    { title: "Rota Mista Asfalto & Calçamento", url: "https://images.unsplash.com/photo-1525160354320-d8e92641c563?auto=format&fit=crop&q=80&w=800" },
-    { title: "Aventura Asfalto & Trilha Leve", url: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&q=80&w=800" }
-  ]
-};
-
 export function Events() {
   const { profile } = useAuth();
   const isVip = isUserProOrBonificado(profile);
@@ -200,14 +208,20 @@ export function Events() {
   };
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
+  const [selectedDateFilter, setSelectedDateFilter] = useState('');
   const [showToast, setShowToast] = useState<{message: string, type: 'success' | 'info'} | null>(null);
   const [selectedEventDetails, setSelectedEventDetails] = useState<MotoEvent | null>(null);
+
+  // Input refs for illuminated time pickers
+  const startTimeInputRef = useRef<HTMLInputElement>(null);
+  const endTimeInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   // Edit State
   const [editingEvent, setEditingEvent] = useState<MotoEvent | null>(null);
 
-  // Cover image mode & custom upload state
-  const [coverSource, setCoverSource] = useState<'sugestoes' | 'upload'>('sugestoes');
+  // Cover image mode & custom upload state (apenas upload e url)
+  const [coverSource, setCoverSource] = useState<'upload' | 'url'>('upload');
   const [isCustomImage, setIsCustomImage] = useState(false);
   const [customUrlInput, setCustomUrlInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -223,20 +237,18 @@ export function Events() {
     endTime: '',
     distance: '',
     desc: '',
-    image: CATEGORY_COVER_SUGGESTIONS['Geral'][0].url
+    image: ''
   });
 
-  // When category changes in form, auto-update image to category suggestion unless user uploaded custom image
+  // Category changes no longer overwrite image with suggestions
   const handleCategoryChange = (newCategory: string) => {
-    const suggestions = CATEGORY_COVER_SUGGESTIONS[newCategory] || CATEGORY_COVER_SUGGESTIONS['Geral'];
     setFormData(prev => ({
       ...prev,
-      category: newCategory,
-      image: isCustomImage ? prev.image : suggestions[0].url
+      category: newCategory
     }));
   };
 
-  // File Upload Handler (FileReader)
+  // File Upload Handler (FileReader) for new events
   const handleFileUpload = (file: File) => {
     if (!file.type.startsWith('image/')) {
       triggerToast("Selecione um arquivo de imagem válido (JPG, PNG, WebP)!", "info");
@@ -259,6 +271,28 @@ export function Events() {
     reader.readAsDataURL(file);
   };
 
+  // File Upload Handler for edit / approval modal
+  const handleEditFileUpload = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      triggerToast("Selecione um arquivo de imagem válido (JPG, PNG, WebP)!", "info");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      triggerToast("O arquivo de imagem deve ter no máximo 10MB.", "info");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const dataUrl = event.target.result as string;
+        setEditingEvent(prev => prev ? ({ ...prev, image: dataUrl, isCustomImage: true }) : null);
+        triggerToast("Nova imagem de capa carregada para o evento!", "success");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleFileUpload(file);
@@ -271,39 +305,61 @@ export function Events() {
     triggerToast("Link de imagem personalizado aplicado!", "success");
   };
 
-  const handleResetToCategorySuggestion = () => {
-    const suggestions = CATEGORY_COVER_SUGGESTIONS[formData.category] || CATEGORY_COVER_SUGGESTIONS['Geral'];
-    setFormData(prev => ({ ...prev, image: suggestions[0].url }));
+  const handleResetCover = () => {
+    setFormData(prev => ({ ...prev, image: '' }));
     setIsCustomImage(false);
-    setCoverSource('sugestoes');
-    triggerToast("Capa restaurada para as sugestões da categoria.", "info");
+    setCustomUrlInput('');
+    triggerToast("Imagem de capa removida.", "info");
   };
 
-  // Load and Save LocalStorage sync
+  // Load events from Hostinger MySQL Database (com fallback resiliente de cache)
   useEffect(() => {
-    const saved = localStorage.getItem('motolegado_events');
+    let isMounted = true;
+    clientDbService.events.getAll()
+      .then((dbEvents) => {
+        if (!isMounted) return;
+        if (Array.isArray(dbEvents) && dbEvents.length > 0) {
+          setEvents(dbEvents);
+          localStorage.setItem('motolegado_events', JSON.stringify(dbEvents));
+          return;
+        }
 
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Remove fake/mock events
-        const mockIds = ['e_pend_1', 'e_pend_2', 'e_fest_1', 'e_fest_2', 'e_sul_1', 'e0', 'e1', 'e2', 'e3', 'e4', 'e5'];
-        const cleaned = parsed.filter((evt: MotoEvent) => !mockIds.includes(evt.id));
-        setEvents(cleaned);
-        localStorage.setItem('motolegado_events', JSON.stringify(cleaned));
-      } catch (e) {
+        const saved = localStorage.getItem('motolegado_events');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            const mockIds = ['e_pend_1', 'e_pend_2', 'e_fest_1', 'e_fest_2', 'e_sul_1', 'e0', 'e1', 'e2', 'e3', 'e4', 'e5'];
+            const cleaned = parsed.filter((evt: MotoEvent) => !mockIds.includes(evt.id));
+            setEvents(cleaned);
+            return;
+          } catch {}
+        }
         setEvents([]);
-        localStorage.setItem('motolegado_events', JSON.stringify([]));
-      }
-    } else {
-      setEvents([]);
-      localStorage.setItem('motolegado_events', JSON.stringify([]));
-    }
+      })
+      .catch((err) => {
+        console.warn('[Events] Aviso ao carregar eventos do MySQL:', err);
+        if (!isMounted) return;
+        const saved = localStorage.getItem('motolegado_events');
+        if (saved) {
+          try {
+            setEvents(JSON.parse(saved));
+          } catch {}
+        }
+      });
+
+    return () => { isMounted = false; };
   }, []);
 
-  const saveEvents = (updatedEvents: MotoEvent[]) => {
+  const saveEvents = (updatedEvents: MotoEvent[], eventToPersist?: MotoEvent) => {
     setEvents(updatedEvents);
     localStorage.setItem('motolegado_events', JSON.stringify(updatedEvents));
+
+    // Sincroniza persistência com o MySQL da Hostinger
+    if (eventToPersist) {
+      clientDbService.events.save(eventToPersist).catch((e) => {
+        console.warn('[Events] Aviso ao persistir evento no MySQL:', e);
+      });
+    }
   };
 
   const handleToggleCheckIn = (id: string) => {
@@ -341,7 +397,7 @@ export function Events() {
     }
 
     const updated = events.map(evt => evt.id === editingEvent.id ? editingEvent : evt);
-    saveEvents(updated);
+    saveEvents(updated, editingEvent);
     triggerToast("Informações do evento salvas com sucesso!", "success");
     setEditingEvent(null);
   };
@@ -380,7 +436,7 @@ export function Events() {
       location: formData.location.trim(),
       distance: formData.distance === '' ? 0 : Number(formData.distance),
       category: formData.category,
-      image: formData.image,
+      image: formData.image.trim() || DEFAULT_FALLBACK_IMAGE,
       checkedIn: true, // Auto check-in upon event creation
       memberCount: 1,
       status: 'pendente',
@@ -389,7 +445,7 @@ export function Events() {
     };
 
     const updated = [newEvent, ...events];
-    saveEvents(updated);
+    saveEvents(updated, newEvent);
     
     triggerToast("Evento cadastrado com sucesso! Enviado para a fila de moderação no Centro de Comando e aguarda aprovação.", "success");
     setActiveTab('meus');
@@ -405,10 +461,10 @@ export function Events() {
       endTime: '',
       distance: '',
       desc: '',
-      image: CATEGORY_COVER_SUGGESTIONS['Geral'][0].url
+      image: ''
     });
     setIsCustomImage(false);
-    setCoverSource('sugestoes');
+    setCoverSource('upload');
     setCustomUrlInput('');
   };
 
@@ -421,10 +477,21 @@ export function Events() {
       evt.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
       evt.desc.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'Todos' || evt.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesDate = matchesEventDate(evt.date, evt.endDate, selectedDateFilter);
+    return matchesSearch && matchesCategory && matchesDate;
   });
 
   const checkedInEvents = events.filter(evt => evt.checkedIn);
+  const filteredCheckedInEvents = checkedInEvents.filter(evt => {
+    const matchesSearch = 
+      evt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      evt.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      evt.desc.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'Todos' || evt.category === selectedCategory;
+    const matchesDate = matchesEventDate(evt.date, evt.endDate, selectedDateFilter);
+    return matchesSearch && matchesCategory && matchesDate;
+  });
+
   const totalKmsChecked = checkedInEvents.reduce((acc, curr) => acc + curr.distance, 0);
 
   return (
@@ -589,25 +656,110 @@ export function Events() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Horário</label>
-                    <input
-                      type="text"
-                      value={editingEvent.time}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, time: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
-                      required
-                    />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                      <Clock size={12} className="text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.85)] filter" />
+                      Horário
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={editingEvent.time}
+                        onChange={(e) => setEditingEvent({ ...editingEvent, time: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 pr-10 text-sm font-bold text-white focus:border-amber-500 outline-none"
+                        placeholder="Ex: 09:00 ou 09:00 ÀS 18:00"
+                        required
+                      />
+                      <Clock size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.85)] pointer-events-none" />
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">URL da Imagem de Capa</label>
-                  <input
-                    type="text"
-                    value={editingEvent.image}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, image: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-300 focus:border-amber-500 outline-none"
-                  />
+                {/* CAPA DO EVENTO: UPLOAD E URL NA APROVAÇÃO / EDIÇÃO */}
+                <div className="space-y-3 p-4 rounded-2xl bg-slate-950/70 border border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-amber-400 flex items-center gap-2">
+                      <Camera size={14} className="text-amber-500" />
+                      Imagem de Capa do Evento
+                    </label>
+                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                      Upload local ou URL direta
+                    </span>
+                  </div>
+
+                  {/* Pré-visualização da Capa */}
+                  {editingEvent.image && (
+                    <div className="relative rounded-xl overflow-hidden aspect-video max-h-48 border border-slate-800 bg-slate-950 group">
+                      <img 
+                        src={editingEvent.image} 
+                        alt="Capa do evento" 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = DEFAULT_FALLBACK_IMAGE;
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-60" />
+                      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                        <span className="text-[9px] font-bold text-slate-300 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700/50">
+                          Pré-visualização da Capa
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEditingEvent({ ...editingEvent, image: '' })}
+                          title="Remover imagem"
+                          className="p-1 rounded bg-slate-900/90 text-rose-400 hover:text-rose-300 text-[10px] font-bold border border-slate-700 flex items-center gap-1 cursor-pointer"
+                        >
+                          <X size={12} /> Remover
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ações de Upload e URL */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {/* Botão de Upload Local */}
+                    <div>
+                      <label 
+                        htmlFor="edit-event-cover-file"
+                        className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-amber-600/20 border border-slate-700 hover:border-amber-500/50 text-slate-200 hover:text-amber-300 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm active:scale-95"
+                      >
+                        <Upload size={14} className="text-amber-400" />
+                        <span>Fazer Upload da Capa</span>
+                      </label>
+                      <input 
+                        ref={editFileInputRef}
+                        id="edit-event-cover-file"
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleEditFileUpload(file);
+                        }}
+                        className="hidden"
+                      />
+                      <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-1 text-center">
+                        PNG, JPG, WEBP (até 10MB)
+                      </p>
+                    </div>
+
+                    {/* Campo de URL Direta */}
+                    <div className="space-y-1">
+                      <div className="relative">
+                        <LinkIcon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <input
+                          type="url"
+                          placeholder="Ou cole a URL direta..."
+                          value={editingEvent.image}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, image: e.target.value })}
+                          className="w-full bg-slate-900 border border-slate-700/80 rounded-xl py-3 pl-8 pr-3 text-xs font-mono text-slate-200 focus:border-amber-500 outline-none transition-all placeholder:text-slate-500"
+                        />
+                      </div>
+                      <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider text-center">
+                        Link web da imagem
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -754,34 +906,126 @@ export function Events() {
 
       {/* FILTER AND SEARCH CONTROLS */}
       {activeTab !== 'criar' && (
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-slate-900/10 p-3 sm:p-4 border border-slate-800/40 rounded-2xl sm:rounded-3xl backdrop-blur-sm">
-          {/* Categories Selector */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full md:w-auto">
-            {CATEGORY_TAGS.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setSelectedCategory(tag)}
-                className={cn(
-                  "text-[11px] sm:text-xs py-1.5 sm:py-2 px-3 sm:px-4 shrink-0",
-                  selectedCategory === tag ? "btn-filter-active" : "btn-filter-inactive"
+        <div className="space-y-3">
+          <div className="flex flex-col lg:flex-row gap-3.5 justify-between items-stretch lg:items-center bg-slate-900/30 p-3.5 sm:p-4 border border-slate-800/60 rounded-2xl sm:rounded-3xl backdrop-blur-sm shadow-inner">
+            {/* Categories Selector */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              {CATEGORY_TAGS.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedCategory(tag)}
+                  className={cn(
+                    "text-[11px] sm:text-xs py-1.5 sm:py-2 px-3 sm:px-4 shrink-0 transition-all rounded-xl font-bold",
+                    selectedCategory === tag ? "btn-filter-active" : "btn-filter-inactive"
+                  )}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+
+            {/* Inputs: Date Filter & Search Box */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
+              {/* Date Filter */}
+              <div className="relative min-w-[190px] sm:w-52">
+                <DateInput 
+                  value={selectedDateFilter}
+                  onChange={(newDate) => setSelectedDateFilter(newDate)}
+                  placeholder="Filtrar por data..."
+                  className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-4 pr-12 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400 font-mono"
+                />
+                {selectedDateFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDateFilter('')}
+                    title="Limpar filtro de data"
+                    className="absolute right-10 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
                 )}
-              >
-                {tag}
-              </button>
-            ))}
+              </div>
+
+              {/* Search Box */}
+              <div className="relative group w-full sm:w-64 md:w-72">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar título, local..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-12 pr-9 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Search Box */}
-          <div className="relative group w-full md:w-80">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" size={16} />
-            <input 
-              type="text" 
-              placeholder="Buscar título, local, etc..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-12 pr-6 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400"
-            />
-          </div>
+          {/* Active Filter Chips */}
+          {(selectedDateFilter || selectedCategory !== 'Todos' || searchTerm) && (
+            <div className="flex flex-wrap items-center gap-2 px-1">
+              <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                Filtros ativos:
+              </span>
+              {selectedDateFilter && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[11px] font-bold font-mono">
+                  <Calendar size={12} className="text-orange-500" />
+                  Data: {formatDisplayDate(selectedDateFilter)}
+                  <button 
+                    type="button" 
+                    onClick={() => setSelectedDateFilter('')} 
+                    className="hover:text-white ml-0.5 text-orange-400 hover:bg-orange-500/20 rounded-full p-0.5 cursor-pointer"
+                    title="Remover filtro de data"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              {selectedCategory !== 'Todos' && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-bold">
+                  Categoria: {selectedCategory}
+                  <button 
+                    type="button" 
+                    onClick={() => setSelectedCategory('Todos')} 
+                    className="hover:text-white ml-0.5 text-slate-400 hover:bg-slate-700 rounded-full p-0.5 cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              {searchTerm && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-bold">
+                  Busca: "{searchTerm}"
+                  <button 
+                    type="button" 
+                    onClick={() => setSearchTerm('')} 
+                    className="hover:text-white ml-0.5 text-slate-400 hover:bg-slate-700 rounded-full p-0.5 cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDateFilter('');
+                  setSelectedCategory('Todos');
+                  setSearchTerm('');
+                }}
+                className="text-[10px] font-bold text-slate-500 hover:text-rose-400 underline underline-offset-2 ml-1 cursor-pointer transition-colors"
+              >
+                Limpar todos os filtros
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -939,7 +1183,7 @@ export function Events() {
             transition={{ duration: 0.3 }}
             className="grid grid-cols-1 lg:grid-cols-2 gap-8"
           >
-            {checkedInEvents.map((evt) => (
+            {filteredCheckedInEvents.map((evt) => (
               <motion.div 
                 key={evt.id}
                 whileHover={{ y: -6 }}
@@ -1021,7 +1265,7 @@ export function Events() {
                     </button>
 
                     <button 
-                      type="button"
+                      type="button" 
                       onClick={() => handleToggleCheckIn(evt.id)}
                       className="py-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-[9px] font-black uppercase tracking-[0.15em] text-red-500 hover:bg-red-600/10 hover:border-red-600/40 hover:text-red-400 transition-all italic flex items-center justify-center gap-1.5"
                     >
@@ -1032,14 +1276,18 @@ export function Events() {
               </motion.div>
             ))}
 
-            {checkedInEvents.length === 0 && (
+            {filteredCheckedInEvents.length === 0 && (
               <div className="col-span-full py-20 text-center space-y-6">
                 <div className="w-20 h-20 bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center mx-auto shadow-inner">
                   <Bookmark size={32} className="text-slate-700" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-lg font-black text-slate-400 italic uppercase">AGENDA VAZIA</p>
-                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.4em]">VOCÊ NÃO REALIZOU NENHUM CHECK-IN EM EVENTOS RECENTES</p>
+                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.4em]">
+                    {checkedInEvents.length > 0 
+                      ? "NENHUM CHECK-IN ENCONTRADO PARA OS FILTROS SELECIONADOS"
+                      : "VOCÊ NÃO REALIZOU NENHUM CHECK-IN EM EVENTOS RECENTES"}
+                  </p>
                 </div>
               </div>
             )}
@@ -1165,31 +1413,67 @@ export function Events() {
                 </div>
               </div>
 
-              {/* 6 & 7. HORÁRIO INICIAL (Obrigatório) e HORÁRIO FINAL (Opcional) */}
+              {/* 6 & 7. HORÁRIO INICIAL (Obrigatório) e HORÁRIO FINAL (Opcional) com Ícones Iluminados */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2 flex items-center gap-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2 flex items-center gap-1.5">
+                    <Clock size={12} className="text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.85)] filter" />
                     Horário Inicial <span className="text-orange-500 font-bold">*</span>
                   </label>
-                  <input 
-                    type="time" 
-                    required
-                    value={formData.startTime}
-                    onChange={(e) => setFormData({...formData, startTime: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all text-white" 
-                  />
+                  <div className="relative group/time">
+                    <input 
+                      ref={startTimeInputRef}
+                      type="time" 
+                      required
+                      value={formData.startTime}
+                      onChange={(e) => setFormData({...formData, startTime: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800/80 rounded-2xl p-5 pr-14 text-sm font-bold focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all text-white font-mono [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:drop-shadow-[0_0_6px_rgba(249,115,22,0.9)]" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          startTimeInputRef.current?.showPicker();
+                        } catch {
+                          startTimeInputRef.current?.focus();
+                        }
+                      }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-xl text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 transition-all cursor-pointer group-hover/time:scale-110"
+                      title="Selecionar horário inicial"
+                    >
+                      <Clock size={20} className="text-orange-400 drop-shadow-[0_0_10px_rgba(249,115,22,0.95)] filter stroke-[2.2]" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-2 flex items-center gap-1.5">
+                    <Clock size={12} className="text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.85)] filter" />
                     Horário Final <span className="text-slate-600 font-normal">(Opcional)</span>
                   </label>
-                  <input 
-                    type="time" 
-                    value={formData.endTime}
-                    onChange={(e) => setFormData({...formData, endTime: e.target.value})}
-                    className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all text-white" 
-                  />
+                  <div className="relative group/time">
+                    <input 
+                      ref={endTimeInputRef}
+                      type="time" 
+                      value={formData.endTime}
+                      onChange={(e) => setFormData({...formData, endTime: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800/80 rounded-2xl p-5 pr-14 text-sm font-bold focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all text-white font-mono [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:drop-shadow-[0_0_6px_rgba(249,115,22,0.9)]" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          endTimeInputRef.current?.showPicker();
+                        } catch {
+                          endTimeInputRef.current?.focus();
+                        }
+                      }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-xl text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 transition-all cursor-pointer group-hover/time:scale-110"
+                      title="Selecionar horário final"
+                    >
+                      <Clock size={20} className="text-orange-400 drop-shadow-[0_0_10px_rgba(249,115,22,0.95)] filter stroke-[2.2]" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1228,7 +1512,7 @@ export function Events() {
               </button>
             </form>
 
-            {/* Thumbnail & Custom Upload Panel */}
+            {/* Thumbnail & Custom Upload Panel (Apenas Upload e URL) */}
             <div className="lg:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-[2.5rem] p-6 md:p-8 flex flex-col justify-between space-y-6">
               <div className="space-y-5">
                 <div className="flex items-center justify-between border-b border-slate-800/60 pb-4">
@@ -1236,17 +1520,17 @@ export function Events() {
                     <Camera size={18} className="text-orange-500" />
                     <h3 className="text-lg font-black uppercase italic tracking-tighter text-white">Capa do Evento</h3>
                   </div>
-                  {isCustomImage && (
+                  {formData.image && (
                     <span className="text-[8px] font-black uppercase px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-md flex items-center gap-1">
-                      <Check size={10} /> Personalizada
+                      <Check size={10} /> Imagem Definida
                     </span>
                   )}
                 </div>
 
                 {/* CURRENT COVER PREVIEW */}
-                <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 aspect-video group">
+                <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 aspect-video group shadow-inner">
                   <img 
-                    src={formData.image} 
+                    src={formData.image || DEFAULT_FALLBACK_IMAGE} 
                     alt="Pré-visualização da Capa" 
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     referrerPolicy="no-referrer"
@@ -1258,95 +1542,53 @@ export function Events() {
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
                   <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
                     <span className="text-[9px] font-black uppercase tracking-wider text-slate-300 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-700/50">
-                      {isCustomImage ? "Sua Imagem Enviada" : `Sugestão: ${formData.category}`}
+                      {formData.image ? (coverSource === 'upload' ? "Imagem por Upload" : "Imagem por URL") : "Capa Padrão (Sem foto custom)"}
                     </span>
-                    {isCustomImage && (
+                    {formData.image && (
                       <button 
                         type="button"
-                        onClick={handleResetToCategorySuggestion}
-                        title="Restaurar sugestão da categoria"
-                        className="p-1.5 bg-slate-900/90 hover:bg-orange-600 text-slate-300 hover:text-white rounded-lg transition-colors border border-slate-700/50"
+                        onClick={handleResetCover}
+                        title="Remover imagem personalizada"
+                        className="p-1.5 bg-slate-900/90 hover:bg-rose-600 text-slate-300 hover:text-white rounded-lg transition-colors border border-slate-700/50 cursor-pointer"
                       >
-                        <RotateCcw size={12} />
+                        <X size={12} />
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* TAB SWITCHER: SUGESTÕES vs UPLOAD */}
+                {/* TAB SWITCHER: UPLOAD vs URL */}
                 <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setCoverSource('sugestoes')}
-                    className={cn(
-                      "flex-1 py-2 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5",
-                      coverSource === 'sugestoes' 
-                        ? "bg-slate-900 text-orange-500 shadow-md border border-slate-700/60" 
-                        : "text-slate-500 hover:text-slate-300"
-                    )}
-                  >
-                    <ImageIcon size={12} />
-                    Sugestões ({formData.category})
-                  </button>
                   <button
                     type="button"
                     onClick={() => setCoverSource('upload')}
                     className={cn(
-                      "flex-1 py-2 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5",
+                      "flex-1 py-2 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
                       coverSource === 'upload' 
                         ? "bg-slate-900 text-orange-500 shadow-md border border-slate-700/60" 
                         : "text-slate-500 hover:text-slate-300"
                     )}
                   >
                     <Upload size={12} />
-                    Upload Foto
+                    Upload da Capa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCoverSource('url')}
+                    className={cn(
+                      "flex-1 py-2 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                      coverSource === 'url' 
+                        ? "bg-slate-900 text-orange-500 shadow-md border border-slate-700/60" 
+                        : "text-slate-500 hover:text-slate-300"
+                    )}
+                  >
+                    <LinkIcon size={12} />
+                    URL da Imagem
                   </button>
                 </div>
 
                 {/* CONTENT AREA FOR COVER SELECTION */}
-                {coverSource === 'sugestoes' ? (
-                  <div className="space-y-3 animate-in fade-in duration-300">
-                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
-                      Fotos sugeridas para o grupo <span className="text-orange-400 font-black">{formData.category}</span>:
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {(CATEGORY_COVER_SUGGESTIONS[formData.category] || CATEGORY_COVER_SUGGESTIONS['Geral']).map((item, i) => (
-                        <div 
-                          key={i}
-                          onClick={() => {
-                            setFormData(prev => ({ ...prev, image: item.url }));
-                            setIsCustomImage(false);
-                          }}
-                          className={cn(
-                            "aspect-[4/3] rounded-xl overflow-hidden cursor-pointer border-2 transition-all relative group/item",
-                            formData.image === item.url && !isCustomImage 
-                              ? "border-orange-500 ring-2 ring-orange-500/20 scale-[1.02]" 
-                              : "border-slate-800/80 opacity-70 hover:opacity-100 hover:border-slate-600"
-                          )}
-                        >
-                          <img 
-                            src={item.url} 
-                            className="w-full h-full object-cover" 
-                            alt={item.title} 
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = DEFAULT_FALLBACK_IMAGE;
-                            }}
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity p-2 flex items-end">
-                            <span className="text-[8px] font-black uppercase text-white truncate">{item.title}</span>
-                          </div>
-                          {formData.image === item.url && !isCustomImage && (
-                            <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-orange-600 rounded-full flex items-center justify-center text-white shadow-md">
-                              <Check size={12} />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
+                {coverSource === 'upload' ? (
                   <div className="space-y-4 animate-in fade-in duration-300">
                     {/* DRAG & DROP / FILE INPUT */}
                     <div
@@ -1359,26 +1601,26 @@ export function Events() {
                         if (file) handleFileUpload(file);
                       }}
                       className={cn(
-                        "border-2 border-dashed rounded-2xl p-5 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2",
+                        "border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2.5",
                         isDragging 
                           ? "border-orange-500 bg-orange-500/10" 
                           : "border-slate-800 hover:border-orange-500/50 bg-slate-950/50"
                       )}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-orange-500">
-                        <Upload size={18} />
+                      <div className="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-orange-500 shadow-md">
+                        <Upload size={20} />
                       </div>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-300">
-                        Arraste sua foto ou clique para escolher
+                      <p className="text-[11px] font-black uppercase tracking-wider text-slate-200">
+                        Arraste sua foto de capa aqui
                       </p>
                       <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500">
-                        PNG, JPG ou WEBP até 10MB
+                        Formatos JPG, PNG ou WEBP até 10MB
                       </p>
                       <label 
                         htmlFor="event-cover-file-input"
-                        className="mt-1 px-4 py-2 bg-slate-900 hover:bg-orange-600 border border-slate-700 hover:border-orange-500 text-slate-200 hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                        className="mt-1 px-4 py-2.5 bg-slate-900 hover:bg-orange-600 border border-slate-700 hover:border-orange-500 text-slate-200 hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-sm active:scale-95"
                       >
-                        Carregar Imagem Local
+                        Carregar Imagem do Dispositivo
                       </label>
                       <input 
                         id="event-cover-file-input"
@@ -1388,29 +1630,31 @@ export function Events() {
                         className="hidden"
                       />
                     </div>
-
-                    {/* CUSTOM URL OPTION */}
-                    <div className="pt-2 border-t border-slate-800/60 space-y-2">
-                      <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                        <LinkIcon size={12} /> Ou colar Link direto da imagem (URL)
-                      </label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="url"
-                          placeholder="https://exemplo.com/minha-foto.jpg"
-                          value={customUrlInput}
-                          onChange={(e) => setCustomUrlInput(e.target.value)}
-                          className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold focus:border-orange-500 outline-none text-white placeholder:text-slate-400"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleApplyCustomUrl}
-                          className="px-3 py-2 bg-slate-900 hover:bg-orange-600 border border-slate-700 hover:border-orange-500 text-xs font-black uppercase text-slate-200 hover:text-white rounded-xl transition-all"
-                        >
-                          OK
-                        </button>
-                      </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3 animate-in fade-in duration-300">
+                    <label className="text-[9px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <LinkIcon size={12} className="text-orange-500" /> Link direto da imagem (URL Web)
+                    </label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="url"
+                        placeholder="https://exemplo.com/foto-do-evento.jpg"
+                        value={customUrlInput}
+                        onChange={(e) => setCustomUrlInput(e.target.value)}
+                        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:border-orange-500 outline-none text-white placeholder:text-slate-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyCustomUrl}
+                        className="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-xs font-black uppercase text-white rounded-xl transition-all cursor-pointer shadow-md shadow-orange-600/20 active:scale-95"
+                      >
+                        Aplicar
+                      </button>
                     </div>
+                    <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">
+                      Cole o link direto da imagem hospedada na web
+                    </p>
                   </div>
                 )}
               </div>
@@ -1553,7 +1797,7 @@ export function Events() {
                       HORÁRIO INICIAL / SAÍDA
                     </span>
                     <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                      <Clock size={13} className="text-orange-500 shrink-0" />
+                      <Clock size={14} className="text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.9)] filter shrink-0" />
                       {selectedEventDetails.time}
                     </span>
                   </div>
@@ -1563,7 +1807,7 @@ export function Events() {
                       HORÁRIO FINAL
                     </span>
                     <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                      <Clock size={13} className="text-orange-500/60 shrink-0" />
+                      <Clock size={14} className="text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.9)] filter shrink-0" />
                       {selectedEventDetails.endTime || "Não especificado"}
                     </span>
                   </div>

@@ -10,19 +10,16 @@ import {
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  Tooltip, 
-  Legend 
+  Tooltip 
 } from 'recharts';
 import { 
   Navigation, 
   Clock, 
-  Route as RouteIcon, 
+  Route as RouteIcon,
   Zap, 
   Calendar, 
   TrendingUp, 
-  Compass, 
   Plus, 
-  Layers, 
   Gauge
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

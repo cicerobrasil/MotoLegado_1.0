@@ -1,6 +1,6 @@
 import React from 'react';
-import { X, ShieldCheck, MapPin, Calendar, Clock, Download, Compass, Tag } from 'lucide-react';
-import { DocumentaryProof, DocumentaryProofType } from '../types';
+import { X, ShieldCheck, MapPin, Clock, Download, Compass } from 'lucide-react';
+import { DocumentaryProof } from '../types';
 import { PROOF_TYPES } from './DocumentaryCameraModal';
 
 interface ProofLightboxModalProps {

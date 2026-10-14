@@ -2,150 +2,110 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 
-// MotoLegado Crest Emblem (Shield + Wings + Headlight Core + MOTOLEGADO Ribbon)
-// Clean, authoritative biker crest without the letter 'M'
+// MotoLegado Official Icon ("M" Brand Logo)
+// Dark Navy Blue (#001b3d) background, Salmon Orange (#ff751f) box with bold "M", and "OTOLEGADO" text.
 const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
-  <defs>
-    <!-- Vibrant orange gradient -->
-    <linearGradient id="primaryOrange" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ff8533" />
-      <stop offset="50%" stop-color="#ea580c" />
-      <stop offset="100%" stop-color="#c2410c" />
-    </linearGradient>
+  <!-- Fundo Azul Escuro Oficial (#001b3d) -->
+  <rect width="512" height="512" rx="96" fill="#001b3d" />
 
-    <!-- Deep obsidian shield fill -->
-    <linearGradient id="darkArmor" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#182234" />
-      <stop offset="40%" stop-color="#0b111e" />
-      <stop offset="100%" stop-color="#030712" />
-    </linearGradient>
+  <!-- Caixa Salmão Oficial (#ff751f) -->
+  <rect x="146" y="80" width="220" height="220" rx="44" fill="#ff751f" />
+  
+  <!-- Letra M em Azul (#001b3d) -->
+  <text x="256" y="246" 
+        font-family="'Outfit', 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+        font-weight="900" font-size="180" fill="#001b3d" text-anchor="middle">M</text>
 
-    <!-- Wing gradient -->
-    <linearGradient id="wingOrange" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffedd5" />
-      <stop offset="20%" stop-color="#fb923c" />
-      <stop offset="65%" stop-color="#ea580c" />
-      <stop offset="100%" stop-color="#9a3412" />
-    </linearGradient>
+  <!-- OTO (Branco #ffffff) + LEGADO (Salmão #ff751f) -->
+  <text x="256" y="385" 
+        font-family="'Outfit', 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+        font-weight="900" font-size="56" letter-spacing="-1" text-anchor="middle">
+    <tspan fill="#ffffff">OTO</tspan><tspan fill="#ff751f">LEGADO</tspan>
+  </text>
+</svg>
+`;
 
-    <!-- Glow effect -->
-    <filter id="orangeGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="8" result="blur" />
-      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-    </filter>
-  </defs>
+// Maskable Icon: Full bleed #001b3d background, inner elements scaled inside the 80% safe circle
+const svgMaskableContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Fundo Totalmente Preenchido para Máscara Circular/Squircle do Android (Sem corte nos cantos) -->
+  <rect width="512" height="512" fill="#001b3d" />
 
-  <!-- Base Dark Squircle Plate with Electric Orange Accent Border -->
-  <rect x="18" y="18" width="476" height="476" rx="100" fill="#070c16" stroke="url(#primaryOrange)" stroke-width="6" />
-  <rect x="24" y="24" width="464" height="464" rx="94" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="1.5" />
-
-  <!-- Outer Protective Armor Shield -->
-  <g id="shield">
-    <!-- Shield Outer Edge -->
-    <path d="M 256 46 L 436 108 C 436 298 256 428 256 458 C 256 428 76 298 76 108 Z" 
-          fill="url(#darkArmor)" stroke="url(#primaryOrange)" stroke-width="8" stroke-linejoin="round" />
-    
-    <!-- Shield Inner Bevel Line -->
-    <path d="M 256 64 L 418 120 C 418 284 256 398 256 432 C 256 398 94 284 94 120 Z" 
-          fill="none" stroke="#ffffff" stroke-opacity="0.25" stroke-width="2" />
+  <!-- Elementos Centrais rigorosamente dentro da Safe Zone (80% central) -->
+  <g transform="translate(0, 10)">
+    <rect x="166" y="90" width="180" height="180" rx="36" fill="#ff751f" />
+    <text x="256" y="226" 
+          font-family="'Outfit', 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-weight="900" font-size="148" fill="#001b3d" text-anchor="middle">M</text>
+    <text x="256" y="340" 
+          font-family="'Outfit', 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-weight="900" font-size="46" letter-spacing="-1" text-anchor="middle">
+      <tspan fill="#ffffff">OTO</tspan><tspan fill="#ff751f">LEGADO</tspan>
+    </text>
   </g>
+</svg>
+`;
 
-  <!-- Symmetrical Biker Wings (Triple blade) -->
-  <g id="wings" fill="url(#wingOrange)" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round">
-    <!-- Left Wing -->
-    <path d="M 226 178 L 102 152 C 140 190 200 212 226 216 Z" />
-    <path d="M 222 224 L 114 224 C 154 254 202 260 222 262 Z" />
-    <path d="M 220 270 L 132 284 C 168 304 206 306 220 306 Z" />
+// Favicon Especial de Alta Legibilidade (32x32 e abas do navegador)
+// Foca no símbolo icônico da marca "M" em destaque central
+const svgFaviconContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Fundo Azul Escuro Oficial (#001b3d) -->
+  <rect width="512" height="512" rx="96" fill="#001b3d" />
 
-    <!-- Right Wing -->
-    <path d="M 286 178 L 410 152 C 372 190 312 212 286 216 Z" />
-    <path d="M 290 224 L 398 224 C 358 254 310 260 290 262 Z" />
-    <path d="M 292 270 L 380 284 C 344 304 306 306 292 306 Z" />
-  </g>
-
-  <!-- Central Projector Headlight / Speedometer Core -->
-  <g id="headlight-core">
-    <!-- Outer Neon Ring -->
-    <circle cx="256" cy="240" r="58" fill="#070c16" stroke="url(#primaryOrange)" stroke-width="7" filter="url(#orangeGlow)" />
-    <!-- White Rim Ring -->
-    <circle cx="256" cy="240" r="50" fill="#0b111e" stroke="#ffffff" stroke-width="3" />
-    <!-- Inner Lens Ring -->
-    <circle cx="256" cy="240" r="42" fill="url(#darkArmor)" stroke="#ea580c" stroke-width="3" />
-
-    <!-- Center Glowing Lens Orb -->
-    <circle cx="256" cy="240" r="28" fill="url(#primaryOrange)" stroke="#ffedd5" stroke-width="3" />
-    <circle cx="256" cy="240" r="16" fill="#ffedd5" />
-
-    <!-- Vertical Projector Light Beam -->
-    <line x1="256" y1="188" x2="256" y2="218" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
-    <line x1="256" y1="262" x2="256" y2="292" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
-    <line x1="204" y1="240" x2="228" y2="240" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
-    <line x1="308" y1="240" x2="284" y2="240" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
-  </g>
-
-  <!-- Lower Banner Ribbon with MOTOLEGADO -->
-  <g id="banner">
-    <!-- Banner Plate -->
-    <path d="M 124 358 L 388 358 L 364 410 L 256 438 L 148 410 Z" 
-          fill="url(#primaryOrange)" stroke="#ffffff" stroke-width="4" stroke-linejoin="round" filter="url(#orangeGlow)" />
-    
-    <!-- Banner Inner Trim -->
-    <path d="M 132 364 L 380 364 L 358 404 L 256 428 L 154 404 Z" 
-          fill="none" stroke="#ffedd5" stroke-opacity="0.4" stroke-width="1.5" />
-
-    <!-- Pure Crisp White MOTOLEGADO Text -->
-    <text x="256" y="398" text-anchor="middle" fill="#ffffff" 
-          font-family="'Impact', 'Arial Black', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
-          font-weight="900" font-size="28" font-style="italic" letter-spacing="3.5">MOTOLEGADO</text>
-  </g>
+  <!-- Caixa Salmão Oficial (#ff751f) -->
+  <rect x="76" y="76" width="360" height="360" rx="72" fill="#ff751f" />
+  
+  <!-- Letra M em Azul (#001b3d) com máxima nitidez e presença -->
+  <text x="256" y="348" 
+        font-family="'Outfit', 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+        font-weight="900" font-size="290" fill="#001b3d" text-anchor="middle">M</text>
 </svg>
 `;
 
 async function main() {
   const publicDir = path.resolve('public');
 
-  console.log('Generating updated SVG icon...');
+  console.log('Generating updated SVG icons...');
   fs.writeFileSync(path.join(publicDir, 'icon.svg'), svgContent, 'utf-8');
-  fs.writeFileSync(path.join(publicDir, 'icon-maskable.svg'), svgContent, 'utf-8');
+  fs.writeFileSync(path.join(publicDir, 'icon-maskable.svg'), svgMaskableContent, 'utf-8');
 
   console.log('Rendering PNG icons with sharp...');
   const svgBuffer = Buffer.from(svgContent);
+  const maskableBuffer = Buffer.from(svgMaskableContent);
+  const faviconBuffer = Buffer.from(svgFaviconContent);
 
-  // 1. Favicon 32x32
-  await sharp(svgBuffer).resize(32, 32).png().toFile(path.join(publicDir, 'favicon-32x32.png'));
+  // 1. Favicon 32x32 (Otimizado para abas do navegador com o símbolo M central de alto contraste)
+  await sharp(faviconBuffer).resize(32, 32).png({ quality: 100, compressionLevel: 9 }).toFile(path.join(publicDir, 'favicon-32x32.png'));
 
-  // 2. Apple Touch Icon 180x180
-  await sharp(svgBuffer).resize(180, 180).png().toFile(path.join(publicDir, 'apple-touch-icon.png'));
+  // 2. Apple Touch Icon 180x180 (iOS Home Screen)
+  await sharp(svgBuffer).resize(180, 180).png({ quality: 100 }).toFile(path.join(publicDir, 'apple-touch-icon.png'));
 
-  // 3. PWA 192x192
-  await sharp(svgBuffer).resize(192, 192).png().toFile(path.join(publicDir, 'pwa-192x192.png'));
+  // 3. PWA 192x192 (Android e PWA Standard)
+  await sharp(svgBuffer).resize(192, 192).png({ quality: 100 }).toFile(path.join(publicDir, 'pwa-192x192.png'));
 
-  // 4. PWA 512x512
-  await sharp(svgBuffer).resize(512, 512).png().toFile(path.join(publicDir, 'pwa-512x512.png'));
+  // 4. PWA 512x512 (Splash Screen e PWA High-Res)
+  await sharp(svgBuffer).resize(512, 512).png({ quality: 100 }).toFile(path.join(publicDir, 'pwa-512x512.png'));
 
-  // 5. PWA Maskable 512x512
-  await sharp(svgBuffer).resize(512, 512).png().toFile(path.join(publicDir, 'pwa-maskable-512x512.png'));
+  // 5. PWA Maskable 512x512 (Ícone adaptativo Android dentro da Safe Zone)
+  await sharp(maskableBuffer).resize(512, 512).png({ quality: 100 }).toFile(path.join(publicDir, 'pwa-maskable-512x512.png'));
 
-  // 6. High-Resolution Badge Downloads (1024px and 2048px Ultra HD)
+  // 6. High-Resolution Brand Assets (1024px e 2048px Ultra HD)
   await sharp(svgBuffer).resize(1024, 1024).png().toFile(path.join(publicDir, 'motolegado-emblema-1024.png'));
   await sharp(svgBuffer).resize(2048, 2048).png().toFile(path.join(publicDir, 'motolegado-emblema-2048.png'));
+  await sharp(svgBuffer).resize(1024, 1024).png().toFile(path.join(publicDir, 'motolegado-logo-1024.png'));
+  await sharp(svgBuffer).resize(2048, 2048).png().toFile(path.join(publicDir, 'motolegado-logo-2048.png'));
 
-  // 7. Transparent Background Version (Without outer plate - pure shield, wings and ribbon)
-  const transparentSvg = svgContent
-    .replace(/<rect x="18" y="18"[^>]+>/, '')
-    .replace(/<rect x="24" y="24"[^>]+>/, '');
-
+  // 7. Versão Transparente
+  const transparentSvg = svgContent.replace(/<rect width="512" height="512"[^>]+>/, '');
   fs.writeFileSync(path.join(publicDir, 'motolegado-emblema-transparente.svg'), transparentSvg, 'utf-8');
   const transparentSvgBuffer = Buffer.from(transparentSvg);
 
   await sharp(transparentSvgBuffer).resize(1024, 1024).png().toFile(path.join(publicDir, 'motolegado-emblema-transparente-1024.png'));
   await sharp(transparentSvgBuffer).resize(2048, 2048).png().toFile(path.join(publicDir, 'motolegado-emblema-transparente-2048.png'));
 
-  console.log('All brand kit assets and icons generated successfully!');
+  console.log('All brand kit assets and icons generated successfully with the official "M" design!');
 }
 
 main().catch(err => {
   console.error('Error generating icons:', err);
   process.exit(1);
 });
-

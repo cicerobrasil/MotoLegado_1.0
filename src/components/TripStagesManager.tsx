@@ -18,7 +18,8 @@ import {
   Loader2, 
   X,
   Share2,
-  Info
+  Info,
+  RotateCcw
 } from 'lucide-react';
 import { apiParseGoogleMapsRoute } from '../lib/api';
 import { parseGoogleMapsRouteClient } from '../lib/mapsParserClient';
@@ -98,6 +99,9 @@ interface TripStagesManagerProps {
   onMapsUrlGenerated?: (url: string) => void;
   setDistance?: (distance: string) => void;
   setDuration?: (duration: string) => void;
+  currentDistance?: string;
+  currentDuration?: string;
+  currentMapsUrl?: string;
 }
 
 export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
@@ -111,12 +115,54 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
   currentTitle,
   onMapsUrlGenerated,
   setDistance,
-  setDuration
+  setDuration,
+  currentDistance,
+  currentDuration,
+  currentMapsUrl
 }) => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importInput, setImportInput] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importFeedback, setImportFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  
+  // Estado para controle e cancelamento de importação do Google Maps
+  const [hasImportedFromMaps, setHasImportedFromMaps] = useState(false);
+  const [importedSnapshot, setImportedSnapshot] = useState<{
+    origin: string;
+    destination: string;
+    stages: TripStage[];
+    title: string;
+    distance: string;
+    duration: string;
+    mapsUrl: string;
+  } | null>(null);
+
+  // Cancelar importação do Google Maps e restaurar preenchimento manual
+  const handleCancelImport = () => {
+    if (importedSnapshot) {
+      setOrigin(importedSnapshot.origin);
+      setDestination(importedSnapshot.destination);
+      setStages(importedSnapshot.stages);
+      if (setTitle && importedSnapshot.title) setTitle(importedSnapshot.title);
+      if (setDistance) setDistance(importedSnapshot.distance);
+      if (setDuration) setDuration(importedSnapshot.duration);
+      if (onMapsUrlGenerated) onMapsUrlGenerated(importedSnapshot.mapsUrl);
+    } else {
+      setDestination('');
+      setStages([]);
+      if (setDistance) setDistance('');
+      if (setDuration) setDuration('');
+      if (onMapsUrlGenerated) onMapsUrlGenerated('');
+    }
+    setHasImportedFromMaps(false);
+    setImportedSnapshot(null);
+    setIsImportModalOpen(false);
+    setImportFeedback({ 
+      type: 'success', 
+      message: '✓ Importação cancelada! Você pode preencher os dados manualmente.' 
+    });
+    setTimeout(() => setImportFeedback(null), 4000);
+  };
 
   // Gera o link oficial do Google Maps com todos os pontos
   const getGoogleMapsDirectionsUrl = () => {
@@ -218,6 +264,17 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
         return;
       }
 
+      // Salva snapshot prévio completo para permitir que o usuário cancele a importação caso queira
+      setImportedSnapshot({
+        origin,
+        destination,
+        stages: [...stages],
+        title: currentTitle || '',
+        distance: currentDistance || '',
+        duration: currentDuration || '',
+        mapsUrl: currentMapsUrl || ''
+      });
+
       const { 
         origin: parsedOrigin, 
         destination: parsedDest, 
@@ -245,12 +302,20 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
         setStages(newStages);
       }
 
-      // Preenchimento automático da distância e duração
-      const finalKm = estimatedDistanceKm || res.data.estimatedDistanceKm;
-      const finalDuration = estimatedDuration || res.data.estimatedDuration;
+      // Preenchimento automático da distância e duração exatas do Google Maps
+      const rawKm = estimatedDistanceKm ?? res?.data?.estimatedDistanceKm;
+      const finalDuration = estimatedDuration || res?.data?.estimatedDuration;
 
-      if (setDistance && finalKm) {
-        setDistance(`${finalKm}km`);
+      let finalKmStr = '';
+      if (rawKm !== undefined && rawKm !== null) {
+        const num = typeof rawKm === 'number' ? rawKm : parseFloat(String(rawKm).replace(',', '.'));
+        if (!isNaN(num) && num > 0) {
+          finalKmStr = String(Math.round(num));
+        }
+      }
+
+      if (setDistance && finalKmStr) {
+        setDistance(finalKmStr);
       }
       if (setDuration && finalDuration) {
         setDuration(finalDuration);
@@ -266,14 +331,16 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
         onMapsUrlGenerated(fullRouteUrl);
       }
 
+      setHasImportedFromMaps(true);
+
       const metricDetails = [
-        finalKm ? `${finalKm} km` : null,
+        finalKmStr ? `${finalKmStr} km` : null,
         finalDuration ? finalDuration : null
       ].filter(Boolean).join(' • ');
 
       setImportFeedback({ 
         type: 'success', 
-        message: `✓ Rota importada! ${metricDetails ? `Distância & Tempo: ${metricDetails} | ` : ''}${suggestedStages?.length || 0} paradas identificadas.` 
+        message: `✓ Rota importada com sucesso! ${metricDetails ? `Distância & Duração: ${metricDetails} | ` : ''}${suggestedStages?.length || 0} paradas identificadas.` 
       });
 
       setTimeout(() => {
@@ -311,7 +378,20 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Botão Cancelar Importação (aparece quando uma rota foi importada do Maps) */}
+          {hasImportedFromMaps && (
+            <button
+              type="button"
+              onClick={handleCancelImport}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Cancelar importação e voltar a preencher manualmente"
+            >
+              <RotateCcw size={14} />
+              <span>Cancelar Importação</span>
+            </button>
+          )}
+
           {/* Botão Importar Google Maps */}
           <button
             type="button"
@@ -319,7 +399,7 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-500/50 transition-all cursor-pointer shadow-sm active:scale-95"
           >
             <Sparkles size={14} className="text-sky-400" />
-            <span>Importar do Google Maps</span>
+            <span>{hasImportedFromMaps ? 'Reimportar do Google Maps' : 'Importar do Google Maps'}</span>
           </button>
 
           {/* Botão Adicionar Parada */}
@@ -333,6 +413,39 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Banner Informativo quando rota está importada do Google Maps */}
+      {hasImportedFromMaps && (
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-sky-950/40 border border-sky-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200 shadow-inner">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/30 shrink-0">
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-sky-300">
+                  Rota Importada do Google Maps
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  Ativa
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Origem, destino, distância {currentDistance ? `(${currentDistance} km)` : ''}, duração {currentDuration ? `(${currentDuration})` : ''} e {stages.length} {stages.length === 1 ? 'parada' : 'paradas'} aplicadas. Quer digitar manualmente?
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleCancelImport}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-rose-300 hover:text-white bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/40 transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap self-end sm:self-center"
+            title="Cancelar importação e restaurar campos para entrada manual"
+          >
+            <RotateCcw size={13} />
+            <span>Cancelar Importação (Preencher Manualmente)</span>
+          </button>
+        </div>
+      )}
 
       {/* Modal / Expansor de Importação do Google Maps */}
       {isImportModalOpen && (
@@ -366,11 +479,38 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
               placeholder="Ex: https://maps.app.goo.gl/... ou Curitiba -> Morretes -> Antonina"
               className="flex-1 bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-400 outline-none transition-colors"
             />
+          </div>
+
+          {/* Botões de Ação do Modal: Cancelar / Desfazer / Processar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportFeedback(null);
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Fechar / Cancelar
+              </button>
+              {hasImportedFromMaps && (
+                <button
+                  type="button"
+                  onClick={handleCancelImport}
+                  className="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <RotateCcw size={13} />
+                  <span>Desfazer Importação Anterior</span>
+                </button>
+              )}
+            </div>
+
             <button
               type="button"
               disabled={isImporting}
               onClick={handleProcessImport}
-              className="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer shadow-md shadow-sky-500/20"
+              className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer shadow-md shadow-sky-500/20"
             >
               {isImporting ? (
                 <>

@@ -32,6 +32,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
+import { clientDbService } from '../lib/dbService';
 
 export interface PartnerManager {
   name: string;
@@ -125,31 +126,56 @@ export function Partners() {
   const [formManagerName, setFormManagerName] = useState('');
   const [formManagerPhone, setFormManagerPhone] = useState('');
 
-  // Sync with localStorage
+  // Load partners from Hostinger MySQL Database (com fallback resiliente de cache)
   useEffect(() => {
-    const saved = localStorage.getItem('motolegado_partners');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        const mockIds = ['p1', 'p2', 'p3', 'p4', 'p5'];
-        const cleaned = Array.isArray(parsed) 
-          ? parsed.filter((p: Partner) => !mockIds.includes(p.id) && !p.name?.includes('Aço & Fogo') && !p.name?.includes('Minha Empresa'))
-          : [];
-        setPartners(cleaned);
-        localStorage.setItem('motolegado_partners', JSON.stringify(cleaned));
-      } catch (e) {
+    let isMounted = true;
+    clientDbService.partners.getAll()
+      .then((dbPartners) => {
+        if (!isMounted) return;
+        if (Array.isArray(dbPartners) && dbPartners.length > 0) {
+          setPartners(dbPartners);
+          localStorage.setItem('motolegado_partners', JSON.stringify(dbPartners));
+          return;
+        }
+
+        const saved = localStorage.getItem('motolegado_partners');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            const mockIds = ['p1', 'p2', 'p3', 'p4', 'p5'];
+            const cleaned = Array.isArray(parsed) 
+              ? parsed.filter((p: Partner) => !mockIds.includes(p.id) && !p.name?.includes('Aço & Fogo') && !p.name?.includes('Minha Empresa'))
+              : [];
+            setPartners(cleaned);
+            return;
+          } catch {}
+        }
         setPartners([]);
-        localStorage.setItem('motolegado_partners', JSON.stringify([]));
-      }
-    } else {
-      setPartners([]);
-      localStorage.setItem('motolegado_partners', JSON.stringify([]));
-    }
+      })
+      .catch((err) => {
+        console.warn('[Partners] Aviso ao carregar parceiros do MySQL:', err);
+        if (!isMounted) return;
+        const saved = localStorage.getItem('motolegado_partners');
+        if (saved) {
+          try {
+            setPartners(JSON.parse(saved));
+          } catch {}
+        }
+      });
+
+    return () => { isMounted = false; };
   }, []);
 
-  const savePartners = (list: Partner[]) => {
+  const savePartners = (list: Partner[], partnerToPersist?: Partner) => {
     setPartners(list);
     localStorage.setItem('motolegado_partners', JSON.stringify(list));
+
+    // Sincroniza persistência com o MySQL da Hostinger
+    if (partnerToPersist) {
+      clientDbService.partners.save(partnerToPersist).catch((e) => {
+        console.warn('[Partners] Aviso ao persistir parceiro no MySQL:', e);
+      });
+    }
   };
 
   const triggerToast = (message: string, type: 'success' | 'info') => {
@@ -229,7 +255,7 @@ export function Partners() {
     };
 
     const updated = [newPartner, ...partners];
-    savePartners(updated);
+    savePartners(updated, newPartner);
     triggerToast(`Solicitação de homologação de "${formName}" enviada com sucesso! Aguardando autorização no Centro de Comando.`, "success");
 
     // Clear form

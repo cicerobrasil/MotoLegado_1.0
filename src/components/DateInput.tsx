@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export interface DateInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {

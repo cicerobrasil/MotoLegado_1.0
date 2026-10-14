@@ -13,7 +13,8 @@ import {
   Store,
   X,
   BookOpen,
-  Crown
+  Crown,
+  LogIn
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
@@ -61,14 +62,15 @@ interface SidebarProps {
 export function Sidebar({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }: SidebarProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, signOut } = useAuth();
+  const { profile, user, signOut } = useAuth();
+  const isAuthenticated = Boolean(user || profile);
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
   const setIsOpen = externalSetIsOpen || setInternalIsOpen;
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const isVip = isUserProOrBonificado(profile);
 
-  const pilotName = profile?.name || 'Piloto MotoLegado';
+  const pilotName = profile?.name || user?.user_metadata?.name || '';
   
   const [livePoints, setLivePoints] = useState(() => getPilotLiveGamification().pointsBreakdown.totalPoints);
   const [liveTier, setLiveTier] = useState(() => getPilotLiveGamification().rankInfo.currentTier.title);
@@ -91,7 +93,9 @@ export function Sidebar({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }
   const pilotPoints = livePoints ?? profile?.points ?? 0;
   const pilotAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
     ? profile.avatar_url
-    : `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotName)}&background=ea580c&color=ffffff&bold=true`;
+    : pilotName 
+      ? `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotName)}&background=ea580c&color=ffffff&bold=true`
+      : '';
   const isAdmin = profile?.role === 'admin' || 
     profile?.name?.toLowerCase().includes('admin') || 
     profile?.email?.toLowerCase().includes('admin') || 
@@ -204,61 +208,92 @@ export function Sidebar({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }
         </nav>
 
         <div className="p-4 sm:p-5 border-t border-[#1e293b] bg-[#001b3d]/60 backdrop-blur-md space-y-3">
-          {/* User Pilot Profile Card */}
-          <Link to="/profile" onClick={() => setIsOpen(false)} className="flex items-center gap-3 group cursor-pointer decoration-none">
-            <div className="w-10 h-10 rounded-lg bg-[#001b3d] border border-[#1e293b] overflow-hidden group-hover:border-[#ff751f] transition-all shadow-lg shrink-0">
-              <img src={pilotAvatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-black uppercase italic tracking-tight text-[#e2e8f0] group-hover:text-amber-400 transition-colors truncate">{pilotName}</p>
-              {isAdmin ? (
-                <p className="text-[9px] text-[#ff751f] font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
-                  <span>🛡️</span> COMANDO • ADMIN
-                </p>
-              ) : profile?.plan_type === 'bonificado' ? (
-                <p className="text-[9px] text-amber-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
-                  <span>🎁</span> BONIFICADO • VIP PRO
-                </p>
-              ) : (profile?.plan_type === 'pago' || profile?.is_pro) ? (
-                <p className="text-[9px] text-[#ff751f] font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
-                  <span>🔥</span> PILOTO PRO • VIP
-                </p>
-              ) : (
-                <p className="text-[9px] text-emerald-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
-                  <span>🟢</span> ASFALTO • {pilotTier} ({pilotPoints} PTS)
-                </p>
+          {/* User Pilot Profile Card OR Unauthenticated Login Card */}
+          {isAuthenticated ? (
+            <>
+              <Link to="/profile" onClick={() => setIsOpen(false)} className="flex items-center gap-3 group cursor-pointer decoration-none">
+                <div className="w-10 h-10 rounded-lg bg-[#001b3d] border border-[#1e293b] overflow-hidden group-hover:border-[#ff751f] transition-all shadow-lg shrink-0">
+                  <img src={pilotAvatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <p className="text-xs font-black uppercase italic tracking-tight text-[#e2e8f0] group-hover:text-amber-400 transition-colors truncate">{pilotName}</p>
+                  {isAdmin ? (
+                    <p className="text-[9px] text-[#ff751f] font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
+                      <span>🛡️</span> COMANDO • ADMIN
+                    </p>
+                  ) : profile?.plan_type === 'bonificado' ? (
+                    <p className="text-[9px] text-amber-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
+                      <span>🎁</span> BONIFICADO • VIP PRO
+                    </p>
+                  ) : (profile?.plan_type === 'pago' || profile?.is_pro) ? (
+                    <p className="text-[9px] text-[#ff751f] font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
+                      <span>🔥</span> PILOTO PRO • VIP
+                    </p>
+                  ) : (
+                    <p className="text-[9px] text-emerald-400 font-black uppercase tracking-wider leading-none mt-1 flex items-center gap-1 truncate">
+                      <span>🟢</span> ASFALTO • {pilotTier} ({pilotPoints} PTS)
+                    </p>
+                  )}
+                </div>
+              </Link>
+
+              {/* Action: PWA Install */}
+              <div className="space-y-2 pt-1">
+                <PWAInstallButton variant="sidebar" />
+              </div>
+
+              {(!isVip || isAdmin) && (
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    setIsUpgradeModalOpen(true);
+                  }}
+                  className="w-full btn-primary py-2.5 px-3"
+                >
+                  <Crown size={14} />
+                  <span>Assine aqui!</span>
+                </button>
               )}
-            </div>
-          </Link>
 
-          {/* Action: PWA Install */}
-          <div className="space-y-2 pt-1">
-            <PWAInstallButton variant="sidebar" />
-          </div>
+              <div className="pt-2 border-t border-[#1e293b] flex flex-col gap-1.5">
+                <button 
+                  type="button"
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-400 transition-colors py-1 cursor-pointer"
+                >
+                  <LogOut size={14} />
+                  <span>Encerrar Sessão</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="rounded-xl bg-[#00273d]/90 border border-slate-700/80 p-3.5 space-y-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-orange-600/20 border border-orange-500/40 flex items-center justify-center text-orange-400 shrink-0">
+                    <User size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-black uppercase text-white truncate">Modo Visitante</p>
+                    <p className="text-[10px] text-slate-400 truncate">Sem sessão conectada</p>
+                  </div>
+                </div>
+                <Link
+                  to="/"
+                  onClick={() => setIsOpen(false)}
+                  className="btn-primary w-full py-2 px-3 text-xs flex items-center justify-center gap-1.5 font-black uppercase tracking-wider"
+                >
+                  <LogIn size={14} />
+                  <span>Entrar / Cadastrar</span>
+                </Link>
+              </div>
 
-          {(!isVip || isAdmin) && (
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                setIsUpgradeModalOpen(true);
-              }}
-              className="w-full btn-primary py-2.5 px-3"
-            >
-              <Crown size={14} />
-              <span>Assine aqui!</span>
-            </button>
+              {/* Action: PWA Install */}
+              <div className="space-y-2 pt-1">
+                <PWAInstallButton variant="sidebar" />
+              </div>
+            </>
           )}
-
-          <div className="pt-2 border-t border-[#1e293b] flex flex-col gap-1.5">
-            <button 
-              type="button"
-              onClick={handleSignOut}
-              className="w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-400 transition-colors py-1 cursor-pointer"
-            >
-              <LogOut size={14} />
-              <span>Encerrar Sessão</span>
-            </button>
-          </div>
         </div>
       </aside>
 

@@ -4,21 +4,15 @@ import {
   SwitchCamera, 
   X, 
   Check, 
-  Trash2, 
   Image as ImageIcon, 
   ShieldCheck, 
   MapPin, 
-  Compass, 
-  Clock, 
-  Bike, 
-  Sparkles, 
   AlertCircle, 
   RotateCcw, 
   Plus, 
-  CheckCircle2, 
-  Layers
+  CheckCircle2 
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { DocumentaryProof, DocumentaryProofType } from '../types';
 import { uploadImageToStorage } from '../lib/storage';
 

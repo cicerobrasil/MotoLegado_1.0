@@ -368,7 +368,11 @@ export const SEEDED_COMMUNITY_PILOTS: Omit<LeaderboardPilot, 'rank'>[] = [
 ];
 
 export interface BuildRankingOptions {
+  realPilots?: Omit<LeaderboardPilot, 'rank'>[];
   currentPilot?: {
+    isAuthenticated?: boolean;
+    id?: string;
+    email?: string;
     name?: string;
     handle?: string;
     avatar?: string;
@@ -401,6 +405,7 @@ export function buildGlobalRanking(options: BuildRankingOptions): {
   totalPilotsCount: number;
 } {
   const {
+    realPilots,
     currentPilot,
     sortBy = 'points',
     period = 'all',
@@ -409,21 +414,27 @@ export function buildGlobalRanking(options: BuildRankingOptions): {
     searchQuery = ''
   } = options;
 
-  // Clone community pilots
-  let pilotsList: Omit<LeaderboardPilot, 'rank'>[] = [...SEEDED_COMMUNITY_PILOTS];
+  // Usa estritamente os pilotos reais carregados do banco de dados MySQL na Hostinger
+  let pilotsList: Omit<LeaderboardPilot, 'rank'>[] = [...(realPilots || [])];
 
-  // Insert or update current user
-  if (currentPilot) {
-    const userPilot: Omit<LeaderboardPilot, 'rank'> = {
-      id: 'current-user-pilot',
-      name: currentPilot.name || 'Você (Piloto MotoLegado)',
+  // Insere ou atualiza o piloto atual SOMENTE se estiver autenticado no sistema
+  if (currentPilot && currentPilot.isAuthenticated) {
+    const existingIdx = pilotsList.findIndex(p => 
+      (currentPilot.id && p.id === currentPilot.id) ||
+      (currentPilot.email && p.handle === `@${currentPilot.email.split('@')[0]}`) ||
+      (currentPilot.name && p.name.toLowerCase() === currentPilot.name.toLowerCase())
+    );
+
+    const userPilotData: Omit<LeaderboardPilot, 'rank'> = {
+      id: currentPilot.id || 'current-user-pilot',
+      name: currentPilot.name || 'Meu Perfil',
       handle: currentPilot.handle || '@meupiloto',
-      avatar: currentPilot.avatar || 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?auto=format&fit=crop&q=80&w=250',
+      avatar: currentPilot.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentPilot.name || 'Piloto')}&background=ea580c&color=ffffff&bold=true`,
       motoClub: currentPilot.motoClub || 'Independente',
       clubRole: 'Piloto Oficial',
       motorcycle: currentPilot.motorcycle || 'Minha Moto',
-      city: currentPilot.city || 'Joinville',
-      state: currentPilot.state || 'SC',
+      city: currentPilot.city || 'Brasil',
+      state: currentPilot.state || 'BR',
       totalPoints: currentPilot.totalPoints,
       totalKm: currentPilot.totalKm,
       eventsCount: currentPilot.eventsCount,
@@ -442,9 +453,14 @@ export function buildGlobalRanking(options: BuildRankingOptions): {
       rankChange: 0,
     };
 
-    // Remove any existing user pilot and push fresh
-    pilotsList = pilotsList.filter(p => p.id !== 'current-user-pilot');
-    pilotsList.push(userPilot);
+    if (existingIdx >= 0) {
+      pilotsList[existingIdx] = {
+        ...pilotsList[existingIdx],
+        ...userPilotData
+      };
+    } else {
+      pilotsList.push(userPilotData);
+    }
   }
 
   // Adjust metrics based on period filter if applicable

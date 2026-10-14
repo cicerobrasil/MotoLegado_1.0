@@ -25,6 +25,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { getPilotLiveGamification } from '../lib/gamification';
 import { buildGlobalRanking } from '../lib/rankingData';
+import { getPilotsFromHostinger } from '../lib/api';
 import { LeaderboardPilot, RankingSortBy, RankingPeriod } from '../types';
 import { cn } from '../lib/utils';
 import type { LogEntry } from './Logbook';
@@ -32,7 +33,19 @@ import type { MotoEvent } from './Events';
 
 export function GlobalRanking() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const isAuthenticated = Boolean(user || profile);
+  const [dbPilots, setDbPilots] = useState<any[]>([]);
+
+  useEffect(() => {
+    getPilotsFromHostinger()
+      .then((res) => {
+        if (res && res.pilots && Array.isArray(res.pilots)) {
+          setDbPilots(res.pilots);
+        }
+      })
+      .catch((e) => console.warn('Aviso ao carregar pilotos reais do MySQL:', e));
+  }, []);
 
   // Local state for filters
   const [sortBy, setSortBy] = useState<RankingSortBy>('points');
@@ -95,21 +108,63 @@ export function GlobalRanking() {
 
   const { pointsBreakdown, rankInfo, badges } = gamification;
 
-  // Pilot details for the user
+  // Mapeia pilotos reais do MySQL na Hostinger para o ranking
+  const realCommunityPilots: Omit<LeaderboardPilot, 'rank'>[] = useMemo(() => {
+    return dbPilots.map((p) => {
+      const pName = p.name || 'Piloto MotoLegado';
+      const pAvatar = (p.avatar_url && !p.avatar_url.includes('56ceb5ecca61'))
+        ? p.avatar_url
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=ea580c&color=ffffff&bold=true`;
+      const pTier = p.tier || 'Bronze';
+      const pPoints = typeof p.points === 'number' ? p.points : 0;
+      return {
+        id: String(p.id),
+        name: pName,
+        handle: p.email ? `@${p.email.split('@')[0]}` : `@piloto_${String(p.id).slice(-4)}`,
+        avatar: pAvatar,
+        motoClub: p.club_name || 'Independente',
+        clubRole: p.role === 'admin' ? 'Comandante Geral' : 'Piloto Oficial',
+        motorcycle: p.motorcycle || 'Motocicleta Oficial',
+        city: p.city || 'Brasil',
+        state: p.state || 'BR',
+        totalPoints: pPoints,
+        totalKm: Math.round(pPoints * 0.8),
+        eventsCount: 0,
+        tripsCount: 0,
+        badgesCount: pPoints > 1000 ? 5 : (pPoints > 0 ? 1 : 0),
+        tierTitle: pTier,
+        tierIcon: pTier === 'Diamante' ? '💎' : pTier === 'Ouro' ? '🥇' : pTier === 'Prata' ? '🥈' : '🥉',
+        tierAccent: pTier === 'Diamante' ? '#38bdf8' : pTier === 'Ouro' ? '#eab308' : '#94a3b8',
+        isVerified: p.role === 'admin' || p.plan === 'pago' || p.plan === 'bonificado',
+        isPro: p.role === 'admin' || p.plan === 'pago' || p.plan === 'bonificado',
+        bio: p.bio || 'Piloto cadastrado no MotoLegado.',
+        joinedYear: p.created_at ? new Date(p.created_at).getFullYear() : 2026,
+        pointsTrend: 'same' as const,
+        rankChange: 0,
+      };
+    });
+  }, [dbPilots]);
+
+  // Pilot details for the authenticated user
   const userPilotData = useMemo(() => {
-    const pilotName = profile?.name || 'Você (Piloto MotoLegado)';
+    if (!isAuthenticated) return null;
+
+    const pilotName = profile?.name || user?.user_metadata?.name || 'Meu Perfil';
     const pilotAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
       ? profile.avatar_url
       : `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotName)}&background=ea580c&color=ffffff&bold=true`;
 
     return {
+      isAuthenticated: true,
+      id: profile?.id || user?.id,
+      email: profile?.email || user?.email,
       name: pilotName,
       handle: profile?.email ? `@${profile.email.split('@')[0]}` : '@meupiloto',
       avatar: pilotAvatar,
       motoClub: profile?.club_name || (profile as any)?.motoclub || 'Independente',
       motorcycle: profile?.motorcycle || 'Moto Oficial',
-      city: profile?.city || 'Joinville',
-      state: profile?.state || 'SC',
+      city: profile?.city || 'Brasil',
+      state: profile?.state || 'BR',
       totalPoints: pointsBreakdown.totalPoints,
       totalKm: pointsBreakdown.totalKm,
       eventsCount: pointsBreakdown.eventsCount,
@@ -121,19 +176,20 @@ export function GlobalRanking() {
       isPro: profile?.plan_type === 'pago' || profile?.is_pro,
       bio: profile?.bio || 'Piloto na estrada acumulando quilômetros e histórias no asfalto.',
     };
-  }, [profile, pointsBreakdown, rankInfo, badges]);
+  }, [isAuthenticated, profile, user, pointsBreakdown, rankInfo, badges]);
 
   // Build ranking
   const { leaderboard, currentUserPosition, currentUserPilot, totalPilotsCount } = useMemo(() => {
     return buildGlobalRanking({
-      currentPilot: userPilotData,
+      realPilots: realCommunityPilots,
+      currentPilot: userPilotData || undefined,
       sortBy,
       period,
       stateFilter: selectedState,
       clubFilter: selectedClub,
       searchQuery,
     });
-  }, [userPilotData, sortBy, period, selectedState, selectedClub, searchQuery]);
+  }, [realCommunityPilots, userPilotData, sortBy, period, selectedState, selectedClub, searchQuery]);
 
   // Top 3 Podium
   const top1 = leaderboard.length > 0 ? leaderboard[0] : null;

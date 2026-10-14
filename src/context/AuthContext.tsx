@@ -10,6 +10,7 @@ import {
   apiResetPassword,
   apiChangePassword
 } from '../lib/api';
+import { isMockOrTestUser, limparCacheEEstadoGlobal } from '../utils/systemReset';
 
 export interface PilotProfile {
   id: string;
@@ -170,6 +171,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const parsed = JSON.parse(storedSession);
 
+          // Se for usuário de teste, convidado ou piloto modelo, força logout imediato
+          if (isMockOrTestUser(parsed)) {
+            limparCacheEEstadoGlobal();
+            setUser(null);
+            setProfile(null);
+            setLoading(false);
+            return;
+          }
+
           // Preservar dados caso não estejam na sessão salva
           if (!parsed.motorcycle_photos || parsed.motorcycle_photos.length === 0) {
             const savedPhotos = localStorage.getItem('motolegado_pilot_bike_photos');
@@ -275,6 +285,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.warn('Erro ao restaurar sessão salva:', e);
         }
       } else if (storedEmail && storedName) {
+        if (isMockOrTestUser({ name: storedName, email: storedEmail, id: storedId })) {
+          limparCacheEEstadoGlobal();
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
+
         const assignedRole = checkIfAdmin(storedEmail, storedName);
         const storedPlan = (localStorage.getItem('motolegado_pilot_plan') as 'gratuito' | 'pago' | 'bonificado') || (assignedRole === 'admin' ? 'pago' : 'gratuito');
         let initialPhotos: string[] = [];
@@ -329,6 +347,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     restoreSession();
 
+    const handleForceLogout = () => {
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      setLoading(false);
+    };
+    window.addEventListener('motolegado_force_logout', handleForceLogout);
+
     if (isSupabaseConfigured) {
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         setSession(session);
@@ -345,9 +371,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       return () => {
+        window.removeEventListener('motolegado_force_logout', handleForceLogout);
         subscription.unsubscribe();
       };
     }
+
+    return () => {
+      window.removeEventListener('motolegado_force_logout', handleForceLogout);
+    };
   }, []);
 
   // Entrar com E-mail e Senha (Autenticação Real com Senha no MySQL da Hostinger / Armazenamento Resiliente)

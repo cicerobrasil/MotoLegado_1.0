@@ -8,13 +8,10 @@ import {
   Download, 
   ShieldCheck, 
   Bike, 
-  ExternalLink,
-  Sparkles,
   CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import QRCode from 'qrcode';
-import { cn } from '../lib/utils';
 
 interface DigitalIdModalProps {
   isOpen: boolean;

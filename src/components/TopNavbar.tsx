@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, ChevronRight, LogOut } from 'lucide-react';
+import { Menu, ChevronRight, LogOut, LogIn } from 'lucide-react';
 import { LogoMark } from './LogoMark';
 import { TourButton } from './TourButton';
 import { AccessibilityButton } from './AccessibilityButton';
@@ -31,12 +31,15 @@ const ROUTE_NAMES: Record<string, string> = {
 export function TopNavbar({ onOpenSidebar }: TopNavbarProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, signOut } = useAuth();
+  const { profile, user, signOut } = useAuth();
+  const isAuthenticated = Boolean(user || profile);
 
-  const pilotName = profile?.name || 'Piloto MotoLegado';
+  const pilotName = profile?.name || user?.user_metadata?.name || '';
   const pilotAvatar = (profile?.avatar_url && !profile.avatar_url.includes('56ceb5ecca61'))
     ? profile.avatar_url
-    : `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotName)}&background=ea580c&color=ffffff&bold=true`;
+    : pilotName 
+      ? `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotName)}&background=ea580c&color=ffffff&bold=true`
+      : '';
 
   const currentPageTitle = ROUTE_NAMES[location.pathname] || 'MotoLegado';
 
@@ -100,30 +103,43 @@ export function TopNavbar({ onOpenSidebar }: TopNavbarProps) {
         {/* Legibilidade & Tema */}
         <AccessibilityButton variant="top-menu" />
 
-        {/* Pilot Avatar Profile Link */}
-        <Link 
-          to="/profile" 
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00273d] border-2 border-slate-700/80 hover:border-[#ff751f] overflow-hidden shrink-0 transition-all shadow-sm group"
-          title={`Perfil de ${pilotName}`}
-          aria-label="Meu Perfil"
-        >
-          <img 
-            src={pilotAvatar} 
-            alt={pilotName} 
-            referrerPolicy="no-referrer" 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
-          />
-        </Link>
+        {/* Pilot Avatar Profile Link OR Entrar Button */}
+        {isAuthenticated ? (
+          <>
+            <Link 
+              to="/profile" 
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00273d] border-2 border-slate-700/80 hover:border-[#ff751f] overflow-hidden shrink-0 transition-all shadow-sm group"
+              title={`Perfil de ${pilotName}`}
+              aria-label="Meu Perfil"
+            >
+              <img 
+                src={pilotAvatar} 
+                alt={pilotName} 
+                referrerPolicy="no-referrer" 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+              />
+            </Link>
 
-        {/* Encerrar Sessão */}
-        <button
-          onClick={handleSignOut}
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 border border-slate-800 hover:border-red-500/60 hover:bg-red-950/30 text-slate-400 hover:text-red-400 flex items-center justify-center transition-all cursor-pointer"
-          title="Encerrar Sessão"
-          aria-label="Encerrar Sessão"
-        >
-          <LogOut size={16} />
-        </button>
+            {/* Encerrar Sessão */}
+            <button
+              onClick={handleSignOut}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 border border-slate-800 hover:border-red-500/60 hover:bg-red-950/30 text-slate-400 hover:text-red-400 flex items-center justify-center transition-all cursor-pointer"
+              title="Encerrar Sessão"
+              aria-label="Encerrar Sessão"
+            >
+              <LogOut size={16} />
+            </button>
+          </>
+        ) : (
+          <Link
+            to="/"
+            className="h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-orange-950/40 transition-all cursor-pointer shrink-0"
+            title="Acessar Conta MotoLegado"
+          >
+            <LogIn size={15} />
+            <span>Entrar</span>
+          </Link>
+        )}
       </div>
     </header>
   );

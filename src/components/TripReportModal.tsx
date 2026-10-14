@@ -5,33 +5,22 @@ import {
   Printer, 
   Share2, 
   Check, 
-  Compass, 
-  Calendar, 
   Route, 
   Star, 
   Sparkles, 
   Bike, 
   ShieldCheck, 
-  Clock, 
-  ChevronDown,
   FileSpreadsheet,
   CheckCircle2,
   AlertCircle,
-  Copy,
   Download,
-  CheckSquare,
   MapPin,
   Camera,
-  Fuel,
-  UtensilsCrossed,
-  Bed,
-  Layers,
   BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import { LogEntry } from './Logbook';
-import { TripStage } from './TripStagesManager';
 import { cn } from '../lib/utils';
 
 export interface TripReportModalProps {

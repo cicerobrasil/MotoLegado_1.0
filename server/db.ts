@@ -144,16 +144,28 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
       CREATE TABLE IF NOT EXISTS routes (
         id VARCHAR(64) PRIMARY KEY,
         author_id VARCHAR(64) NULL,
+        author_name VARCHAR(150) NULL,
+        author_avatar TEXT NULL,
         title VARCHAR(200) NOT NULL,
         description TEXT NULL,
+        maps_address TEXT NULL,
+        maps_url TEXT NULL,
+        rider_tips TEXT NULL,
+        ai_tourist_info TEXT NULL,
         state VARCHAR(10) NULL,
         city VARCHAR(100) NULL,
         distance_km DECIMAL(10,2) DEFAULT 0,
-        difficulty ENUM('facil', 'moderada', 'dificil', 'extrema') DEFAULT 'moderada',
+        duration VARCHAR(50) NULL,
+        difficulty VARCHAR(50) DEFAULT 'Médio',
         road_type VARCHAR(100) NULL,
         cover_image TEXT NULL,
         waypoints JSON NULL,
-        status ENUM('approved', 'pending', 'rejected') DEFAULT 'approved',
+        rating DECIMAL(3,2) DEFAULT 5.0,
+        total_ratings_count INT DEFAULT 1,
+        rating_metrics JSON NULL,
+        reviews JSON NULL,
+        status VARCHAR(20) DEFAULT 'aprovado',
+        rejection_reason TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
@@ -163,14 +175,22 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
       CREATE TABLE IF NOT EXISTS events (
         id VARCHAR(64) PRIMARY KEY,
         organizer_id VARCHAR(64) NULL,
+        created_by VARCHAR(150) NULL,
         title VARCHAR(200) NOT NULL,
         description TEXT NULL,
         event_date DATE NOT NULL,
+        end_date DATE NULL,
+        time VARCHAR(20) DEFAULT '09:00',
+        end_time VARCHAR(20) NULL,
         location VARCHAR(255) NOT NULL,
         city VARCHAR(100) NULL,
         state VARCHAR(10) NULL,
+        distance_km DECIMAL(10,2) DEFAULT 0,
+        category VARCHAR(100) DEFAULT 'Passeios & Bate-Fica',
         banner_url TEXT NULL,
-        status ENUM('active', 'pending', 'cancelled') DEFAULT 'active',
+        status VARCHAR(20) DEFAULT 'aprovado',
+        rejection_reason TEXT NULL,
+        member_count INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
@@ -182,13 +202,22 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
         name VARCHAR(200) NOT NULL,
         category VARCHAR(100) NOT NULL,
         description TEXT NULL,
+        news TEXT NULL,
         address VARCHAR(255) NULL,
         city VARCHAR(100) NULL,
         state VARCHAR(10) NULL,
         phone VARCHAR(30) NULL,
+        whatsapp VARCHAR(30) NULL,
+        corporate_contact VARCHAR(150) NULL,
+        website TEXT NULL,
+        map_url TEXT NULL,
         discount_info VARCHAR(200) NULL,
         logo_url TEXT NULL,
-        status ENUM('approved', 'pending', 'inactive') DEFAULT 'approved',
+        rating DECIMAL(3,2) DEFAULT 5.0,
+        highlight TINYINT(1) DEFAULT 0,
+        responsible JSON NULL,
+        posts JSON NULL,
+        status VARCHAR(20) DEFAULT 'aprovado',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
@@ -198,13 +227,103 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
       CREATE TABLE IF NOT EXISTS community_posts (
         id VARCHAR(64) PRIMARY KEY,
         pilot_id VARCHAR(64) NOT NULL,
+        author_name VARCHAR(150) NULL,
+        author_avatar TEXT NULL,
+        author_role VARCHAR(50) DEFAULT 'pilot',
         content TEXT NOT NULL,
         image_url TEXT NULL,
+        category VARCHAR(100) DEFAULT 'Geral',
         likes_count INT DEFAULT 0,
-        status ENUM('published', 'flagged', 'archived') DEFAULT 'published',
+        comments_count INT DEFAULT 0,
+        comments_list JSON NULL,
+        status VARCHAR(20) DEFAULT 'aprovado',
+        rejection_reason TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    // 7. Tabela de Motoclubes
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS clubs (
+        id VARCHAR(64) PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        city VARCHAR(100) NULL,
+        state VARCHAR(10) NULL,
+        members_count INT DEFAULT 1,
+        rating DECIMAL(3,2) DEFAULT 5.0,
+        image TEXT NULL,
+        logo TEXT NULL,
+        description TEXT NULL,
+        category VARCHAR(100) DEFAULT 'Tradicional',
+        president_name VARCHAR(150) NULL,
+        contact_phone VARCHAR(30) NULL,
+        status VARCHAR(20) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 8. Tabela de Pagamentos / Solicitações PIX
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS payment_requests (
+        id VARCHAR(64) PRIMARY KEY,
+        pilot_id VARCHAR(64) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        name VARCHAR(150) NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        method VARCHAR(50) DEFAULT 'pix_direct',
+        status VARCHAR(30) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        approved_at TIMESTAMP NULL,
+        approved_by VARCHAR(150) NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // Migrações e compatibilidade de colunas para bancos já criados
+    const extraColumns = [
+      "ALTER TABLE routes ADD COLUMN author_name VARCHAR(150) NULL",
+      "ALTER TABLE routes ADD COLUMN author_avatar TEXT NULL",
+      "ALTER TABLE routes ADD COLUMN maps_address TEXT NULL",
+      "ALTER TABLE routes ADD COLUMN maps_url TEXT NULL",
+      "ALTER TABLE routes ADD COLUMN rider_tips TEXT NULL",
+      "ALTER TABLE routes ADD COLUMN ai_tourist_info TEXT NULL",
+      "ALTER TABLE routes ADD COLUMN duration VARCHAR(50) NULL",
+      "ALTER TABLE routes ADD COLUMN rating DECIMAL(3,2) DEFAULT 5.0",
+      "ALTER TABLE routes ADD COLUMN total_ratings_count INT DEFAULT 1",
+      "ALTER TABLE routes ADD COLUMN rating_metrics JSON NULL",
+      "ALTER TABLE routes ADD COLUMN reviews JSON NULL",
+      "ALTER TABLE routes ADD COLUMN rejection_reason TEXT NULL",
+      "ALTER TABLE events ADD COLUMN created_by VARCHAR(150) NULL",
+      "ALTER TABLE events ADD COLUMN end_date DATE NULL",
+      "ALTER TABLE events ADD COLUMN time VARCHAR(20) DEFAULT '09:00'",
+      "ALTER TABLE events ADD COLUMN end_time VARCHAR(20) NULL",
+      "ALTER TABLE events ADD COLUMN distance_km DECIMAL(10,2) DEFAULT 0",
+      "ALTER TABLE events ADD COLUMN rejection_reason TEXT NULL",
+      "ALTER TABLE events ADD COLUMN member_count INT DEFAULT 0",
+      "ALTER TABLE partners ADD COLUMN news TEXT NULL",
+      "ALTER TABLE partners ADD COLUMN whatsapp VARCHAR(30) NULL",
+      "ALTER TABLE partners ADD COLUMN corporate_contact VARCHAR(150) NULL",
+      "ALTER TABLE partners ADD COLUMN website TEXT NULL",
+      "ALTER TABLE partners ADD COLUMN map_url TEXT NULL",
+      "ALTER TABLE partners ADD COLUMN rating DECIMAL(3,2) DEFAULT 5.0",
+      "ALTER TABLE partners ADD COLUMN highlight TINYINT(1) DEFAULT 0",
+      "ALTER TABLE partners ADD COLUMN responsible JSON NULL",
+      "ALTER TABLE partners ADD COLUMN posts JSON NULL",
+      "ALTER TABLE community_posts ADD COLUMN author_name VARCHAR(150) NULL",
+      "ALTER TABLE community_posts ADD COLUMN author_avatar TEXT NULL",
+      "ALTER TABLE community_posts ADD COLUMN author_role VARCHAR(50) DEFAULT 'pilot'",
+      "ALTER TABLE community_posts ADD COLUMN category VARCHAR(100) DEFAULT 'Geral'",
+      "ALTER TABLE community_posts ADD COLUMN comments_count INT DEFAULT 0",
+      "ALTER TABLE community_posts ADD COLUMN comments_list JSON NULL",
+      "ALTER TABLE community_posts ADD COLUMN rejection_reason TEXT NULL"
+    ];
+
+    for (const sql of extraColumns) {
+      try {
+        await connection.query(sql);
+      } catch {
+        // Ignora caso a coluna já exista
+      }
+    }
 
     // Inserir / Garantir Administrador Principal no Banco de Dados
     await connection.query(`

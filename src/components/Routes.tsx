@@ -12,15 +12,9 @@ import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
 import { uploadImageToStorage } from '../lib/storage';
+import { clientDbService } from '../lib/dbService';
 
 export const DEFAULT_ROUTE_FALLBACK = "https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=1200";
-
-export const PRESET_ROUTE_IMAGES = [
-  { label: 'Serra & Curvas', url: 'https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=1200' },
-  { label: 'Montanhas & Estrada', url: 'https://images.unsplash.com/photo-1471466054146-e71bcc0d2bb2?auto=format&fit=crop&q=80&w=1200' },
-  { label: 'Pôr do Sol no Asfalto', url: 'https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=1200' },
-  { label: 'Aventura & Viagem', url: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=1200' }
-];
 
 export function sanitizeAndExtractImageUrl(raw: string): string {
   if (!raw) return '';
@@ -137,32 +131,26 @@ export function Routes() {
 
   const handleLaunchInLogbook = (targetRoute: Route, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const metrics = estimateRouteMetrics(targetRoute);
     const query = new URLSearchParams({
       routeTitle: targetRoute.name,
       routeDest: targetRoute.mapsAddress || targetRoute.endPoint || '',
       routeOrigin: targetRoute.startPoint || '',
       routeDesc: targetRoute.description || '',
       routeImg: targetRoute.image || '',
-      routeMaps: targetRoute.mapsUrl || '',
-      routeDist: metrics.distance,
-      routeDuration: metrics.duration
+      routeMaps: targetRoute.mapsUrl || (targetRoute.mapsAddress.startsWith('http') ? targetRoute.mapsAddress : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetRoute.mapsAddress || targetRoute.name)}`)
     }).toString();
     navigate(`/logbook?${query}`);
   };
 
   const handleCompleteRouteWithCamera = (targetRoute: Route, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const metrics = estimateRouteMetrics(targetRoute);
     const query = new URLSearchParams({
       routeTitle: targetRoute.name,
       routeDest: targetRoute.mapsAddress || targetRoute.endPoint || '',
       routeOrigin: targetRoute.startPoint || '',
       routeDesc: targetRoute.description || '',
       routeImg: targetRoute.image || '',
-      routeMaps: targetRoute.mapsUrl || '',
-      routeDist: metrics.distance,
-      routeDuration: metrics.duration,
+      routeMaps: targetRoute.mapsUrl || (targetRoute.mapsAddress.startsWith('http') ? targetRoute.mapsAddress : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetRoute.mapsAddress || targetRoute.name)}`),
       openCamera: 'true'
     }).toString();
     navigate(`/logbook?${query}`);
@@ -182,12 +170,10 @@ export function Routes() {
     }
     setNewTitle('');
     setNewMapsAddress('');
-    setNewDistance('');
-    setNewDuration('');
+    setNewMapsUrl('');
     setNewImage('');
     setNewDescription('');
     setNewRiderTips('');
-    setNewAiTouristInfo('');
     setAiError(null);
     setIsCreateModalOpen(true);
   };
@@ -209,13 +195,11 @@ export function Routes() {
   // New Route Form State
   const [newTitle, setNewTitle] = useState('');
   const [newMapsAddress, setNewMapsAddress] = useState('');
-  const [newDistance, setNewDistance] = useState('');
-  const [newDuration, setNewDuration] = useState('');
+  const [newMapsUrl, setNewMapsUrl] = useState('');
   const [newDifficulty, setNewDifficulty] = useState<RouteDifficulty>(RouteDifficulty.MEDIUM);
   const [newImage, setNewImage] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newRiderTips, setNewRiderTips] = useState('');
-  const [newAiTouristInfo, setNewAiTouristInfo] = useState('');
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -294,42 +278,60 @@ export function Routes() {
     infraestrutura: 4
   });
 
-  // Load from LocalStorage
+  // Load routes from Hostinger MySQL Database (com fallback resiliente de cache)
   useEffect(() => {
-    const saved = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const mockIds = ['serra-rio-rastro', 'estrada-graciosa', 'rota-das-hortensias', 'route-pending-1', '1'];
-          const cleaned = parsed.filter((r: Route) => {
-            const name = (r.name || '').toLowerCase();
-            const address = (r.mapsAddress || '').toLowerCase();
-            const author = (r.author?.name || '').toLowerCase();
-            const isMock = mockIds.includes(r.id) ||
-              name.includes('cunha') || name.includes('paraty') || address.includes('cunha') || address.includes('paraty') ||
-              author.includes('renato') || name.includes('estrada real');
-            return !isMock;
-          });
-          setRoutes(cleaned);
-          localStorage.setItem('motolegado_routes_v3', JSON.stringify(cleaned));
-          localStorage.setItem('motolegado_routes', JSON.stringify(cleaned));
+    let isMounted = true;
+
+    // 1. Carrega imediatamente do MySQL real da Hostinger
+    clientDbService.routes.getAll()
+      .then((dbRoutes) => {
+        if (!isMounted) return;
+        if (Array.isArray(dbRoutes) && dbRoutes.length > 0) {
+          setRoutes(dbRoutes);
+          localStorage.setItem('motolegado_routes_v3', JSON.stringify(dbRoutes));
+          localStorage.setItem('motolegado_routes', JSON.stringify(dbRoutes));
           return;
         }
-      } catch (e) {
-        console.error("Error loading routes", e);
-      }
-    }
-    setRoutes([]);
-    localStorage.setItem('motolegado_routes_v3', JSON.stringify([]));
-    localStorage.setItem('motolegado_routes', JSON.stringify([]));
+
+        // Se o banco estiver vazio ou ainda sem registros, verifica cache local limpo
+        const saved = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              setRoutes(parsed);
+              return;
+            }
+          } catch {}
+        }
+        setRoutes([]);
+      })
+      .catch((err) => {
+        console.warn('[Routes] Aviso ao carregar rotas do MySQL:', err);
+        if (!isMounted) return;
+        const saved = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
+        if (saved) {
+          try {
+            setRoutes(JSON.parse(saved));
+          } catch {}
+        }
+      });
+
+    return () => { isMounted = false; };
   }, []);
 
-  const saveRoutes = (updated: Route[]) => {
+  const saveRoutes = (updated: Route[], routeToPersist?: Route) => {
     setRoutes(updated);
     localStorage.setItem('motolegado_routes_v3', JSON.stringify(updated));
     localStorage.setItem('motolegado_routes', JSON.stringify(updated));
     window.dispatchEvent(new Event('routes-updated'));
+
+    // Sincroniza persistência com o MySQL da Hostinger
+    if (routeToPersist) {
+      clientDbService.routes.save(routeToPersist).catch((e) => {
+        console.warn('[Routes] Aviso ao persistir rota no MySQL:', e);
+      });
+    }
   };
 
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -345,6 +347,7 @@ export function Routes() {
     if (selectedRouteDetail && selectedRouteDetail.id === routeId) {
       setSelectedRouteDetail({ ...selectedRouteDetail, status: 'aprovado', rejectionReason: undefined });
     }
+    clientDbService.routes.updateStatus(routeId, 'aprovado').catch(() => {});
     showToast("✓ Roteiro APROVADO com sucesso! Agora ele está visível publicamente na comunidade.", "success");
   };
 
@@ -361,20 +364,17 @@ export function Routes() {
       setSelectedRouteDetail({ ...selectedRouteDetail, status: 'rejeitado', rejectionReason: reason });
     }
 
+    clientDbService.routes.updateStatus(rejectingRouteId, 'rejeitado', reason).catch(() => {});
+
     setRejectingRouteId(null);
     setRejectionReasonText('');
     showToast("✕ Roteiro REJEITADO. O autor poderá revisar as informações.", "error");
   };
 
-  // Generate Tourist Info using Gemini AI
-  const handleGenerateAiInfo = async (
-    titleToUse: string,
-    addressToUse: string,
-    descToUse: string,
-    setTargetState: (val: string) => void
-  ) => {
-    if (!titleToUse.trim()) {
-      alert("Por favor, preencha o Título do Roteiro primeiro para gerar as informações com IA.");
+  // Sugerir Descrição e Técnicas com IA Gemini
+  const handleSuggestAiRouteContent = async () => {
+    if (!newTitle.trim()) {
+      showToast("Por favor, preencha o Título do Roteiro para a IA gerar a sugestão.", "info");
       return;
     }
 
@@ -382,38 +382,31 @@ export function Routes() {
     setAiError(null);
 
     try {
-      const res = await fetch('/api/routes/ai-tourist-info', {
+      const res = await fetch('/api/routes/ai-suggest-route', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: titleToUse,
-          address: addressToUse,
-          description: descToUse
+          title: newTitle.trim(),
+          address: newMapsAddress.trim()
         })
       });
 
       const data = await res.json();
-      if (res.ok && data.touristInfo) {
-        setTargetState(data.touristInfo);
+      if (res.ok && (data.description || data.techniques)) {
+        if (data.description) setNewDescription(data.description);
+        if (data.techniques) setNewRiderTips(data.techniques);
+        showToast("✨ Sugestão de descrição e técnicas gerada com sucesso pela IA!", "success");
       } else {
-        throw new Error(data.error || "Não foi possível gerar informações turísticas.");
+        throw new Error(data.error || "Não foi possível gerar sugestões.");
       }
     } catch (err: any) {
-      console.warn("API Error, using intelligent fallback", err);
-      const generatedFallback = `🏛️ **Destaques Turísticos & Atrações do Local ("${titleToUse}"):**
-- Mirante panorâmico com parada estratégica para apreciação da paisagem natural.
-- Pontos turísticos históricos regionais e marcos geográficos de destaque.
+      console.warn("API Error, using fallback suggestions", err);
+      const fallbackDesc = `Roteiro fascinante por "${newTitle.trim()}"${newMapsAddress.trim() ? ` (${newMapsAddress.trim()})` : ''}. Um percurso repleto de belezas cênicas, curvas dinâmicas e paisagens ideais para quem viaja de moto.`;
+      const fallbackTech = `• Pilotagem & Curvas: Mantenha olhar na saída da curva, postura relaxada e modulação precisa no acelerador.\n• Atenção ao Asfalto: Cuidado com possíveis trechos úmidos pela manhã e folhas em curvas sombreadas.\n• Planejamento: Abasteça a moto nos pontos de apoio e verifique a calibragem dos pneus.\n• Segurança: Uso de equipamentos completos de proteção para todas as condições climáticas.`;
 
-📜 **Curiosidades Históricas:**
-- Região tradicional marcada por antigas rotas de tropeiros e ligação entre municípios vizinhos.
-
-🍲 **Gastronomia Típica Recomendada:**
-- Pratos típicos da culinária local, cafés coloniais e lanchonetes de estrada com produtos artesanais da região.
-
-📸 **Dicas de Fotografia & Melhores Horários:**
-- Registros incríveis ao amanhecer ou no final da tarde, aproveitando a iluminação suave sobre as curvas e a pista.`;
-
-      setTargetState(generatedFallback);
+      setNewDescription(fallbackDesc);
+      setNewRiderTips(fallbackTech);
+      showToast("✨ Sugestão gerada com sucesso!", "success");
     } finally {
       setIsAiGenerating(false);
     }
@@ -424,7 +417,7 @@ export function Routes() {
     e.preventDefault();
 
     if (!newTitle.trim()) {
-      alert("Informe o título do roteiro!");
+      showToast("Informe o título do roteiro!", "error");
       return;
     }
 
@@ -432,22 +425,14 @@ export function Routes() {
       ((newMetrics.paisagem + newMetrics.asfalto + newMetrics.curvas + newMetrics.seguranca + newMetrics.infraestrutura) / 5).toFixed(1)
     );
 
-    const formattedMapsUrl = newMapsAddress.startsWith('http')
-      ? newMapsAddress
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(newMapsAddress || newTitle)}`;
+    const formattedMapsUrl = newMapsUrl.trim()
+      ? (newMapsUrl.trim().startsWith('http') ? newMapsUrl.trim() : `https://${newMapsUrl.trim()}`)
+      : (newMapsAddress.trim().startsWith('http')
+          ? newMapsAddress.trim()
+          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(newMapsAddress.trim() || newTitle.trim())}`);
 
     const sanitizedImage = sanitizeAndExtractImageUrl(newImage);
     const finalImage = sanitizedImage.trim() || DEFAULT_ROUTE_FALLBACK;
-
-    const metrics = estimateRouteMetrics({
-      name: newTitle.trim(),
-      mapsAddress: newMapsAddress.trim(),
-      description: newDescription.trim(),
-      riderTips: newRiderTips.trim(),
-      difficulty: newDifficulty,
-      distance: newDistance ? parseInt(newDistance.replace(/\D/g, ''), 10) : undefined,
-      duration: newDuration.trim() || undefined
-    });
 
     const newRouteItem: Route = {
       id: "route-" + Date.now(),
@@ -456,10 +441,7 @@ export function Routes() {
       mapsUrl: formattedMapsUrl,
       description: newDescription.trim() || "Roteiro cadastrado pelo piloto no MotoLegado.",
       riderTips: newRiderTips.trim() || "Verifique a calibragem dos pneus e nível de combustível antes de partir.",
-      aiTouristInfo: newAiTouristInfo.trim() || undefined,
       difficulty: newDifficulty,
-      distance: parseInt(metrics.distance, 10),
-      duration: metrics.duration,
       image: finalImage,
       author: {
         name: "Você (Piloto)",
@@ -475,16 +457,14 @@ export function Routes() {
     };
 
     const updated = [newRouteItem, ...routes];
-    saveRoutes(updated);
+    saveRoutes(updated, newRouteItem);
 
     // Reset Form
     setNewTitle('');
     setNewMapsAddress('');
-    setNewDistance('');
-    setNewDuration('');
+    setNewMapsUrl('');
     setNewDescription('');
     setNewRiderTips('');
-    setNewAiTouristInfo('');
     setNewImage('');
     setIsCreateModalOpen(false);
 
@@ -549,7 +529,7 @@ export function Routes() {
     };
 
     const updatedRoutesList = routes.map(r => r.id === updatedRoute.id ? updatedRoute : r);
-    saveRoutes(updatedRoutesList);
+    saveRoutes(updatedRoutesList, updatedRoute);
     setSelectedRouteDetail(updatedRoute);
 
     setIsRatingModalOpen(false);
@@ -764,22 +744,10 @@ export function Routes() {
                   </p>
 
                   {/* Metrics Stats */}
-                  <div className="grid grid-cols-4 gap-2 py-3 border-y border-slate-800/80 bg-slate-950/40 px-2 sm:px-3 rounded-2xl text-center">
-                    <div>
-                      <span className="text-[8px] font-black uppercase text-slate-500 block">Distância</span>
-                      <span className="text-xs font-black text-orange-400 font-mono">
-                        {estimateRouteMetrics(route).distance} KM
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[8px] font-black uppercase text-slate-500 block">Tempo</span>
-                      <span className="text-xs font-bold text-slate-300 font-mono truncate block">
-                        {estimateRouteMetrics(route).duration}
-                      </span>
-                    </div>
+                  <div className="grid grid-cols-2 gap-2 py-3 border-y border-slate-800/80 bg-slate-950/40 px-3 rounded-2xl text-center">
                     <div>
                       <span className="text-[8px] font-black uppercase text-slate-500 block">Dificuldade</span>
-                      <span className="text-xs font-black text-slate-300 uppercase truncate block">{route.difficulty}</span>
+                      <span className="text-xs font-black text-orange-400 uppercase truncate block">{route.difficulty}</span>
                     </div>
                     <div>
                       <span className="text-[8px] font-black uppercase text-slate-500 block">Avaliação</span>
@@ -794,14 +762,6 @@ export function Routes() {
                   {isRejected && route.rejectionReason && (
                     <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[10px] text-rose-300">
                       <strong>Motivo da recusa:</strong> {route.rejectionReason}
-                    </div>
-                  )}
-
-                  {/* AI Badge Indicator if AI content exists */}
-                  {route.aiTouristInfo && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[9px] font-black uppercase text-amber-400">
-                      <Sparkles size={12} />
-                      Com Dicas Turísticas por IA
                     </div>
                   )}
                 </div>
@@ -827,33 +787,33 @@ export function Routes() {
                 )}
 
                 <div className="space-y-2 mt-2">
+                  <button 
+                    onClick={(e) => handleLaunchInLogbook(route, e)}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md group/btn active:scale-95"
+                    title="Enviar dados deste roteiro para criar uma nova viagem no Diário de Bordo"
+                  >
+                    <BookOpen size={13} className="group-hover/btn:scale-110 transition-transform" />
+                    <span>ENVIAR P/ DIÁRIO (NOVA VIAGEM)</span>
+                  </button>
+
                   <div className="grid grid-cols-2 gap-2">
                     <button 
-                      onClick={(e) => handleLaunchInLogbook(route, e)}
-                      className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm group/btn"
-                      title="Lançar este roteiro no seu Diário de Bordo para alimentar o Dashboard"
+                      onClick={(e) => handleCompleteRouteWithCamera(route, e)}
+                      className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm group/cam active:scale-95"
+                      title="Tirar foto com a câmera para comprovar e concluir este roteiro no Diário de Bordo"
                     >
-                      <BookOpen size={13} className="text-orange-500 group-hover/btn:scale-110 transition-transform" />
-                      <span>No Diário</span>
+                      <Camera size={13} className="text-orange-500 group-hover/cam:scale-110 transition-transform" />
+                      <span>Comprovar</span>
                     </button>
 
                     <button 
-                      onClick={(e) => handleCompleteRouteWithCamera(route, e)}
-                      className="py-2.5 rounded-xl bg-orange-600/15 hover:bg-orange-600 text-orange-400 hover:text-white border border-orange-500/40 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm group/cam active:scale-95"
-                      title="Tirar foto com a câmera para comprovar e concluir este roteiro no Diário de Bordo"
+                      onClick={() => setSelectedRouteDetail(route)}
+                      className="py-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-orange-500/50 text-[10px] font-black uppercase tracking-wider text-slate-200 hover:bg-slate-900 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Camera size={13} className="group-hover/cam:scale-110 transition-transform" />
-                      <span>Comprovar</span>
+                      <span>Detalhes</span>
+                      <ArrowRight size={13} />
                     </button>
                   </div>
-
-                  <button 
-                    onClick={() => setSelectedRouteDetail(route)}
-                    className="w-full py-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-orange-500/50 text-xs font-black uppercase tracking-wider text-slate-200 group-hover:bg-orange-600 group-hover:text-white group-hover:border-orange-500 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    VER DETALHES & AVALIAÇÕES
-                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                  </button>
                 </div>
               </div>
             </motion.div>
@@ -946,22 +906,36 @@ export function Routes() {
                       />
                     </div>
 
-                    <div className="md:col-span-2 space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Endereço no Google Maps / Localização *</label>
-                      <div className="relative">
-                        <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                        <input 
-                          type="text"
-                          required
-                          placeholder="Ex: RS-235, Gramado / Canela - RS ou Link do Google Maps"
-                          value={newMapsAddress}
-                          onChange={(e) => setNewMapsAddress(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-orange-500 transition-all"
-                        />
-                      </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1.5">
+                        <MapPin size={13} className="text-orange-500" />
+                        Endereço / Localização do Roteiro *
+                      </label>
+                      <input 
+                        type="text"
+                        required
+                        placeholder="Ex: RS-235, Gramado / Canela - RS"
+                        value={newMapsAddress}
+                        onChange={(e) => setNewMapsAddress(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-all"
+                      />
                     </div>
 
                     <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1.5">
+                        <ExternalLink size={13} className="text-orange-500" />
+                        Link do Google Maps (Opcional)
+                      </label>
+                      <input 
+                        type="url"
+                        placeholder="Ex: https://maps.app.goo.gl/... ou link de rota"
+                        value={newMapsUrl}
+                        onChange={(e) => setNewMapsUrl(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-all"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 space-y-1">
                       <label className="text-[10px] font-black uppercase text-slate-400">Nível de Dificuldade</label>
                       <select 
                         value={newDifficulty}
@@ -973,38 +947,6 @@ export function Routes() {
                         <option value={RouteDifficulty.HARD}>Difícil (Serras travadas e tráfego)</option>
                         <option value={RouteDifficulty.EXPERT}>Especialista (Curvas extremas e alta altitude)</option>
                       </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Distância Estimada (KM)</label>
-                      <input 
-                        type="text"
-                        placeholder="Ex: 220"
-                        value={newDistance}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setNewDistance(val);
-                          const num = parseInt(val.replace(/\D/g, ''), 10);
-                          if (!isNaN(num) && num > 0 && !newDuration) {
-                            const totalMinutes = Math.round((num / 65) * 60);
-                            const hours = Math.floor(totalMinutes / 60);
-                            const mins = totalMinutes % 60;
-                            setNewDuration(hours > 0 ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}` : `${mins}min`);
-                          }
-                        }}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Duração Estimada de Viagem</label>
-                      <input 
-                        type="text"
-                        placeholder="Ex: 3h 30min"
-                        value={newDuration}
-                        onChange={(e) => setNewDuration(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500"
-                      />
                     </div>
 
                     {/* Foto de Capa do Roteiro */}
@@ -1075,7 +1017,7 @@ export function Routes() {
                                 Tirar Foto ou Escolher da Galeria
                               </p>
                               <p className="text-[9px] font-medium text-slate-500 mt-0.5">
-                                Ou cole o link de uma imagem externa abaixo
+                                Ou cole o link direto de uma imagem externa abaixo
                               </p>
                             </div>
                           </div>
@@ -1088,7 +1030,7 @@ export function Routes() {
                           <div className="space-y-1">
                             <p className="font-bold">O link da imagem não pôde ser carregado diretamente.</p>
                             <p className="text-[11px] text-rose-300/80">
-                              Links de páginas ou serviços protegidos não exibem fotos diretamente. Você pode fazer o upload da foto acima ou selecionar um dos modelos abaixo.
+                              Links de páginas ou serviços protegidos não exibem fotos diretamente. Você pode fazer o upload da foto acima ou colar uma URL direta de imagem.
                             </p>
                           </div>
                         </div>
@@ -1108,33 +1050,6 @@ export function Routes() {
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-400 outline-none focus:border-orange-500 transition-colors"
                         />
                       </div>
-
-                      {/* Modelos recomendados */}
-                      <div className="space-y-1.5 pt-1">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
-                          Ou escolha uma foto recomendada para esta rota:
-                        </span>
-                        <div className="flex flex-wrap gap-2">
-                          {PRESET_ROUTE_IMAGES.map((preset, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => {
-                                setNewImage(preset.url);
-                                setImageLoadError(false);
-                              }}
-                              className={cn(
-                                "px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer",
-                                newImage === preset.url
-                                  ? "bg-orange-500/20 border-orange-500 text-orange-400"
-                                  : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
-                              )}
-                            >
-                              📷 {preset.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
                     </div>
 
                   </div>
@@ -1142,16 +1057,35 @@ export function Routes() {
 
                 {/* Description & Rider Tips */}
                 <div className="space-y-4 pt-2 border-t border-slate-800">
-                  <h3 className="text-xs font-black uppercase text-orange-400 tracking-widest flex items-center gap-2">
-                    <Info size={14} /> 2. DESCRIÇÃO E DICAS PARA PILOTOS
-                  </h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <h3 className="text-xs font-black uppercase text-orange-400 tracking-widest flex items-center gap-2">
+                      <Info size={14} /> 2. DESCRIÇÃO E DICAS TÉCNICAS
+                    </h3>
+
+                    <button 
+                      type="button"
+                      disabled={isAiGenerating}
+                      onClick={handleSuggestAiRouteContent}
+                      className="px-4 py-2 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-50 shrink-0 shadow-md cursor-pointer active:scale-95"
+                    >
+                      {isAiGenerating ? (
+                        <>
+                          <RefreshCw size={12} className="animate-spin" /> Sugerindo com IA...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={12} className="text-amber-200" /> Sugerir com IA (Descrição & Técnicas)
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                   <div className="space-y-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-slate-400">Descrição do Local e Experiência do Percurso</label>
                       <textarea 
                         rows={3}
-                        placeholder="Descreva o que os pilotos encontrarão nesta rota (paisagens, qualidade do piso, trechos históricos)..."
+                        placeholder="Descreva o que os pilotos encontrarão nesta rota (paisagens, qualidade do piso, trechos históricos)... Ou clique no botão 'Sugerir com IA' acima."
                         value={newDescription}
                         onChange={(e) => setNewDescription(e.target.value)}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-orange-500"
@@ -1162,7 +1096,7 @@ export function Routes() {
                       <label className="text-[10px] font-black uppercase text-slate-400">Maiores Informações & Dicas Técnicas do Local</label>
                       <textarea 
                         rows={3}
-                        placeholder="Dicas sobre postos de combustível, condições de asfalto, pontos de apoio para café, radares, melhor época do ano..."
+                        placeholder="Dicas sobre pilotagem em curvas, frenagem, postos de combustível, condições de asfalto, radares, melhor época do ano..."
                         value={newRiderTips}
                         onChange={(e) => setNewRiderTips(e.target.value)}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-orange-500"
@@ -1171,53 +1105,10 @@ export function Routes() {
                   </div>
                 </div>
 
-                {/* AI Tourist Info Section */}
-                <div className="space-y-4 pt-2 border-t border-slate-800 bg-amber-500/5 p-4 rounded-2xl border border-amber-500/20">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-xs font-black uppercase text-amber-400 tracking-widest flex items-center gap-2">
-                        <Sparkles size={16} /> 3. INFORMAÇÕES TURÍSTICAS COM INTELIGÊNCIA ARTIFICIAL
-                      </h3>
-                      <p className="text-[10px] text-slate-400">
-                        Obtenha automaticamente atrações turísticas, fatos históricos, gastronomia e dicas fotográficas.
-                      </p>
-                    </div>
-
-                    <button 
-                      type="button"
-                      disabled={isAiGenerating}
-                      onClick={() => handleGenerateAiInfo(newTitle, newMapsAddress, newDescription, setNewAiTouristInfo)}
-                      className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-50 shrink-0"
-                    >
-                      {isAiGenerating ? (
-                        <>
-                          <RefreshCw size={12} className="animate-spin" /> Gerando com IA...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={12} /> Gerar via IA Gemini
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {aiError && (
-                    <p className="text-[10px] text-rose-400 font-mono">{aiError}</p>
-                  )}
-
-                  <textarea 
-                    rows={5}
-                    placeholder="Clique no botão acima para gerar automaticamente informações turísticas por IA, ou digite manualmente..."
-                    value={newAiTouristInfo}
-                    onChange={(e) => setNewAiTouristInfo(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 outline-none focus:border-amber-500 font-mono leading-relaxed"
-                  />
-                </div>
-
                 {/* Initial Metrics Ratings */}
                 <div className="space-y-4 pt-2 border-t border-slate-800">
                   <h3 className="text-xs font-black uppercase text-orange-400 tracking-widest flex items-center gap-2">
-                    <Star size={14} /> 4. ESCALA DE AVALIAÇÃO INICIAL DO PILOTO (1 a 5)
+                    <Star size={14} /> 3. ESCALA DE AVALIAÇÃO INICIAL DO PILOTO (1 a 5)
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 bg-slate-950 p-4 rounded-2xl border border-slate-800">
@@ -1425,27 +1316,15 @@ export function Routes() {
                 )}
 
                 {/* Stats Bar */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center">
-                  <div>
-                    <span className="text-[9px] font-black uppercase text-slate-500 block">Distância</span>
-                    <span className="text-xs font-black text-orange-400 font-mono">
-                      {estimateRouteMetrics(selectedRouteDetail).distance} KM
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-black uppercase text-slate-500 block">Duração Estimada</span>
-                    <span className="text-xs font-black text-slate-300 font-mono">
-                      {estimateRouteMetrics(selectedRouteDetail).duration}
-                    </span>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center">
                   <div>
                     <span className="text-[9px] font-black uppercase text-slate-500 block">Nível de Dificuldade</span>
-                    <span className="text-xs font-black text-amber-400 uppercase">{selectedRouteDetail.difficulty}</span>
+                    <span className="text-sm font-black text-orange-400 uppercase">{selectedRouteDetail.difficulty}</span>
                   </div>
                   <div>
                     <span className="text-[9px] font-black uppercase text-slate-500 block">Avaliação Média</span>
-                    <span className="text-xs font-black text-amber-400 flex items-center justify-center gap-1">
-                      <Star size={12} className="fill-amber-400" />
+                    <span className="text-sm font-black text-amber-400 flex items-center justify-center gap-1">
+                      <Star size={14} className="fill-amber-400" />
                       {selectedRouteDetail.rating} / 5.0
                     </span>
                   </div>
@@ -1456,9 +1335,9 @@ export function Routes() {
                   <div className="space-y-1">
                     <h4 className="text-xs font-black uppercase text-white flex items-center gap-2">
                       <MapPin size={16} className="text-orange-500" />
-                      LOCALIZAÇÃO E NAVEGAÇÃO NO GOOGLE MAPS
+                      LOCALIZAÇÃO E NAVEGAÇÃO
                     </h4>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-slate-300 font-medium">
                       {selectedRouteDetail.mapsAddress}
                     </p>
                   </div>
@@ -1466,31 +1345,31 @@ export function Routes() {
                   <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => handleCompleteRouteWithCamera(selectedRouteDetail)}
-                      className="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-orange-600/20 cursor-pointer transition-all active:scale-95"
-                      title="Tirar foto com a câmera para comprovar e concluir este roteiro no Diário de Bordo"
+                      onClick={() => handleLaunchInLogbook(selectedRouteDetail)}
+                      className="px-4 py-2.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-orange-600/20 cursor-pointer transition-all active:scale-95"
+                      title="Enviar dados deste roteiro para criar uma nova viagem no Diário de Bordo"
                     >
-                      <Camera size={14} />
-                      TIRAR FOTO / COMPROVAR
+                      <BookOpen size={14} />
+                      ENVIAR PARA DIÁRIO (NOVA VIAGEM)
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => handleLaunchInLogbook(selectedRouteDetail)}
+                      onClick={() => handleCompleteRouteWithCamera(selectedRouteDetail)}
                       className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95"
-                      title="Lançar este roteiro no seu Diário de Bordo para alimentar o Dashboard"
+                      title="Tirar foto com a câmera para comprovar e concluir este roteiro no Diário de Bordo"
                     >
-                      <BookOpen size={14} className="text-orange-500" />
-                      LANÇAR NO DIÁRIO
+                      <Camera size={14} className="text-orange-500" />
+                      COMPROVAR
                     </button>
 
                     <a 
-                      href={selectedRouteDetail.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedRouteDetail.mapsAddress)}`}
+                      href={selectedRouteDetail.mapsUrl || (selectedRouteDetail.mapsAddress.startsWith('http') ? selectedRouteDetail.mapsAddress : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedRouteDetail.mapsAddress)}`)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-sm shrink-0 transition-all"
+                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-sm shrink-0 transition-all"
                     >
-                      <ExternalLink size={14} />
+                      <ExternalLink size={14} className="text-orange-500" />
                       GOOGLE MAPS
                     </a>
                   </div>
@@ -1514,39 +1393,6 @@ export function Routes() {
                     <div className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 whitespace-pre-line">
                       {selectedRouteDetail.riderTips}
                     </div>
-                  </div>
-                </div>
-
-                {/* AI Tourist Info Section */}
-                <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-2">
-                      <Sparkles size={16} /> INFORMAÇÕES TURÍSTICAS DO LOCAL (IA GEMINI)
-                    </h4>
-
-                    {!selectedRouteDetail.aiTouristInfo && (
-                      <button 
-                        disabled={isAiGenerating}
-                        onClick={() => handleGenerateAiInfo(
-                          selectedRouteDetail.name, 
-                          selectedRouteDetail.mapsAddress, 
-                          selectedRouteDetail.description,
-                          (generated) => {
-                            const updated = { ...selectedRouteDetail, aiTouristInfo: generated };
-                            setSelectedRouteDetail(updated);
-                            saveRoutes(routes.map(r => r.id === updated.id ? updated : r));
-                          }
-                        )}
-                        className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5"
-                      >
-                        {isAiGenerating ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                        Gerar com IA
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-line bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    {selectedRouteDetail.aiTouristInfo || "Nenhuma informação turística gerada ainda. Clique em 'Gerar com IA' para obter atracoes, historia e dicas turisticas do local."}
                   </div>
                 </div>
 

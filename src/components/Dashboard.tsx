@@ -1,18 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
-} from 'recharts';
-import { 
   Calendar, Store, Percent, Route, BookOpen, CheckCircle, Plus, MapPin, Trophy,
-  Navigation, Clock, Sun, Moon, Star, CloudRain, Cloud, Zap, CloudFog, Wind,
-  ExternalLink, ShieldCheck, Bike
+  Navigation, Clock, Sun, Star, ExternalLink, Bike
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { MotoEvent } from './Events';
@@ -61,7 +51,12 @@ export function Dashboard() {
         }
       }
 
-      const currentPilotKey = user?.id || profile?.id || user?.email || 'guest';
+      const currentPilotKey = user?.id || profile?.id || user?.email;
+      if (!currentPilotKey) {
+        setLogs([]);
+        return;
+      }
+
       const userStorageKey = `motolegado_logs_${currentPilotKey}`;
       const currentPilotSet = new Set<string>([
         user?.id,
@@ -71,8 +66,7 @@ export function Dashboard() {
       ].filter(Boolean).map(s => String(s).toLowerCase()));
 
       const isMyLog = (log: any) => {
-        if (!log) return false;
-        if (!log.pilot_id) return true;
+        if (!log || !log.pilot_id) return false;
         return currentPilotSet.has(String(log.pilot_id).toLowerCase());
       };
 
@@ -107,7 +101,7 @@ export function Dashboard() {
       // 4. Carregar e sincronizar viagens do MySQL na Hostinger estritamente para o piloto ativo
       const isStockUrl = (u?: string) => !u || u.includes('images.unsplash.com');
 
-      getTripsFromHostinger(user?.id || profile?.id || user?.email)
+      getTripsFromHostinger(currentPilotKey)
         .then((res) => {
           if (res && res.trips && Array.isArray(res.trips)) {
             const mappedLogs: LogEntry[] = res.trips.map((t: any) => {
@@ -269,36 +263,6 @@ export function Dashboard() {
       stagesList,
     };
   }, [latestLog, profile]);
-
-  // Dynamic telemetry chart data reflecting actual trips
-  const chartKmData = useMemo(() => {
-    if (logs.length === 0) {
-      return [
-        { name: 'Km 0', km: 0 },
-        { name: 'Km 150', km: 150 },
-        { name: 'Km 320', km: 320 },
-        { name: 'Km 580', km: 580 },
-        { name: 'Km 900', km: 900 },
-      ];
-    }
-
-    // Sort chronologically (oldest to newest) to display cumulative distance evolution
-    const chronological = [...logs].reverse();
-    let accumulated = 0;
-
-    return chronological.map((log, index) => {
-      const dist = parseInt(log.distance, 10) || 0;
-      accumulated += dist;
-      const titleLabel = log.title 
-        ? (log.title.length > 14 ? log.title.slice(0, 12) + '...' : log.title) 
-        : `Rota ${index + 1}`;
-      return {
-        name: titleLabel,
-        km: accumulated,
-        tripKm: dist
-      };
-    });
-  }, [logs]);
 
   // Live Gamification Engine (KM + Eventos + Diário + Badges)
   const gamification = useMemo(() => {

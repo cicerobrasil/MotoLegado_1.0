@@ -26,6 +26,7 @@ import { cn } from '../lib/utils';
 import { CommunityPost } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { uploadImageToStorage } from '../lib/storage';
+import { clientDbService } from '../lib/dbService';
 
 export const COMMUNITY_CATEGORIES = [
   "TUDO", 
@@ -76,18 +77,34 @@ export function Feed() {
   const [reportingPost, setReportingPost] = useState<CommunityPost | null>(null);
   const [reportReason, setReportReason] = useState("");
 
-  // Load Posts from LocalStorage
+  // Load Posts from Hostinger MySQL Database (com fallback resiliente de cache)
   const loadPosts = () => {
-    const saved = localStorage.getItem('motolegado_community_posts_v1');
-    if (saved) {
-      try {
-        setPosts(JSON.parse(saved));
-      } catch (e) {
+    clientDbService.posts.getAll()
+      .then((dbPosts) => {
+        if (Array.isArray(dbPosts) && dbPosts.length > 0) {
+          setPosts(dbPosts);
+          localStorage.setItem('motolegado_community_posts_v1', JSON.stringify(dbPosts));
+          return;
+        }
+
+        const saved = localStorage.getItem('motolegado_community_posts_v1');
+        if (saved) {
+          try {
+            setPosts(JSON.parse(saved));
+            return;
+          } catch {}
+        }
         setPosts([]);
-      }
-    } else {
-      setPosts([]);
-    }
+      })
+      .catch((err) => {
+        console.warn('[Feed] Aviso ao carregar posts do MySQL:', err);
+        const saved = localStorage.getItem('motolegado_community_posts_v1');
+        if (saved) {
+          try {
+            setPosts(JSON.parse(saved));
+          } catch {}
+        }
+      });
   };
 
   useEffect(() => {
@@ -102,10 +119,17 @@ export function Feed() {
     };
   }, []);
 
-  const savePosts = (updated: CommunityPost[]) => {
+  const savePosts = (updated: CommunityPost[], postToPersist?: CommunityPost) => {
     setPosts(updated);
     localStorage.setItem('motolegado_community_posts_v1', JSON.stringify(updated));
     window.dispatchEvent(new Event('community-posts-updated'));
+
+    // Sincroniza persistência com o MySQL da Hostinger
+    if (postToPersist) {
+      clientDbService.posts.save(postToPersist).catch((e) => {
+        console.warn('[Feed] Aviso ao persistir post no MySQL:', e);
+      });
+    }
   };
 
   const showToast = (msg: string) => {
@@ -192,7 +216,7 @@ export function Feed() {
     };
 
     const updated = [newPost, ...posts];
-    savePosts(updated);
+    savePosts(updated, newPost);
 
     // Reset Form
     setPostContent("");
@@ -219,6 +243,9 @@ export function Feed() {
       return p;
     });
     savePosts(updated);
+    if (!isLiked) {
+      clientDbService.posts.like(postId).catch(() => {});
+    }
   };
 
   // Handle Comments

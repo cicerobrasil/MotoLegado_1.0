@@ -300,6 +300,30 @@ export function ProfileDashboard() {
     { month: 'JUN', value: 0 },
   ];
 
+  if (!user && !profile) {
+    return (
+      <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto space-y-6 min-h-[70vh] flex flex-col items-center justify-center text-center">
+        <div className="w-16 h-16 rounded-2xl bg-[#001b3d] border border-orange-500/40 flex items-center justify-center text-orange-400 shadow-xl">
+          <ShieldCheck size={32} />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-white italic uppercase tracking-tight">Perfil de Piloto</h1>
+          <p className="text-slate-400 text-sm max-w-md mx-auto">
+            Você não possui uma sessão ativa no momento. Faça login ou crie sua conta no MotoLegado para acessar sua telemetria, passaporte digital e histórico de viagens.
+          </p>
+        </div>
+        <div>
+          <button
+            onClick={() => navigate('/')}
+            className="btn-primary px-8 py-3.5 text-xs font-black uppercase tracking-wider shadow-lg shadow-orange-950/50 cursor-pointer"
+          >
+            Entrar / Cadastrar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-12 bg-slate-950 min-h-screen">
       

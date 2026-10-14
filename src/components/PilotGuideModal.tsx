@@ -14,16 +14,8 @@ import {
   ExternalLink,
   X,
   Gauge,
-  Award,
-  AlertTriangle,
   CheckCircle2,
   ChevronRight,
-  Flame,
-  Wrench,
-  Fuel,
-  Users,
-  Eye,
-  ArrowRight,
   ShieldCheck
 } from 'lucide-react';
 import { useTour } from '../context/TourContext';

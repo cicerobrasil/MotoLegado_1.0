@@ -8,9 +8,7 @@ import {
   Bike, 
   ArrowRight, 
   X, 
-  Sparkles,
-  ShieldCheck,
-  CheckCircle2
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 

@@ -6,6 +6,7 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { testDbConnection, initDatabaseTables, getDbPool, safeMySqlQuery, dbConfig } from './server/db';
+import dbService from './server/dbService';
 import { 
   handleRegister, 
   handleLogin, 
@@ -27,7 +28,7 @@ import {
   storeSavePaymentRequest,
   storeApprovePaymentRequest
 } from './server/store';
-import { parseGoogleMapsRoute, calculateRouteDistanceAndDuration } from './server/mapsParser';
+import { parseGoogleMapsRoute, calculateRouteDistanceAndDuration, extractMetricsFromText } from './server/mapsParser';
 
 async function startServer() {
   const app = express();
@@ -90,7 +91,75 @@ async function startServer() {
     }
   });
 
-  // API Route to generate tourist & motorcycle info using Gemini AI
+  // API Route to suggest route description & riding techniques using Gemini AI
+  app.post('/api/routes/ai-suggest-route', async (req, res) => {
+    try {
+      const { title, address } = req.body;
+
+      if (!title || !title.trim()) {
+        return res.status(400).json({ error: 'Título do roteiro é obrigatório para gerar sugestão com IA.' });
+      }
+
+      const fallbackDescription = `Roteiro incrível por "${title}"${address ? ` localizado em ${address}` : ''}. Um percurso espetacular que combina belas paisagens naturais, trechos sinuosos e uma experiência imersiva para quem pilota sobre duas rodas. Pelo caminho, você encontrará mirantes panorâmicos com vista privilegiada, paradas estratégicas para descanso e gastronomia regional típica da serra.`;
+
+      const fallbackTechniques = `• Pilotagem & Curvas: Mantenha postura relaxada nos braços, olhar direcionado para a saída de cada curva e atenção à inclinação da moto em trechos com declive.\n• Asfalto & Aderência: Fique atento a eventuais resíduos de folhas ou umidade nas curvas sombreadas no período da manhã.\n• Planejamento: Abasteça a moto nas cidades-base e mantenha a calibragem dos pneus adequada para o tipo de percurso.\n• Equipamentos: Jaqueta com proteções completas, luvas e viseira limpa para máxima visibilidade nas variações de luminosidade.`;
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.json({
+          description: fallbackDescription,
+          techniques: fallbackTechniques
+        });
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+
+      const prompt = `Você é um experiente motociclista e guia de viagens de moto no Brasil e América do Sul.
+Para o roteiro de moto a seguir:
+- Título do Roteiro: "${title}"
+- Endereço / Localização: "${address || 'Não especificado'}"
+
+Gere uma sugestão em JSON estrito com dois campos em português:
+1. "description": Descrição envolvente e rica do local e da experiência de pilotagem (2 a 3 parágrafos fluídos sobre paisagem, estrada, história ou atmosfera).
+2. "techniques": Dicas técnicas práticas de pilotagem para essa rota (itens com marcadores • abordando curvas, frenagem, marcha/tração, qualidade do piso, segurança, postos e melhor horário).
+
+Responda EXCLUSIVAMENTE em formato JSON:
+{
+  "description": "...",
+  "techniques": "..."
+}`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json'
+        }
+      });
+
+      const rawText = response.text || '';
+      try {
+        const parsed = JSON.parse(rawText);
+        return res.json({
+          description: parsed.description || fallbackDescription,
+          techniques: parsed.techniques || fallbackTechniques
+        });
+      } catch {
+        return res.json({
+          description: rawText || fallbackDescription,
+          techniques: fallbackTechniques
+        });
+      }
+    } catch (err: any) {
+      console.error('Erro na API do Gemini para sugestão de roteiro:', err);
+      return res.json({
+        description: `Roteiro por "${req.body?.title || 'Roteiro'}"${req.body?.address ? ` (${req.body.address})` : ''}. Uma rota cênica com curvas e paisagens marcantes para motociclistas.`,
+        techniques: `• Atenção ao traçado das curvas e modulação suave dos freios.\n• Verifique a pressão dos pneus e nível de combustível antes de iniciar o trecho.\n• Mantenha distância segura e aproveite as paradas para fotos e hidratação.`
+      });
+    }
+  });
+
+  // API Route to generate tourist & motorcycle info using Gemini AI (legacy compatibility)
   app.post('/api/routes/ai-tourist-info', async (req, res) => {
     try {
       const { title, address, description } = req.body;
@@ -125,7 +194,7 @@ Por favor, elabore um resumo turístico bem formatado em Markdown contendo:
 Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada com emoticons.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         contents: prompt,
       });
 
@@ -446,14 +515,18 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
       }
 
       let targetUrl = input;
+      let responseHtml = '';
 
-      // Se for um link HTTP/HTTPS (incluindo encurtadores como maps.app.goo.gl ou goo.gl/maps)
-      if (input.startsWith('http://') || input.startsWith('https://')) {
+      // Extrai qualquer URL contida na entrada (inclusive dentro de mensagens como "De Curitiba para Morretes... https://maps.app.goo.gl/...")
+      const extractedUrl = input.match(/https?:\/\/[^\s]+/i)?.[0];
+      const urlToFetch = extractedUrl || (input.startsWith('http://') || input.startsWith('https://') ? input : null);
+
+      if (urlToFetch) {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-          const response = await fetch(input, {
+          const response = await fetch(urlToFetch, {
             method: 'GET',
             redirect: 'follow',
             signal: controller.signal,
@@ -463,13 +536,41 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
             }
           });
           clearTimeout(timeoutId);
-          targetUrl = response.url || input;
+          targetUrl = response.url || urlToFetch;
+          responseHtml = await response.text();
         } catch (fetchErr: any) {
           console.warn('[ParseMaps] Falha ao seguir redirecionamento automático:', fetchErr?.message || fetchErr);
         }
       }
 
+      // Se a URL final for de consentimento do Google (consent.google.com), extrai o parâmetro continue original
+      if (targetUrl && targetUrl.includes('consent.google.com') && targetUrl.includes('continue=')) {
+        try {
+          const consentUrl = new URL(targetUrl);
+          const cont = consentUrl.searchParams.get('continue');
+          if (cont) {
+            targetUrl = decodeURIComponent(cont);
+          }
+        } catch {}
+      }
+
       const parsed = parseGoogleMapsRoute(targetUrl, input);
+
+      // Se a página do Google Maps retornou HTML com metatags de rota (ex: descrição com tempo e km)
+      if (responseHtml && (!parsed.estimatedDistanceKm || !parsed.estimatedDuration)) {
+        const metaMatches = [
+          responseHtml.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i)?.[1],
+          responseHtml.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i)?.[1],
+          responseHtml.match(/<meta\s+[^>]*content=["']([^"']*(?:km|min|h)[^"']*)["'][^>]*>/i)?.[1],
+          responseHtml.match(/<title>([^<]+)<\/title>/i)?.[1]
+        ].filter(Boolean) as string[];
+
+        for (const metaText of metaMatches) {
+          const { distanceKm: metaKm, duration: metaDur } = extractMetricsFromText(metaText);
+          if (metaKm && !parsed.estimatedDistanceKm) parsed.estimatedDistanceKm = metaKm;
+          if (metaDur && !parsed.estimatedDuration) parsed.estimatedDuration = metaDur;
+        }
+      }
 
       if (!parsed.origin && !parsed.destination && parsed.waypoints.length === 0) {
         return res.status(422).json({
@@ -479,13 +580,18 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
         });
       }
 
-      // Calcula a distância rodoviária real e a duração de viagem automaticamente
-      if (parsed.origin && parsed.destination) {
+      // Se ainda não temos distância ou duração exatas extraídas do Google Maps, calcula via OSRM / Geocodificação
+      if (parsed.origin && parsed.destination && (!parsed.estimatedDistanceKm || !parsed.estimatedDuration)) {
         try {
-          const metrics = await calculateRouteDistanceAndDuration(parsed.origin, parsed.destination, parsed.waypoints);
+          const metrics = await calculateRouteDistanceAndDuration(
+            parsed.origin, 
+            parsed.destination, 
+            parsed.waypoints,
+            parsed.coords
+          );
           if (metrics) {
-            parsed.estimatedDistanceKm = metrics.distanceKm;
-            parsed.estimatedDuration = metrics.duration;
+            if (!parsed.estimatedDistanceKm) parsed.estimatedDistanceKm = metrics.distanceKm;
+            if (!parsed.estimatedDuration) parsed.estimatedDuration = metrics.duration;
           }
         } catch (mErr) {
           console.warn('[ParseMaps] Falha ao calcular métricas de distância/duração:', mErr);
@@ -568,6 +674,57 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
     });
   });
 
+  // Hostinger MySQL Teste Direto de Consulta SELECT 1 via mysql2
+  app.get('/api/db/ping', async (req, res) => {
+    const startTime = Date.now();
+    try {
+      const pool = getDbPool();
+      if (!pool) {
+        return res.status(500).json({
+          success: false,
+          status: 'Erro de Conexão',
+          query: 'SELECT 1 AS ping',
+          latencyMs: Date.now() - startTime,
+          host: dbConfig.host,
+          database: dbConfig.database,
+          message: 'Pool de conexão MySQL não inicializado.',
+          error: 'MySQL Pool indisponível.'
+        });
+      }
+
+      const [rows]: any = await pool.query('SELECT 1 AS ping, NOW() AS server_time, DATABASE() AS current_database, VERSION() AS mysql_version');
+      const latencyMs = Date.now() - startTime;
+
+      return res.json({
+        success: true,
+        status: 'Conectado',
+        query: 'SELECT 1 AS ping',
+        latencyMs,
+        host: dbConfig.host,
+        database: dbConfig.database,
+        user: dbConfig.user,
+        message: 'Consulta SELECT 1 executada com sucesso via mysql2 no banco da Hostinger!',
+        result: rows,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      const latencyMs = Date.now() - startTime;
+      console.error('[MySQL Ping SELECT 1] Erro na consulta:', err);
+      return res.status(500).json({
+        success: false,
+        status: 'Erro de Conexão',
+        query: 'SELECT 1 AS ping',
+        latencyMs,
+        host: dbConfig.host,
+        database: dbConfig.database,
+        user: dbConfig.user,
+        message: err?.message || 'Falha ao executar SELECT 1 no banco da Hostinger.',
+        error: err?.message || String(err),
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
   app.post('/api/db/test-connection', async (req, res) => {
     const { host } = req.body;
     const result = await testDbConnection(host);
@@ -588,38 +745,19 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
   app.post('/api/auth/reset-password', handleResetPassword);
   app.post('/api/auth/change-password', handleChangePassword);
 
-  // Pilots API - Listar todos os pilotos (para CommandCenter / Admin)
+  // Pilots API - Centralizado via dbService
   app.get('/api/pilots', async (req, res) => {
     try {
-      let pilots: any[] = [];
-      const mysqlRes: any = await safeMySqlQuery('SELECT * FROM pilots ORDER BY created_at DESC');
-      if (mysqlRes && mysqlRes[0] && Array.isArray(mysqlRes[0]) && mysqlRes[0].length > 0) {
-        pilots = mysqlRes[0];
-      }
-      if (pilots.length === 0) {
-        pilots = storeGetAllPilots();
-      }
+      const pilots = await dbService.getAllPilots();
       return res.json({ success: true, pilots });
     } catch (err: any) {
-      return res.json({ success: true, pilots: storeGetAllPilots() });
+      return res.status(500).json({ success: false, error: err.message, pilots: [] });
     }
   });
 
-  // Pilots API - Obter perfil por ID ou E-mail
   app.get('/api/pilots/:id', async (req, res) => {
     try {
-      const searchId = req.params.id;
-      let pilot: any = null;
-      const mysqlRes: any = await safeMySqlQuery('SELECT * FROM pilots WHERE id = ? OR LOWER(email) = ?', [searchId, searchId.toLowerCase()]);
-      if (mysqlRes && mysqlRes[0] && mysqlRes[0].length > 0) {
-        pilot = mysqlRes[0][0];
-      }
-
-      // Se não encontrou no MySQL, busca no armazenamento persistente local
-      if (!pilot) {
-        pilot = storeGetPilotById(searchId) || storeGetPilotByEmail(searchId);
-      }
-
+      const pilot = await dbService.getPilotById(req.params.id);
       if (pilot) {
         return res.json({ success: true, pilot });
       }
@@ -629,66 +767,9 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
     }
   });
 
-  // Salvar ou atualizar perfil do piloto
   app.post('/api/pilots', async (req, res) => {
     try {
-      // 1. Salvar imediatamente no armazenamento persistente local garantindo zero perda de dados
-      const savedPilot = storeSavePilot(req.body);
-
-      // 2. Tentativa assíncrona de persistência no MySQL se disponível (sem travar requisição)
-      const {
-        id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone,
-        role, plan, motorcycle_nickname, motorcycle_photos, motorcycle_year, motorcycle_plate,
-        bio, avatar_url, personal_logo_url, city, state, cep, street, street_number, neighborhood,
-        default_start_point, club_name
-      } = req.body;
-      const photosJson = Array.isArray(motorcycle_photos) ? JSON.stringify(motorcycle_photos) : (motorcycle_photos || null);
-
-      safeMySqlQuery(`
-        INSERT INTO pilots (
-          id, email, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone,
-          role, plan, motorcycle_nickname, motorcycle_photos, motorcycle_year, motorcycle_plate,
-          bio, avatar_url, personal_logo_url, city, state, cep, street, street_number, neighborhood,
-          default_start_point, club_name
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          name = VALUES(name),
-          motorcycle = VALUES(motorcycle),
-          phone = VALUES(phone),
-          blood_type = VALUES(blood_type),
-          emergency_contact = VALUES(emergency_contact),
-          emergency_phone = VALUES(emergency_phone),
-          role = VALUES(role),
-          plan = VALUES(plan),
-          motorcycle_nickname = VALUES(motorcycle_nickname),
-          motorcycle_photos = VALUES(motorcycle_photos),
-          motorcycle_year = VALUES(motorcycle_year),
-          motorcycle_plate = VALUES(motorcycle_plate),
-          bio = VALUES(bio),
-          avatar_url = VALUES(avatar_url),
-          personal_logo_url = VALUES(personal_logo_url),
-          city = VALUES(city),
-          state = VALUES(state),
-          cep = VALUES(cep),
-          street = VALUES(street),
-          street_number = VALUES(street_number),
-          neighborhood = VALUES(neighborhood),
-          default_start_point = VALUES(default_start_point),
-          club_name = VALUES(club_name)
-      `, [
-        id || savedPilot.id, email || savedPilot.email, name || savedPilot.name, motorcycle || savedPilot.motorcycle || null, 
-        phone || null, blood_type || null, emergency_contact || null, emergency_phone || null,
-        role || savedPilot.role || 'pilot', plan || savedPilot.plan || 'gratuito', 
-        motorcycle_nickname || savedPilot.motorcycle_nickname || null, photosJson, 
-        motorcycle_year || savedPilot.motorcycle_year || null, motorcycle_plate || savedPilot.motorcycle_plate || null,
-        bio || savedPilot.bio || null, avatar_url || savedPilot.avatar_url || null, 
-        personal_logo_url || savedPilot.personal_logo_url || null, city || savedPilot.city || null, 
-        state || savedPilot.state || null, cep || savedPilot.cep || null, street || savedPilot.street || null, 
-        street_number || savedPilot.street_number || null, neighborhood || savedPilot.neighborhood || null,
-        default_start_point !== undefined ? (default_start_point ? 1 : 0) : 1, club_name || null
-      ]).catch(() => {});
-
+      const savedPilot = await dbService.savePilot(req.body);
       return res.json({ 
         success: true, 
         message: 'Perfil do piloto salvo com sucesso!', 
@@ -696,221 +777,258 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
       });
     } catch (err: any) {
       console.error('[API PILOTS ERROR]:', err);
-      return res.status(200).json({ success: true, message: 'Perfil processado.' });
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // Trips API - Consulta estrita por piloto para isolamento do Diário de Bordo
+  // Trips API (Diário de Bordo) - Centralizado via dbService
   app.get('/api/trips', async (req, res) => {
     try {
       const rawPilotId = req.query.pilot_id as string;
       const wantAll = req.query.all === 'true' || rawPilotId === 'all';
       const cleanPilotId = (!rawPilotId || rawPilotId === 'undefined' || rawPilotId === 'null' || rawPilotId === 'all') 
-        ? null 
+        ? undefined 
         : rawPilotId.trim();
 
-      let trips: any[] = [];
-
-      // Apenas se explicitamente solicitado 'all' ou sem identificador de piloto (para ranking/admin global)
-      if (wantAll || !cleanPilotId) {
-        const mysqlRes: any = await safeMySqlQuery('SELECT * FROM trips ORDER BY created_at DESC');
-        if (mysqlRes && mysqlRes[0] && Array.isArray(mysqlRes[0])) {
-          trips = mysqlRes[0];
-        }
-        if (trips.length === 0) {
-          trips = storeGetTrips('all', true);
-        }
-      } else {
-        // Resolver estritamente os identificadores DESTE piloto específico (ID, email)
-        const candidateIds = new Set<string>([cleanPilotId]);
-        const storePilot = storeGetPilotById(cleanPilotId) || storeGetPilotByEmail(cleanPilotId);
-        if (storePilot) {
-          if (storePilot.id) candidateIds.add(storePilot.id);
-          if (storePilot.email) candidateIds.add(storePilot.email);
-        }
-
-        try {
-          const pilotRows: any = await safeMySqlQuery(
-            'SELECT id, email FROM pilots WHERE id = ? OR email = ? OR email = ?',
-            [cleanPilotId, cleanPilotId, storePilot?.email || '']
-          );
-          if (pilotRows && pilotRows[0] && Array.isArray(pilotRows[0])) {
-            pilotRows[0].forEach((pr: any) => {
-              if (pr.id) candidateIds.add(pr.id);
-              if (pr.email) candidateIds.add(pr.email);
-            });
-          }
-        } catch {}
-
-        const idList = Array.from(candidateIds);
-        const placeholders = idList.map(() => '?').join(',');
-        const query = `SELECT * FROM trips WHERE pilot_id IN (${placeholders}) ORDER BY created_at DESC`;
-        const mysqlRes: any = await safeMySqlQuery(query, idList);
-        if (mysqlRes && mysqlRes[0] && Array.isArray(mysqlRes[0])) {
-          trips = mysqlRes[0];
-        }
-
-        // Se não houver viagens no MySQL para este piloto, consulta o cache local estritamente para ele
-        const storeTrips = storeGetTrips(cleanPilotId, false);
-        if (trips.length === 0) {
-          trips = storeTrips;
-        } else if (storeTrips.length > 0) {
-          trips = trips.map(t => {
-            const match = storeTrips.find(st => st.id === t.id);
-            if (match) {
-              return {
-                ...t,
-                checklist_data: t.checklist_data || match.checklist_data,
-                photos: (t.photos && t.photos.length > 0) ? t.photos : match.photos,
-                motorcycle_used: t.motorcycle_used || match.motorcycle_used,
-                description: t.description || match.description
-              };
-            }
-            return t;
-          });
-        }
-      }
-
-      // Sincroniza viagens do banco no cache local resiliente se encontrou registros
-      if (trips.length > 0) {
-        storeSyncTripsFromDb(trips);
-      }
-
-      res.json({ success: true, trips });
+      const trips = await dbService.getTrips(cleanPilotId, wantAll);
+      return res.json({ success: true, trips });
     } catch (err: any) {
-      console.warn('[Trips API] Falha na consulta MySQL, recorrendo ao cache estrito:', err?.message);
-      res.json({ success: true, trips: storeGetTrips(req.query.pilot_id as string, false) });
+      console.warn('[Trips API] Falha na consulta de viagens:', err?.message);
+      return res.json({ success: true, trips: [] });
     }
   });
 
   app.post('/api/trips', async (req, res) => {
     try {
-      const { 
-        id, 
-        pilot_id, 
-        title, 
-        origin, 
-        destination, 
-        distance_km, 
-        start_date, 
-        motorcycle_used, 
-        checklist_data, 
-        photos, 
-        start_location,
-        description,
-        content,
-        image,
-        category,
-        duration,
-        climate,
-        road,
-        rating
-      } = req.body;
-
-      const finalId = id || 'trip_' + Date.now();
-      const finalOrigin = origin || start_location || null;
-      const finalDesc = description || content || (checklist_data?.content) || null;
-      
-      // Monta checklist garantindo que image e provas não se percam
-      let parsedChecklist: any = checklist_data;
-      if (typeof checklist_data === 'string') {
-        try { parsedChecklist = JSON.parse(checklist_data); } catch { parsedChecklist = {}; }
-      } else if (!parsedChecklist || typeof parsedChecklist !== 'object') {
-        parsedChecklist = {};
-      }
-
-      if (category && !parsedChecklist.category) parsedChecklist.category = category;
-      if (duration && !parsedChecklist.duration) parsedChecklist.duration = duration;
-      if (climate && !parsedChecklist.climate) parsedChecklist.climate = climate;
-      if (road && !parsedChecklist.road) parsedChecklist.road = road;
-      if (rating && !parsedChecklist.rating) parsedChecklist.rating = rating;
-      if (finalDesc && !parsedChecklist.content) parsedChecklist.content = finalDesc;
-
-      // Garante foto de capa no checklist
-      if (image && !parsedChecklist.image) {
-        parsedChecklist.image = image;
-      }
-      if (req.body.documentaryProofs && (!parsedChecklist.documentaryProofs || parsedChecklist.documentaryProofs.length === 0)) {
-        parsedChecklist.documentaryProofs = req.body.documentaryProofs;
-      }
-
-      // Monta fotos garantindo que a foto de capa e provas estejam no array
-      let parsedPhotos: string[] = [];
-      if (Array.isArray(photos)) {
-        parsedPhotos = [...photos];
-      } else if (typeof photos === 'string') {
-        try { parsedPhotos = JSON.parse(photos); } catch { parsedPhotos = [photos]; }
-      }
-      if (parsedPhotos.length === 0 && (parsedChecklist.image || image)) {
-        parsedPhotos = [parsedChecklist.image || image];
-      }
-      if (Array.isArray(parsedChecklist.documentaryProofs)) {
-        for (const p of parsedChecklist.documentaryProofs) {
-          if (p?.url && !parsedPhotos.includes(p.url)) {
-            parsedPhotos.push(p.url);
-          }
-        }
-      }
-
-      const jsonChecklist = JSON.stringify(parsedChecklist);
-      const jsonPhotos = JSON.stringify(parsedPhotos);
-
-      const savedTrip = storeSaveTrip({
-        ...req.body,
-        id: finalId,
-        pilot_id: pilot_id || 'pilot',
-        title: title || 'Roteiro de Viagem',
-        origin: finalOrigin,
-        destination: destination || '',
-        distance_km: distance_km || 0,
-        start_date: start_date || new Date().toISOString().split('T')[0],
-        motorcycle_used: motorcycle_used || null,
-        checklist_data: parsedChecklist,
-        photos: parsedPhotos,
-        description: finalDesc
-      });
-
-      await safeMySqlQuery(`
-        INSERT INTO trips (id, pilot_id, title, start_location, destination, distance_km, start_date, motorcycle_used, checklist_data, photos, description)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          title = VALUES(title),
-          start_location = VALUES(start_location),
-          destination = VALUES(destination),
-          distance_km = VALUES(distance_km),
-          start_date = VALUES(start_date),
-          motorcycle_used = VALUES(motorcycle_used),
-          checklist_data = VALUES(checklist_data),
-          photos = VALUES(photos),
-          description = VALUES(description)
-      `, [
-        finalId, 
-        pilot_id || 'pilot', 
-        title, 
-        finalOrigin, 
-        destination, 
-        distance_km || 0, 
-        start_date || new Date().toISOString().split('T')[0], 
-        motorcycle_used || null, 
-        jsonChecklist, 
-        jsonPhotos,
-        finalDesc
-      ]);
-
-      res.json({ success: true, message: 'Viagem registrada com sucesso!', trip: savedTrip });
+      const savedTrip = await dbService.saveTrip(req.body);
+      return res.json({ success: true, message: 'Viagem registrada com sucesso no banco MySQL!', trip: savedTrip });
     } catch (err: any) {
       console.error('[Trips API] Erro ao registrar viagem:', err);
-      res.status(500).json({ success: false, error: err.message });
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // Excluir viagem do banco de dados MySQL e do armazenamento
   app.delete('/api/trips/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      storeDeleteTrip(id);
-      await safeMySqlQuery('DELETE FROM trips WHERE id = ?', [id]).catch(() => {});
-      return res.json({ success: true, message: 'Viagem excluída com sucesso!' });
+      const success = await dbService.deleteTrip(id);
+      return res.json({ success, message: 'Viagem excluída com sucesso!' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Routes API (Roteiros) - Centralizado via dbService
+  app.get('/api/routes', async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const routes = await dbService.getRoutes(status);
+      return res.json({ success: true, routes });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message, routes: [] });
+    }
+  });
+
+  app.get('/api/routes/:id', async (req, res) => {
+    try {
+      const route = await dbService.getRouteById(req.params.id);
+      if (route) {
+        return res.json({ success: true, route });
+      }
+      return res.status(404).json({ success: false, error: 'Roteiro não encontrado' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/routes', async (req, res) => {
+    try {
+      const savedRoute = await dbService.saveRoute(req.body);
+      return res.json({ 
+        success: true, 
+        message: 'Roteiro registrado com sucesso no banco MySQL!', 
+        route: savedRoute 
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/routes/:id/status', async (req, res) => {
+    try {
+      const { status, rejectionReason } = req.body;
+      const success = await dbService.updateRouteStatus(req.params.id, status, rejectionReason);
+      return res.json({ success, message: 'Status do roteiro atualizado com sucesso!' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/routes/:id', async (req, res) => {
+    try {
+      const success = await dbService.deleteRoute(req.params.id);
+      return res.json({ success, message: 'Roteiro excluído com sucesso!' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Events API (Eventos) - Centralizado via dbService
+  app.get('/api/events', async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const events = await dbService.getEvents(status);
+      return res.json({ success: true, events });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message, events: [] });
+    }
+  });
+
+  app.post('/api/events', async (req, res) => {
+    try {
+      const savedEvent = await dbService.saveEvent(req.body);
+      return res.json({ 
+        success: true, 
+        message: 'Evento registrado com sucesso no banco MySQL!', 
+        event: savedEvent 
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/events/:id/status', async (req, res) => {
+    try {
+      const { status, rejectionReason } = req.body;
+      const success = await dbService.updateEventStatus(req.params.id, status, rejectionReason);
+      return res.json({ success, message: 'Status do evento atualizado com sucesso!' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/events/:id', async (req, res) => {
+    try {
+      const success = await dbService.deleteEvent(req.params.id);
+      return res.json({ success, message: 'Evento excluído com sucesso!' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Partners API (Parceiros) - Centralizado via dbService
+  app.get('/api/partners', async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const partners = await dbService.getPartners(status);
+      return res.json({ success: true, partners });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message, partners: [] });
+    }
+  });
+
+  app.post('/api/partners', async (req, res) => {
+    try {
+      const savedPartner = await dbService.savePartner(req.body);
+      return res.json({ 
+        success: true, 
+        message: 'Parceiro registrado com sucesso no banco MySQL!', 
+        partner: savedPartner 
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/partners/:id/status', async (req, res) => {
+    try {
+      const { status } = req.body;
+      const success = await dbService.updatePartnerStatus(req.params.id, status);
+      return res.json({ success, message: 'Status do parceiro atualizado com sucesso!' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/partners/:id', async (req, res) => {
+    try {
+      const success = await dbService.deletePartner(req.params.id);
+      return res.json({ success, message: 'Parceiro excluído com sucesso!' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Community Posts API (Mural da Comunidade) - Centralizado via dbService
+  app.get('/api/community/posts', async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const posts = await dbService.getCommunityPosts(status);
+      return res.json({ success: true, posts });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message, posts: [] });
+    }
+  });
+
+  app.post('/api/community/posts', async (req, res) => {
+    try {
+      const savedPost = await dbService.saveCommunityPost(req.body);
+      return res.json({ 
+        success: true, 
+        message: 'Publicação registrada com sucesso no banco MySQL!', 
+        post: savedPost 
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/community/posts/:id/like', async (req, res) => {
+    try {
+      const likes = await dbService.likeCommunityPost(req.params.id);
+      return res.json({ success: true, likes });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/community/posts/:id/status', async (req, res) => {
+    try {
+      const { status, rejectionReason } = req.body;
+      const success = await dbService.updatePostStatus(req.params.id, status, rejectionReason);
+      return res.json({ success, message: 'Status da publicação atualizado!' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/community/posts/:id', async (req, res) => {
+    try {
+      const success = await dbService.deleteCommunityPost(req.params.id);
+      return res.json({ success, message: 'Publicação excluída com sucesso!' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Motoclubes API (Clubs) - Centralizado via dbService
+  app.get('/api/clubs', async (req, res) => {
+    try {
+      const clubs = await dbService.getClubs();
+      return res.json({ success: true, clubs });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message, clubs: [] });
+    }
+  });
+
+  app.post('/api/clubs', async (req, res) => {
+    try {
+      const savedClub = await dbService.saveClub(req.body);
+      return res.json({ 
+        success: true, 
+        message: 'Motoclube registrado com sucesso no banco MySQL!', 
+        club: savedClub 
+      });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }

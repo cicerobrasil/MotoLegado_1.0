@@ -1,4 +1,4 @@
-import { useState, useRef, ChangeEvent, FormEvent } from 'react';
+import { useState, useEffect, useRef, ChangeEvent, FormEvent } from 'react';
 import { 
   Shield, 
   MapPin, 
@@ -22,7 +22,8 @@ import {
   Settings,
   Loader2,
   Lock,
-  ExternalLink
+  ExternalLink,
+  Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -32,6 +33,7 @@ import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
 import { DateInput } from './DateInput';
+import { clientDbService } from '../lib/dbService';
 
 export interface ClubItem {
   id: string | number;
@@ -61,7 +63,7 @@ export function MotoClubsList() {
     setActiveMainTab('gestao');
   };
   const [searchTerm, setSearchTerm] = useState('');
-  const [clubs] = useState<ClubItem[]>(() => {
+  const [clubs, setClubs] = useState<ClubItem[]>(() => {
     try {
       const saved = localStorage.getItem('motolegado_clubs');
       return saved ? JSON.parse(saved) : [];
@@ -70,10 +72,41 @@ export function MotoClubsList() {
     }
   });
 
+  // Carregar Motoclubes do Banco de Dados Real MySQL da Hostinger
+  useEffect(() => {
+    let isMounted = true;
+    clientDbService.clubs.getAll()
+      .then((dbClubs) => {
+        if (!isMounted) return;
+        if (Array.isArray(dbClubs) && dbClubs.length > 0) {
+          const formatted: ClubItem[] = dbClubs.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            city: c.city || 'Brasil',
+            members: Number(c.members || c.members_count || 1),
+            rating: Number(c.rating || 5.0),
+            image: c.image || c.image_url || 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=1200',
+            logo: c.logo || c.logo_url || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=200',
+            description: c.description || '',
+            category: c.category || 'Mista'
+          }));
+          setClubs(formatted);
+          localStorage.setItem('motolegado_clubs', JSON.stringify(formatted));
+        }
+      })
+      .catch((err) => {
+        console.warn('Erro ao carregar motoclubes do MySQL:', err);
+      });
+
+    return () => { isMounted = false; };
+  }, []);
+
   // Gestão State Variables
   const [gestaoSubTab, setGestaoSubTab] = useState<'dados' | 'solicitacoes' | 'comando'>('dados');
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [newMember, setNewMember] = useState({ name: '', role: 'Membro' });
+  const [isSavingClub, setIsSavingClub] = useState(false);
+  const [clubSaveFeedback, setClubSaveFeedback] = useState<string | null>(null);
   
   const [pendingRequests, setPendingRequests] = useState<Array<{ id: string; name: string; city: string; bike: string; photo: string }>>([]);
 
@@ -97,6 +130,50 @@ export function MotoClubsList() {
 
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+
+  const handleSaveClub = async () => {
+    if (!clubRegistry.name.trim()) {
+      alert('Por favor, informe o nome do moto clube.');
+      return;
+    }
+
+    setIsSavingClub(true);
+    setClubSaveFeedback(null);
+
+    const clubPayload = {
+      id: `mc_${Date.now()}`,
+      name: clubRegistry.name,
+      city: clubRegistry.city || 'Brasil',
+      members: clubMembers.length > 0 ? clubMembers.length : 1,
+      rating: 5.0,
+      image: clubRegistry.banner || 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=1200',
+      logo: clubRegistry.logo || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=200',
+      description: clubRegistry.about || '',
+      category: clubRegistry.category || 'Cruiser',
+      foundationDate: clubRegistry.foundationDate,
+      presidentName: clubRegistry.president || profile?.name,
+      regulationsFile: clubRegistry.regulationsFileName
+    };
+
+    try {
+      await clientDbService.clubs.save(clubPayload);
+      const updatedClubs = [clubPayload as ClubItem, ...clubs.filter(c => c.name !== clubPayload.name)];
+      setClubs(updatedClubs);
+      localStorage.setItem('motolegado_clubs', JSON.stringify(updatedClubs));
+      setClubSaveFeedback('Dados do moto clube salvos com sucesso no banco de dados!');
+      setTimeout(() => setClubSaveFeedback(null), 4000);
+    } catch (err: any) {
+      console.error('Erro ao salvar clube no MySQL:', err);
+      // Fallback local
+      const updatedClubs = [clubPayload as ClubItem, ...clubs.filter(c => c.name !== clubPayload.name)];
+      setClubs(updatedClubs);
+      localStorage.setItem('motolegado_clubs', JSON.stringify(updatedClubs));
+      setClubSaveFeedback('Dados salvos localmente.');
+      setTimeout(() => setClubSaveFeedback(null), 4000);
+    } finally {
+      setIsSavingClub(false);
+    }
+  };
 
   const handleApprove = (id: string) => {
     setPendingRequests(prev => prev.filter(req => req.id !== id));
@@ -642,6 +719,34 @@ export function MotoClubsList() {
                         </button>
                       )}
                     </div>
+                  </div>
+
+                  {/* Botão de Salvar Dados do Moto Clube no Banco de Dados Real */}
+                  <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-800/60 mt-4">
+                    {clubSaveFeedback && (
+                      <div className="text-xs font-bold text-emerald-400 flex items-center gap-2">
+                        <Check size={16} />
+                        <span>{clubSaveFeedback}</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      disabled={isSavingClub}
+                      onClick={handleSaveClub}
+                      className="w-full sm:w-auto ml-auto px-8 py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-lg shadow-orange-500/20 disabled:opacity-50"
+                    >
+                      {isSavingClub ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Salvando no Banco...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          <span>Salvar Informações do Clube</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </motion.div>

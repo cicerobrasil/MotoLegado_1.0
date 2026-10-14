@@ -54,7 +54,9 @@ import { Partner } from './Partners';
 import { CommunityPost, Route, RouteDifficulty } from '../types';
 import { estimateRouteMetrics } from './Routes';
 import { getDbStatus, initDbTables, getPilotsFromHostinger, syncPilotToHostinger } from '../lib/api';
+import { clientDbService } from '../lib/dbService';
 import { DateInput } from './DateInput';
+import { MySqlPingTest } from './MySqlPingTest';
 
 // Helper to format date cleanly
 function formatDisplayDate(dateStr?: string) {
@@ -724,6 +726,7 @@ export function CommandCenter() {
       return p;
     });
     saveCommunityPosts(updated);
+    clientDbService.posts.updateStatus(postId, 'aprovado').catch(() => {});
     const target = communityPosts.find(p => p.id === postId);
     addAuditLog(`Publicação de "${target?.user.name}" APROVADA e liberada no Feed`);
     showToast(`Publicação de "${target?.user.name}" aprovada com sucesso!`, 'success');
@@ -734,17 +737,19 @@ export function CommandCenter() {
 
   const handleConfirmRejectPost = () => {
     if (!rejectionModalPost) return;
+    const reason = postRejectionReason.trim() || 'Desconformidade com as diretrizes da comunidade';
     const updated = communityPosts.map(p => {
       if (p.id === rejectionModalPost.id) {
         return { 
           ...p, 
           status: 'rejeitado' as const, 
-          rejectionReason: postRejectionReason.trim() || 'Desconformidade com as diretrizes da comunidade' 
+          rejectionReason: reason 
         };
       }
       return p;
     });
     saveCommunityPosts(updated);
+    clientDbService.posts.updateStatus(rejectionModalPost.id, 'rejeitado', reason).catch(() => {});
     addAuditLog(`Publicação de "${rejectionModalPost.user.name}" REJEITADA na moderação`);
     showToast(`Publicação de "${rejectionModalPost.user.name}" foi rejeitada.`, 'info');
     setRejectionModalPost(null);
@@ -981,6 +986,7 @@ export function CommandCenter() {
       return evt;
     });
     saveEvents(updated);
+    clientDbService.events.updateStatus(id, 'aprovado').catch(() => {});
     addAuditLog(`Evento "${events.find(e => e.id === id)?.title}" APROVADO`);
     showToast("Evento APROVADO e publicado no site!", "success");
   };
@@ -992,17 +998,19 @@ export function CommandCenter() {
 
   const handleConfirmRejectEvent = () => {
     if (!rejectionModalEvent) return;
+    const reason = rejectionReasonInput.trim() || 'Não atendeu aos critérios da comunidade.';
     const updated = events.map(evt => {
       if (evt.id === rejectionModalEvent.id) {
         return {
           ...evt,
           status: 'rejeitado' as const,
-          rejectionReason: rejectionReasonInput.trim() || 'Não atendeu aos critérios da comunidade.'
+          rejectionReason: reason
         };
       }
       return evt;
     });
     saveEvents(updated);
+    clientDbService.events.updateStatus(rejectionModalEvent.id, 'rejeitado', reason).catch(() => {});
     addAuditLog(`Evento "${rejectionModalEvent.title}" REJEITADO`);
     showToast("Evento REJEITADO.", "info");
     setRejectionModalEvent(null);
@@ -1189,6 +1197,7 @@ export function CommandCenter() {
   const handleApprovePartnerHomologation = (id: string) => {
     const updated = allPartners.map(p => p.id === id ? { ...p, status: 'aprovado' as const, highlight: true } : p);
     saveAllPartnersList(updated);
+    clientDbService.partners.updateStatus(id, 'aprovado').catch(() => {});
     const target = allPartners.find(p => p.id === id);
     addAuditLog(`Homologação do parceiro "${target?.name || id}" AUTORIZADA pelo Moderador`);
     showToast(`Homologação de "${target?.name}" autorizada com sucesso! O parceiro agora está ativo no portal público.`, "success");
@@ -1200,6 +1209,7 @@ export function CommandCenter() {
   const handleRejectPartnerHomologation = (id: string) => {
     const updated = allPartners.map(p => p.id === id ? { ...p, status: 'rejeitado' as const } : p);
     saveAllPartnersList(updated);
+    clientDbService.partners.updateStatus(id, 'rejeitado').catch(() => {});
     const target = allPartners.find(p => p.id === id);
     addAuditLog(`Homologação do parceiro "${target?.name || id}" REJEITADA pelo Moderador`);
     showToast(`Solicitação de homologação de "${target?.name}" foi rejeitada.`, "info");
@@ -1211,12 +1221,13 @@ export function CommandCenter() {
   const handleConfirmRouteAction = () => {
     if (!pendingActionRoute) return;
     const { route, action } = pendingActionRoute;
+    const rejectionReason = action === 'reject' ? routeRejectionReasonInput.trim() : undefined;
     const updatedRoutes = routes.map(r => {
       if (r.id === route.id) {
         return {
           ...r,
           status: action === 'approve' ? ('aprovado' as const) : ('rejeitado' as const),
-          rejectionReason: action === 'reject' ? routeRejectionReasonInput.trim() : undefined
+          rejectionReason
         };
       }
       return r;
@@ -1226,6 +1237,8 @@ export function CommandCenter() {
     localStorage.setItem('motolegado_routes_v3', JSON.stringify(updatedRoutes));
     window.dispatchEvent(new Event('routes-updated'));
     
+    clientDbService.routes.updateStatus(route.id, action === 'approve' ? 'aprovado' : 'rejeitado', rejectionReason).catch(() => {});
+
     if (action === 'approve') {
       addAuditLog(`Roteiro "${route.name}" APROVADO pelo moderador`);
       showToast(`Roteiro "${route.name}" APROVADO com sucesso!`, "success");
@@ -1395,6 +1408,9 @@ export function CommandCenter() {
         )}
       </AnimatePresence>
 
+      {/* COMPONENTE DE TESTE DE CONEXÃO MYSQL HOSTINGER (SELECT 1 via mysql2) */}
+      <MySqlPingTest autoRunOnMount={true} />
+
       {/* STATS OVERVIEW CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
         <button 
@@ -1514,36 +1530,64 @@ export function CommandCenter() {
         </button>
       </div>
 
-      {/* CORE NAVIGATION TABS */}
-      <div className="flex border-b border-slate-800/80 overflow-x-auto no-scrollbar gap-2">
-        {[
-          { id: 'eventos', label: 'Moderação de Eventos', icon: Calendar, badge: pendingEventsCount },
-          { id: 'clubes', label: 'Moto Clubes & Sedes', icon: Building2, badge: pendingClubsCount },
-          { id: 'roteiros', label: 'Moderação Roteiros', icon: Navigation, badge: pendingRoutesCount },
-          { id: 'comunidade', label: 'Comunidade & Feed', icon: MessageSquare, badge: pendingReportsCount },
-          { id: 'parceiros', label: 'Credenciamento Parceiros', icon: Store, badge: pendingPartnersCount },
-          { id: 'bonificados', label: 'Modo Bonificado (Planos)', icon: Gift, badge: bonificadosCount },
-          { id: 'telemetria', label: 'Logs & Telemetria', icon: Activity }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={cn(
-              "px-6 py-4 text-xs font-black italic uppercase tracking-wider transition-all flex items-center gap-2 border-b-2 whitespace-nowrap shrink-0",
-              activeTab === tab.id
-                ? "border-amber-500 text-amber-400 bg-slate-900/60"
-                : "border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-900/20"
-            )}
-          >
-            <tab.icon size={15} />
-            {tab.label}
-            {tab.badge !== undefined && tab.badge > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black not-italic animate-pulse">
-                {tab.badge}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* CORE NAVIGATION TABS - Organizado em 2 linhas sem scroll bar */}
+      <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-2 sm:p-2.5 shadow-lg space-y-2">
+        {/* Linha 1: 4 opções */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { id: 'eventos', label: 'Moderação de Eventos', icon: Calendar, badge: pendingEventsCount },
+            { id: 'clubes', label: 'Moto Clubes & Sedes', icon: Building2, badge: pendingClubsCount },
+            { id: 'roteiros', label: 'Moderação Roteiros', icon: Navigation, badge: pendingRoutesCount },
+            { id: 'comunidade', label: 'Comunidade & Feed', icon: MessageSquare, badge: pendingReportsCount },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={cn(
+                "px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl text-xs font-black italic uppercase tracking-wider transition-all flex items-center justify-center gap-2 border text-center select-none cursor-pointer",
+                activeTab === tab.id
+                  ? "border-[#ff751f] text-[#ff751f] bg-[#ff751f]/10 shadow-md shadow-[#ff751f]/10"
+                  : "border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700 bg-slate-950/70 hover:bg-slate-900/80"
+              )}
+            >
+              <tab.icon size={15} className={cn(activeTab === tab.id ? "text-[#ff751f]" : "text-slate-500", "shrink-0")} />
+              <span className="truncate">{tab.label}</span>
+              {tab.badge !== undefined && tab.badge > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-[#ff751f] text-slate-950 text-[9px] font-black not-italic animate-pulse shrink-0">
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Linha 2: 3 opções */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {[
+            { id: 'parceiros', label: 'Credenciamento Parceiros', icon: Store, badge: pendingPartnersCount },
+            { id: 'bonificados', label: 'Modo Bonificado (Planos)', icon: Gift, badge: bonificadosCount },
+            { id: 'telemetria', label: 'Logs & Telemetria MySQL', icon: Activity }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={cn(
+                "px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl text-xs font-black italic uppercase tracking-wider transition-all flex items-center justify-center gap-2 border text-center select-none cursor-pointer",
+                activeTab === tab.id
+                  ? "border-[#ff751f] text-[#ff751f] bg-[#ff751f]/10 shadow-md shadow-[#ff751f]/10"
+                  : "border-slate-800/80 text-slate-400 hover:text-white hover:border-slate-700 bg-slate-950/70 hover:bg-slate-900/80"
+              )}
+            >
+              <tab.icon size={15} className={cn(activeTab === tab.id ? "text-[#ff751f]" : "text-slate-500", "shrink-0")} />
+              <span className="truncate">{tab.label}</span>
+              {tab.badge !== undefined && tab.badge > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-[#ff751f] text-slate-950 text-[9px] font-black not-italic animate-pulse shrink-0">
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* TAB CONTENT 1: MODERAÇÃO DE EVENTOS */}

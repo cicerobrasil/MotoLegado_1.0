@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, ChangeEvent } from 'react';
-import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown, Navigation, ExternalLink, Share2, ShieldCheck, Eye, Layers, CheckCircle2, Filter, RotateCcw, TrendingUp, SlidersHorizontal, Pencil, Check, Wrench, Users, Tag, ChevronDown, CloudFog, Wind } from 'lucide-react';
+import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown, Navigation, ExternalLink, ShieldCheck, Layers, CheckCircle2, Filter, RotateCcw, TrendingUp, Pencil, Check, Wrench, Users, Tag, ChevronDown, CloudFog, Wind } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -246,6 +246,19 @@ export function parseLogDate(dateStr?: string): Date | null {
   }
   const parsed = new Date(s);
   return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Higieniza e padroniza valores de distância em KM sem corromper casas decimais
+ * Exemplo: "68,4 km" ou "68.4" -> "68" (em vez do antigo replace(/\D/g) que virava 684!)
+ */
+export function sanitizeDistanceKm(val: string | number | undefined | null): string {
+  if (val === undefined || val === null) return '';
+  const s = String(val).trim().replace(',', '.');
+  const match = s.match(/\d+(?:\.\d+)?/);
+  if (!match) return '';
+  const num = parseFloat(match[0]);
+  return isNaN(num) || num <= 0 ? '' : String(Math.round(num));
 }
 
 /**
@@ -687,15 +700,16 @@ export function Logbook() {
       }
 
       // Se a duração veio vazia, calcula com base na velocidade média de moto (65 km/h)
+      const cleanParsedDist = sanitizeDistanceKm(dist) || '150';
       if (!dur || dur.trim() === '') {
-        const distNum = parseFloat(dist.replace(/\D/g, '')) || 150;
+        const distNum = parseFloat(cleanParsedDist) || 150;
         const totalMinutes = Math.round((distNum / 65) * 60);
         const hours = Math.floor(totalMinutes / 60);
         const mins = totalMinutes % 60;
         dur = hours > 0 ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}` : `${mins}min`;
       }
 
-      setDistance(dist.replace(/\D/g, '') || '150');
+      setDistance(cleanParsedDist);
       setDuration(dur);
       setDate(new Date().toISOString().split('T')[0]);
       setIsFormOpen(true);
@@ -801,7 +815,7 @@ export function Logbook() {
     setMapsUrl(log.mapsUrl || '');
     setDate(log.date || '');
     setBike(log.bike || profile?.motorcycle || '');
-    setDistance(log.distance ? log.distance.replace(/\D/g, '') : '');
+    setDistance(log.distance ? sanitizeDistanceKm(log.distance) : '');
     setDuration(log.duration || '');
     const parsedPeriod = parseLogPeriod(log);
     const parsedClimates = parseLogClimates(log);
@@ -1301,7 +1315,7 @@ export function Logbook() {
         date: formattedDate || new Date().toLocaleDateString('pt-BR'),
         origin: origin || 'Cidade de Origem',
         destination: destination || 'Cidade de Destino',
-        distance: distance ? distance.replace(/\D/g, '') || '100' : '100',
+        distance: distance ? sanitizeDistanceKm(distance) || '100' : '100',
         duration: duration || '2h 30min',
         bike: bike || profile?.motorcycle || 'Motocicleta',
         period,
@@ -1704,7 +1718,7 @@ export function Logbook() {
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">DISTÂNCIA TOTAL (KM)</label>
                   {distance && (
                     <span className="text-[9px] font-bold text-orange-400 font-mono">
-                      {distance.replace(/\D/g, '')} KM
+                      {sanitizeDistanceKm(distance)} KM
                     </span>
                   )}
                 </div>
@@ -1713,45 +1727,14 @@ export function Logbook() {
                   <input 
                     type="text" 
                     value={distance}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setDistance(val);
-                      const num = parseInt(val.replace(/\D/g, ''), 10);
-                      if (!isNaN(num) && num > 0) {
-                        const totalMinutes = Math.round((num / 65) * 60);
-                        const hours = Math.floor(totalMinutes / 60);
-                        const mins = totalMinutes % 60;
-                        setDuration(hours > 0 ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}` : `${mins}min`);
-                      }
-                    }}
+                    onChange={(e) => setDistance(e.target.value)}
                     placeholder="Ex: 288" 
                     className="w-full bg-slate-950/30 border border-slate-800 rounded-2xl py-4 pl-14 text-[13px] font-bold text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500/50 font-mono" 
                   />
                 </div>
               </div>
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">DURAÇÃO DA VIAGEM</label>
-                  {distance && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const num = parseInt(distance.replace(/\D/g, ''), 10);
-                        if (!isNaN(num) && num > 0) {
-                          const totalMinutes = Math.round((num / 65) * 60);
-                          const hours = Math.floor(totalMinutes / 60);
-                          const mins = totalMinutes % 60;
-                          setDuration(hours > 0 ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}` : `${mins}min`);
-                        }
-                      }}
-                      className="text-[9px] font-bold text-orange-400 hover:text-orange-300 uppercase flex items-center gap-1 cursor-pointer transition-colors"
-                      title="Recalcular tempo estimado com base na velocidade de pilotagem em viagem (65 km/h com paradas)"
-                    >
-                      <Sparkles size={10} />
-                      <span>Recalcular Tempo</span>
-                    </button>
-                  )}
-                </div>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">DURAÇÃO DA VIAGEM</label>
                 <div className="relative">
                   <Clock className="absolute left-5 top-1/2 -translate-y-1/2 text-orange-500/50" size={16} />
                   <input 
@@ -1779,6 +1762,9 @@ export function Logbook() {
                 onMapsUrlGenerated={(url) => setMapsUrl(url)}
                 setDistance={setDistance}
                 setDuration={setDuration}
+                currentDistance={distance}
+                currentDuration={duration}
+                currentMapsUrl={mapsUrl}
               />
             </div>
 

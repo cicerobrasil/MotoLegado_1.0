@@ -113,6 +113,48 @@ export function guessStageType(name: string): 'fuel' | 'food' | 'scenic' | 'slee
   return 'scenic';
 }
 
+export function extractMetricsFromTextClient(text: string): { distanceKm: number | null; duration: string | null } {
+  if (!text) return { distanceKm: null, duration: null };
+  let distanceKm: number | null = null;
+  let duration: string | null = null;
+
+  // 1. Extrai distância em KM (ex: "68,4 km", "68.4 km", "185 km", "(68 km)")
+  const distMatch = text.match(/(?:^|[^\w])(\d+(?:[.,]\d+)?)\s*(?:km|kms|quilômetros|quilometros)\b/i);
+  if (distMatch) {
+    const rawVal = distMatch[1].replace(',', '.');
+    const parsed = parseFloat(rawVal);
+    if (!isNaN(parsed) && parsed > 0) {
+      distanceKm = Math.round(parsed);
+    }
+  }
+
+  // 2. Extrai duração em Horas e Minutos
+  const hmMatch = text.match(/(\d+)\s*(?:h|hr|hrs|hora|horas)\s*(?:e\s*)?(\d+)?\s*(?:min|mins|minuto|minutos|m)?\b/i);
+  if (hmMatch) {
+    const hours = parseInt(hmMatch[1], 10);
+    const mins = hmMatch[2] ? parseInt(hmMatch[2], 10) : 0;
+    if (hours > 0 || mins > 0) {
+      duration = hours > 0 
+        ? `${hours}h ${mins > 0 ? `${mins}min` : '00min'}`
+        : `${mins}min`;
+    }
+  } else {
+    const mMatch = text.match(/(\d+)\s*(?:min|mins|minuto|minutos|m)\b/i);
+    if (mMatch) {
+      const mins = parseInt(mMatch[1], 10);
+      if (mins > 0) {
+        const hours = Math.floor(mins / 60);
+        const remMins = mins % 60;
+        duration = hours > 0
+          ? `${hours}h ${remMins > 0 ? `${remMins}min` : '00min'}`
+          : `${mins}min`;
+      }
+    }
+  }
+
+  return { distanceKm, duration };
+}
+
 export function parseGoogleMapsRouteClient(urlOrText: string): ParsedRouteClientResult {
   const input = (urlOrText || '').trim();
   const result: ParsedRouteClientResult = {
@@ -125,8 +167,32 @@ export function parseGoogleMapsRouteClient(urlOrText: string): ParsedRouteClient
 
   if (!input) return result;
 
-  // 1. Tenta formato com /maps/dir/ ponto1 / ponto2 / ponto3...
-  if (input.includes('/maps/dir/') || input.includes('/dir/')) {
+  // 1. Padrão de texto compartilhado do app Google Maps
+  // Ex: "De Curitiba para Morretes via BR-277. 1 h 15 min (68,4 km). Para o melhor trajeto..."
+  const deParaMatch = input.match(/(?:De|de|From|from)\s+([^,.\n]+?)\s+(?:para|p\/|a|to)\s+([^,.\n]+?)(?:\s+(?:via|pela|pelo|by)\s+([^,.\n]+?))?(?:[.]|\s+\d+\s*(?:h|min)|\s*\(|$)/i);
+  if (deParaMatch) {
+    result.origin = cleanLocationName(deParaMatch[1].trim());
+    result.destination = cleanLocationName(deParaMatch[2].trim());
+  } else {
+    // Tenta formato sem prefixo "De" (ex: "Curitiba para Morretes 68 km")
+    const simpleMatch = input.match(/^([^,.\n]+?)\s+(?:para|p\/|a|to)\s+([^,.\n]+?)(?:\s+(?:via|pela|pelo|by)\s+([^,.\n]+?))?(?:[.]|\s+\d+\s*(?:h|min)|\s*\(|$)/i);
+    if (simpleMatch && !simpleMatch[1].toLowerCase().startsWith('http')) {
+      result.origin = cleanLocationName(simpleMatch[1].trim());
+      result.destination = cleanLocationName(simpleMatch[2].trim());
+    }
+  }
+
+  // Extrai métricas explícitas se existirem no texto
+  const textMetrics = extractMetricsFromTextClient(input);
+  if (textMetrics.distanceKm) {
+    result.estimatedDistanceKm = textMetrics.distanceKm;
+  }
+  if (textMetrics.duration) {
+    result.estimatedDuration = textMetrics.duration;
+  }
+
+  // 2. Tenta formato com /maps/dir/ ponto1 / ponto2 / ponto3...
+  if ((!result.origin || !result.destination) && (input.includes('/maps/dir/') || input.includes('/dir/'))) {
     try {
       const dirIndex = input.indexOf('/dir/');
       const afterDir = input.slice(dirIndex + 5);
@@ -148,13 +214,13 @@ export function parseGoogleMapsRouteClient(urlOrText: string): ParsedRouteClient
         result.origin = rawPoints[0];
         result.destination = rawPoints[rawPoints.length - 1];
         result.waypoints = rawPoints.slice(1, -1);
-      } else if (rawPoints.length === 1) {
+      } else if (rawPoints.length === 1 && !result.destination) {
         result.destination = rawPoints[0];
       }
     } catch {}
   }
 
-  // 2. Tenta parâmetros de busca query (?api=1&origin=...&destination=...&waypoints=...)
+  // 3. Tenta parâmetros de busca query (?api=1&origin=...&destination=...&waypoints=...)
   if (!result.origin || !result.destination) {
     try {
       const urlToParse = input.startsWith('http') ? input : `https://example.com/?${input}`;
@@ -164,8 +230,8 @@ export function parseGoogleMapsRouteClient(urlOrText: string): ParsedRouteClient
       const qDest = parsedUrl.searchParams.get('destination');
       const qWaypoints = parsedUrl.searchParams.get('waypoints');
 
-      if (qOrigin) result.origin = cleanLocationName(qOrigin);
-      if (qDest) result.destination = cleanLocationName(qDest);
+      if (qOrigin && !result.origin) result.origin = cleanLocationName(qOrigin);
+      if (qDest && !result.destination) result.destination = cleanLocationName(qDest);
 
       if (qWaypoints) {
         const wpList = qWaypoints.split('|').map(cleanLocationName).filter(Boolean);
@@ -186,7 +252,7 @@ export function parseGoogleMapsRouteClient(urlOrText: string): ParsedRouteClient
     } catch {}
   }
 
-  // 3. Texto puro separado por setas (ex: "Curitiba -> Morretes -> Antonina")
+  // 4. Texto puro separado por setas (ex: "Curitiba -> Morretes -> Antonina")
   if (!result.origin && !result.destination && (input.includes('->') || input.includes('➔') || input.includes('→') || (input.includes('/') && !input.startsWith('http')))) {
     const delimiter = input.includes('->') 
       ? '->' 
@@ -225,13 +291,19 @@ export function parseGoogleMapsRouteClient(urlOrText: string): ParsedRouteClient
     result.fullRouteUrl = `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}${waypointsParam}&travelmode=driving`;
   }
 
-  const allPoints = [result.origin, ...result.waypoints, result.destination].filter(Boolean);
-  const legCount = Math.max(1, allPoints.length - 1);
-  result.estimatedDistanceKm = Math.round(legCount * 85);
-  const totalMins = Math.round(result.estimatedDistanceKm * 1.05);
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  result.estimatedDuration = `${h}h ${m > 0 ? `${m}min` : '15min'}`.trim();
+  // Se não foi extraída distância do texto, calcula estimativa coerente
+  if (!result.estimatedDistanceKm) {
+    const allPoints = [result.origin, ...result.waypoints, result.destination].filter(Boolean);
+    const legCount = Math.max(1, allPoints.length - 1);
+    result.estimatedDistanceKm = Math.round(legCount * 85);
+  }
+
+  if (!result.estimatedDuration && result.estimatedDistanceKm) {
+    const totalMins = Math.round((result.estimatedDistanceKm / 72) * 60);
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    result.estimatedDuration = `${h}h ${m > 0 ? `${m}min` : '00min'}`.trim();
+  }
 
   return result;
 }

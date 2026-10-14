@@ -535,6 +535,30 @@ export function ProfileSettings() {
     }
   };
 
+  if (!user && !profile) {
+    return (
+      <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto space-y-6 min-h-[70vh] flex flex-col items-center justify-center text-center">
+        <div className="w-16 h-16 rounded-2xl bg-[#001b3d] border border-orange-500/40 flex items-center justify-center text-orange-400 shadow-xl">
+          <KeyRound size={32} />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-white italic uppercase tracking-tight">Configurações do Perfil</h1>
+          <p className="text-slate-400 text-sm max-w-md mx-auto">
+            Faça login com sua conta para gerenciar seus dados cadastrais, endereço e motocicleta.
+          </p>
+        </div>
+        <div>
+          <button
+            onClick={() => navigate('/')}
+            className="btn-primary px-8 py-3.5 text-xs font-black uppercase tracking-wider shadow-lg shadow-orange-950/50 cursor-pointer"
+          >
+            Entrar / Cadastrar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-5xl mx-auto space-y-6 md:space-y-10 selection:bg-orange-500 selection:text-white pb-24 md:pb-8">
       <header className="border-b border-slate-800/60 pb-6 md:pb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
