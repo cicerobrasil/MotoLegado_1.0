@@ -57,9 +57,10 @@ function getDatabaseConnection() {
         PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
     ];
 
-    $candidates = ['localhost', '127.0.0.1'];
+    $candidates = array_unique([DB_HOST, 'localhost', '127.0.0.1']);
 
     foreach ($candidates as $h) {
+        if (empty($h)) continue;
         try {
             $dsn = "mysql:host={$h};port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";
             $conn = new PDO($dsn, DB_USER, DB_PASS, $options);

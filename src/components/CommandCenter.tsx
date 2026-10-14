@@ -56,7 +56,6 @@ import { estimateRouteMetrics } from './Routes';
 import { getDbStatus, initDbTables, getPilotsFromHostinger, syncPilotToHostinger } from '../lib/api';
 import { clientDbService } from '../lib/dbService';
 import { DateInput } from './DateInput';
-import { MySqlPingTest } from './MySqlPingTest';
 
 // Helper to format date cleanly
 function formatDisplayDate(dateStr?: string) {
@@ -1407,9 +1406,6 @@ export function CommandCenter() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* COMPONENTE DE TESTE DE CONEXÃO MYSQL HOSTINGER (SELECT 1 via mysql2) */}
-      <MySqlPingTest autoRunOnMount={true} />
 
       {/* STATS OVERVIEW CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">

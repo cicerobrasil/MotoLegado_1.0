@@ -345,6 +345,131 @@ function ensureDatabaseSchema($pdo) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
+        // 3. Tabela de Rotas
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS routes (
+                id VARCHAR(64) PRIMARY KEY,
+                author_id VARCHAR(64) NULL,
+                author_name VARCHAR(150) NULL,
+                author_avatar TEXT NULL,
+                title VARCHAR(200) NOT NULL,
+                description TEXT NULL,
+                maps_address TEXT NULL,
+                maps_url TEXT NULL,
+                rider_tips TEXT NULL,
+                ai_tourist_info TEXT NULL,
+                state VARCHAR(10) NULL,
+                city VARCHAR(100) NULL,
+                distance_km DECIMAL(10,2) DEFAULT 0,
+                duration VARCHAR(50) NULL,
+                difficulty VARCHAR(50) DEFAULT 'Médio',
+                road_type VARCHAR(100) NULL,
+                cover_image TEXT NULL,
+                waypoints JSON NULL,
+                rating DECIMAL(3,2) DEFAULT 5.0,
+                total_ratings_count INT DEFAULT 1,
+                rating_metrics JSON NULL,
+                reviews JSON NULL,
+                status VARCHAR(20) DEFAULT 'aprovado',
+                rejection_reason TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // 4. Tabela de Eventos
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS events (
+                id VARCHAR(64) PRIMARY KEY,
+                organizer_id VARCHAR(64) NULL,
+                created_by VARCHAR(150) NULL,
+                title VARCHAR(200) NOT NULL,
+                description TEXT NULL,
+                event_date DATE NOT NULL,
+                end_date DATE NULL,
+                time VARCHAR(20) DEFAULT '09:00',
+                end_time VARCHAR(20) NULL,
+                location VARCHAR(255) NOT NULL,
+                city VARCHAR(100) NULL,
+                state VARCHAR(10) NULL,
+                distance_km DECIMAL(10,2) DEFAULT 0,
+                category VARCHAR(100) DEFAULT 'Passeios & Bate-Fica',
+                banner_url TEXT NULL,
+                status VARCHAR(20) DEFAULT 'aprovado',
+                rejection_reason TEXT NULL,
+                member_count INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // 5. Tabela de Parceiros
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS partners (
+                id VARCHAR(64) PRIMARY KEY,
+                name VARCHAR(200) NOT NULL,
+                category VARCHAR(100) NOT NULL,
+                description TEXT NULL,
+                news TEXT NULL,
+                address VARCHAR(255) NULL,
+                city VARCHAR(100) NULL,
+                state VARCHAR(10) NULL,
+                phone VARCHAR(30) NULL,
+                whatsapp VARCHAR(30) NULL,
+                corporate_contact VARCHAR(150) NULL,
+                website TEXT NULL,
+                map_url TEXT NULL,
+                discount_info VARCHAR(200) NULL,
+                logo_url TEXT NULL,
+                rating DECIMAL(3,2) DEFAULT 5.0,
+                highlight TINYINT(1) DEFAULT 0,
+                responsible JSON NULL,
+                posts JSON NULL,
+                status VARCHAR(20) DEFAULT 'aprovado',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // 6. Tabela da Comunidade
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS community_posts (
+                id VARCHAR(64) PRIMARY KEY,
+                pilot_id VARCHAR(64) NOT NULL,
+                author_name VARCHAR(150) NULL,
+                author_avatar TEXT NULL,
+                author_role VARCHAR(50) DEFAULT 'pilot',
+                content TEXT NOT NULL,
+                image_url TEXT NULL,
+                category VARCHAR(100) DEFAULT 'Geral',
+                likes_count INT DEFAULT 0,
+                comments_count INT DEFAULT 0,
+                comments_list JSON NULL,
+                status VARCHAR(20) DEFAULT 'aprovado',
+                rejection_reason TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // 7. Tabela de Motoclubes
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS clubs (
+                id VARCHAR(64) PRIMARY KEY,
+                name VARCHAR(200) NOT NULL,
+                city VARCHAR(100) NULL,
+                state VARCHAR(10) NULL,
+                members_count INT DEFAULT 1,
+                rating DECIMAL(3,2) DEFAULT 5.0,
+                image_url TEXT NULL,
+                logo_url TEXT NULL,
+                description TEXT NULL,
+                category VARCHAR(50) DEFAULT 'Cruiser',
+                foundation_date VARCHAR(50) NULL,
+                president_name VARCHAR(150) NULL,
+                president_id VARCHAR(64) NULL,
+                regulations_file TEXT NULL,
+                status VARCHAR(20) DEFAULT 'ativo',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
         // Auto-migração: Garantir todas as colunas essenciais na tabela pilots
         $columnsToEnsure = [
             "password_hash" => "VARCHAR(255) NULL",
@@ -445,6 +570,70 @@ if ($pdo) {
 // -------------------------------------------------------------
 // ROTEADOR DE ENDPOINTS DA API
 // -------------------------------------------------------------
+
+// 0. Teste Direto de Conexão: GET /db/ping (SELECT 1 via PDO/MySQL na Hostinger)
+if ($route === '/db/ping' && $method === 'GET') {
+    $startTime = microtime(true);
+    if (!$pdo) {
+        $latencyMs = round((microtime(true) - $startTime) * 1000);
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'status' => 'Erro de Conexão',
+            'query' => 'SELECT 1 AS ping',
+            'latencyMs' => $latencyMs,
+            'host' => DB_HOST,
+            'database' => DB_NAME,
+            'user' => DB_USER,
+            'message' => 'Não foi possível conectar ao MySQL na Hostinger. Verifique as credenciais no config.php.',
+            'error' => function_exists('getDatabaseLastError') ? getDatabaseLastError() : 'PDO não inicializado',
+            'timestamp' => date('c')
+        ]);
+        exit;
+    }
+
+    try {
+        $stmt = $pdo->query("SELECT 1 AS ping, NOW() AS server_time, DATABASE() AS current_database, VERSION() AS mysql_version");
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $latencyMs = round((microtime(true) - $startTime) * 1000);
+
+        echo json_encode([
+            'success' => true,
+            'status' => 'Conectado',
+            'query' => 'SELECT 1 AS ping',
+            'latencyMs' => $latencyMs,
+            'host' => DB_HOST,
+            'database' => DB_NAME,
+            'user' => DB_USER,
+            'message' => 'Consulta SELECT 1 executada com sucesso via MySQL na Hostinger!',
+            'result' => [
+                [
+                    'ping' => (int) ($row['ping'] ?? 1),
+                    'server_time' => $row['server_time'] ?? date('c'),
+                    'current_database' => $row['current_database'] ?? DB_NAME,
+                    'mysql_version' => $row['mysql_version'] ?? 'MySQL'
+                ]
+            ],
+            'timestamp' => date('c')
+        ]);
+    } catch (Exception $e) {
+        $latencyMs = round((microtime(true) - $startTime) * 1000);
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'status' => 'Erro de Conexão',
+            'query' => 'SELECT 1 AS ping',
+            'latencyMs' => $latencyMs,
+            'host' => DB_HOST,
+            'database' => DB_NAME,
+            'user' => DB_USER,
+            'message' => 'Falha ao executar SELECT 1 no banco da Hostinger: ' . $e->getMessage(),
+            'error' => $e->getMessage(),
+            'timestamp' => date('c')
+        ]);
+    }
+    exit;
+}
 
 // 1. Diagnóstico do Banco de Dados: GET /db/status
 if ($route === '/db/status' && $method === 'GET') {
@@ -1230,6 +1419,456 @@ if ($route === '/pilots' && $method === 'GET') {
         $pilots = array_values(array_map('sanitizePilot', $store['pilots'] ?? []));
     }
     echo json_encode(['success' => true, 'pilots' => $pilots]);
+    exit;
+}
+
+// 13. ROTAS / ROTEIROS
+if ($route === '/routes' && $method === 'GET') {
+    $routesList = [];
+    $status = $_GET['status'] ?? null;
+    if ($pdo) {
+        try {
+            $sql = "SELECT * FROM routes";
+            $params = [];
+            if ($status && $status !== 'todos') {
+                $sql .= " WHERE status = ?";
+                $params[] = $status;
+            }
+            $sql .= " ORDER BY created_at DESC";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll();
+            foreach ($rows as $r) {
+                $ratingMetrics = null;
+                if (!empty($r['rating_metrics'])) {
+                    $ratingMetrics = is_string($r['rating_metrics']) ? json_decode($r['rating_metrics'], true) : $r['rating_metrics'];
+                }
+                $reviews = [];
+                if (!empty($r['reviews'])) {
+                    $reviews = is_string($r['reviews']) ? json_decode($r['reviews'], true) : $r['reviews'];
+                }
+                $routesList[] = [
+                    'id' => $r['id'],
+                    'name' => $r['title'],
+                    'title' => $r['title'],
+                    'mapsAddress' => $r['maps_address'] ?? '',
+                    'mapsUrl' => $r['maps_url'] ?? '',
+                    'description' => $r['description'] ?? '',
+                    'riderTips' => $r['rider_tips'] ?? '',
+                    'aiTouristInfo' => $r['ai_tourist_info'] ?? '',
+                    'distance' => (float) ($r['distance_km'] ?? 0),
+                    'duration' => $r['duration'] ?? '',
+                    'difficulty' => $r['difficulty'] ?? 'Médio',
+                    'image' => $r['cover_image'] ?? '',
+                    'cover_image' => $r['cover_image'] ?? '',
+                    'author' => [
+                        'name' => $r['author_name'] ?? 'Comunidade MotoLegado',
+                        'avatar' => $r['author_avatar'] ?? ''
+                    ],
+                    'rating' => (float) ($r['rating'] ?? 5.0),
+                    'totalRatingsCount' => (int) ($r['total_ratings_count'] ?? 1),
+                    'ratingMetrics' => $ratingMetrics ?: ['paisagem' => 5, 'asfalto' => 5, 'curvas' => 5, 'seguranca' => 5, 'infraestrutura' => 5],
+                    'reviews' => $reviews ?: [],
+                    'status' => $r['status'] ?? 'aprovado',
+                    'rejectionReason' => $r['rejection_reason'] ?? null,
+                    'createdAt' => $r['created_at'] ?? date('c')
+                ];
+            }
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'routes' => $routesList]);
+    exit;
+}
+
+if ($route === '/routes' && $method === 'POST') {
+    $id = $body['id'] ?? ('route_' . round(microtime(true) * 1000));
+    $title = $body['name'] ?? ($body['title'] ?? 'Nova Rota');
+    $mapsAddress = $body['mapsAddress'] ?? ($body['maps_address'] ?? '');
+    $mapsUrl = $body['mapsUrl'] ?? ($body['maps_url'] ?? '');
+    $description = $body['description'] ?? '';
+    $riderTips = $body['riderTips'] ?? ($body['rider_tips'] ?? '');
+    $aiTouristInfo = $body['aiTouristInfo'] ?? ($body['ai_tourist_info'] ?? '');
+    $distance = (float) ($body['distance'] ?? ($body['distance_km'] ?? 0));
+    $duration = $body['duration'] ?? '';
+    $difficulty = $body['difficulty'] ?? 'Médio';
+    $image = $body['image'] ?? ($body['cover_image'] ?? '');
+    $authorName = $body['author']['name'] ?? ($body['author_name'] ?? 'Piloto');
+    $authorAvatar = $body['author']['avatar'] ?? ($body['author_avatar'] ?? '');
+    $rating = (float) ($body['rating'] ?? 5.0);
+    $totalRatingsCount = (int) ($body['totalRatingsCount'] ?? 1);
+    $ratingMetrics = isset($body['ratingMetrics']) ? json_encode($body['ratingMetrics']) : null;
+    $reviews = isset($body['reviews']) ? json_encode($body['reviews']) : null;
+    $status = $body['status'] ?? 'aprovado';
+
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO routes (id, title, maps_address, maps_url, description, rider_tips, ai_tourist_info, distance_km, duration, difficulty, cover_image, author_name, author_avatar, rating, total_ratings_count, rating_metrics, reviews, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE 
+                    title = VALUES(title), maps_address = VALUES(maps_address), maps_url = VALUES(maps_url),
+                    description = VALUES(description), rider_tips = VALUES(rider_tips), ai_tourist_info = VALUES(ai_tourist_info),
+                    distance_km = VALUES(distance_km), duration = VALUES(duration), difficulty = VALUES(difficulty),
+                    cover_image = VALUES(cover_image), rating = VALUES(rating), total_ratings_count = VALUES(total_ratings_count),
+                    rating_metrics = VALUES(rating_metrics), reviews = VALUES(reviews), status = VALUES(status);
+            ");
+            $stmt->execute([$id, $title, $mapsAddress, $mapsUrl, $description, $riderTips, $aiTouristInfo, $distance, $duration, $difficulty, $image, $authorName, $authorAvatar, $rating, $totalRatingsCount, $ratingMetrics, $reviews, $status]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'route' => array_merge($body, ['id' => $id])]);
+    exit;
+}
+
+if (preg_match('#^/routes/([^/]+)/status$#', $route, $matches) && $method === 'PUT') {
+    $routeId = $matches[1];
+    $status = $body['status'] ?? 'aprovado';
+    $reason = $body['rejectionReason'] ?? null;
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("UPDATE routes SET status = ?, rejection_reason = ? WHERE id = ?");
+            $stmt->execute([$status, $reason, $routeId]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'message' => 'Status da rota atualizado!']);
+    exit;
+}
+
+if (preg_match('#^/routes/([^/]+)$#', $route, $matches) && $method === 'DELETE') {
+    $routeId = $matches[1];
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM routes WHERE id = ?");
+            $stmt->execute([$routeId]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'message' => 'Rota excluída com sucesso!']);
+    exit;
+}
+
+// 14. EVENTOS
+if ($route === '/events' && $method === 'GET') {
+    $eventsList = [];
+    $status = $_GET['status'] ?? null;
+    if ($pdo) {
+        try {
+            $sql = "SELECT * FROM events";
+            $params = [];
+            if ($status && $status !== 'todos') {
+                $sql .= " WHERE status = ?";
+                $params[] = $status;
+            }
+            $sql .= " ORDER BY event_date ASC";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll();
+            foreach ($rows as $r) {
+                $eventsList[] = [
+                    'id' => $r['id'],
+                    'title' => $r['title'],
+                    'date' => $r['event_date'],
+                    'time' => $r['time'] ?? '09:00',
+                    'location' => $r['location'],
+                    'category' => $r['category'] ?? 'Encontro',
+                    'desc' => $r['description'] ?? '',
+                    'description' => $r['description'] ?? '',
+                    'image' => $r['banner_url'] ?? '',
+                    'bannerUrl' => $r['banner_url'] ?? '',
+                    'organizer' => $r['created_by'] ?? 'MotoLegado',
+                    'status' => $r['status'] ?? 'aprovado',
+                    'rejectionReason' => $r['rejection_reason'] ?? null,
+                    'memberCount' => (int) ($r['member_count'] ?? 0)
+                ];
+            }
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'events' => $eventsList]);
+    exit;
+}
+
+if ($route === '/events' && $method === 'POST') {
+    $id = $body['id'] ?? ('event_' . round(microtime(true) * 1000));
+    $title = $body['title'] ?? 'Novo Evento';
+    $eventDate = $body['date'] ?? ($body['event_date'] ?? date('Y-m-d'));
+    $time = $body['time'] ?? '09:00';
+    $location = $body['location'] ?? 'Brasil';
+    $category = $body['category'] ?? 'Encontro';
+    $description = $body['desc'] ?? ($body['description'] ?? '');
+    $bannerUrl = $body['image'] ?? ($body['bannerUrl'] ?? '');
+    $organizer = is_string($body['organizer'] ?? null) ? $body['organizer'] : ($body['organizer']['name'] ?? 'MotoLegado');
+    $status = $body['status'] ?? 'aprovado';
+
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO events (id, title, event_date, time, location, category, description, banner_url, created_by, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE 
+                    title = VALUES(title), event_date = VALUES(event_date), time = VALUES(time),
+                    location = VALUES(location), category = VALUES(category), description = VALUES(description),
+                    banner_url = VALUES(banner_url), created_by = VALUES(created_by), status = VALUES(status);
+            ");
+            $stmt->execute([$id, $title, $eventDate, $time, $location, $category, $description, $bannerUrl, $organizer, $status]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'event' => array_merge($body, ['id' => $id])]);
+    exit;
+}
+
+if (preg_match('#^/events/([^/]+)/status$#', $route, $matches) && $method === 'PUT') {
+    $eventId = $matches[1];
+    $status = $body['status'] ?? 'aprovado';
+    $reason = $body['rejectionReason'] ?? null;
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("UPDATE events SET status = ?, rejection_reason = ? WHERE id = ?");
+            $stmt->execute([$status, $reason, $eventId]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'message' => 'Status do evento atualizado!']);
+    exit;
+}
+
+if (preg_match('#^/events/([^/]+)$#', $route, $matches) && $method === 'DELETE') {
+    $eventId = $matches[1];
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM events WHERE id = ?");
+            $stmt->execute([$eventId]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'message' => 'Evento excluído com sucesso!']);
+    exit;
+}
+
+// 15. PARCEIROS
+if ($route === '/partners' && $method === 'GET') {
+    $partnersList = [];
+    $status = $_GET['status'] ?? null;
+    if ($pdo) {
+        try {
+            $sql = "SELECT * FROM partners";
+            $params = [];
+            if ($status && $status !== 'todos') {
+                $sql .= " WHERE status = ?";
+                $params[] = $status;
+            }
+            $sql .= " ORDER BY created_at DESC";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll();
+            foreach ($rows as $r) {
+                $partnersList[] = [
+                    'id' => $r['id'],
+                    'name' => $r['name'],
+                    'category' => $r['category'],
+                    'location' => $r['address'] ?? ($r['city'] ?? 'Brasil'),
+                    'address' => $r['address'] ?? '',
+                    'city' => $r['city'] ?? '',
+                    'discount' => $r['discount_info'] ?? '10% OFF',
+                    'news' => $r['news'] ?? '',
+                    'phone' => $r['phone'] ?? '',
+                    'whatsapp' => $r['whatsapp'] ?? '',
+                    'rating' => (float) ($r['rating'] ?? 5.0),
+                    'image' => $r['logo_url'] ?? '',
+                    'status' => $r['status'] ?? 'aprovado',
+                    'highlight' => (bool) ($r['highlight'] ?? false)
+                ];
+            }
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'partners' => $partnersList]);
+    exit;
+}
+
+if ($route === '/partners' && $method === 'POST') {
+    $id = $body['id'] ?? ('partner_' . round(microtime(true) * 1000));
+    $name = $body['name'] ?? 'Parceiro';
+    $category = $body['category'] ?? 'Oficina';
+    $address = $body['location'] ?? ($body['address'] ?? 'Brasil');
+    $discount = $body['discount'] ?? ($body['discount_info'] ?? '10% OFF');
+    $news = $body['news'] ?? '';
+    $phone = $body['phone'] ?? '';
+    $whatsapp = $body['whatsapp'] ?? '';
+    $rating = (float) ($body['rating'] ?? 5.0);
+    $image = $body['image'] ?? ($body['logo_url'] ?? '');
+    $status = $body['status'] ?? 'aprovado';
+
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO partners (id, name, category, address, discount_info, news, phone, whatsapp, rating, logo_url, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE 
+                    name = VALUES(name), category = VALUES(category), address = VALUES(address),
+                    discount_info = VALUES(discount_info), news = VALUES(news), phone = VALUES(phone),
+                    whatsapp = VALUES(whatsapp), rating = VALUES(rating), logo_url = VALUES(logo_url), status = VALUES(status);
+            ");
+            $stmt->execute([$id, $name, $category, $address, $discount, $news, $phone, $whatsapp, $rating, $image, $status]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'partner' => array_merge($body, ['id' => $id])]);
+    exit;
+}
+
+if (preg_match('#^/partners/([^/]+)/status$#', $route, $matches) && $method === 'PUT') {
+    $partnerId = $matches[1];
+    $status = $body['status'] ?? 'aprovado';
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("UPDATE partners SET status = ? WHERE id = ?");
+            $stmt->execute([$status, $partnerId]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'message' => 'Status do parceiro atualizado!']);
+    exit;
+}
+
+if (preg_match('#^/partners/([^/]+)$#', $route, $matches) && $method === 'DELETE') {
+    $partnerId = $matches[1];
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM partners WHERE id = ?");
+            $stmt->execute([$partnerId]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'message' => 'Parceiro excluído com sucesso!']);
+    exit;
+}
+
+// 16. MURAL DA COMUNIDADE (POSTS)
+if ($route === '/community/posts' && $method === 'GET') {
+    $postsList = [];
+    $status = $_GET['status'] ?? null;
+    if ($pdo) {
+        try {
+            $sql = "SELECT * FROM community_posts";
+            $params = [];
+            if ($status && $status !== 'todos') {
+                $sql .= " WHERE status = ?";
+                $params[] = $status;
+            }
+            $sql .= " ORDER BY created_at DESC";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll();
+            foreach ($rows as $r) {
+                $postsList[] = [
+                    'id' => $r['id'],
+                    'authorId' => $r['pilot_id'],
+                    'authorName' => $r['author_name'] ?? 'Piloto',
+                    'authorAvatar' => $r['author_avatar'] ?? '',
+                    'authorRole' => $r['author_role'] ?? 'pilot',
+                    'content' => $r['content'],
+                    'image' => $r['image_url'] ?? null,
+                    'likes' => (int) ($r['likes_count'] ?? 0),
+                    'status' => $r['status'] ?? 'aprovado',
+                    'createdAt' => $r['created_at'] ?? date('c')
+                ];
+            }
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'posts' => $postsList]);
+    exit;
+}
+
+if ($route === '/community/posts' && $method === 'POST') {
+    $id = $body['id'] ?? ('post_' . round(microtime(true) * 1000));
+    $pilotId = $body['authorId'] ?? ($body['author_id'] ?? 'pilot_anon');
+    $authorName = $body['authorName'] ?? ($body['author_name'] ?? 'Piloto');
+    $authorAvatar = $body['authorAvatar'] ?? ($body['author_avatar'] ?? '');
+    $content = $body['content'] ?? '';
+    $image = $body['image'] ?? ($body['image_url'] ?? null);
+    $status = $body['status'] ?? 'aprovado';
+
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO community_posts (id, pilot_id, author_name, author_avatar, content, image_url, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE content = VALUES(content), image_url = VALUES(image_url), status = VALUES(status);
+            ");
+            $stmt->execute([$id, $pilotId, $authorName, $authorAvatar, $content, $image, $status]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'post' => array_merge($body, ['id' => $id])]);
+    exit;
+}
+
+if (preg_match('#^/community/posts/([^/]+)/like$#', $route, $matches) && $method === 'POST') {
+    $postId = $matches[1];
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("UPDATE community_posts SET likes_count = likes_count + 1 WHERE id = ?");
+            $stmt->execute([$postId]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'message' => 'Post curtido com sucesso!']);
+    exit;
+}
+
+if (preg_match('#^/community/posts/([^/]+)$#', $route, $matches) && $method === 'DELETE') {
+    $postId = $matches[1];
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM community_posts WHERE id = ?");
+            $stmt->execute([$postId]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'message' => 'Post excluído com sucesso!']);
+    exit;
+}
+
+// 17. MOTO CLUBES
+if ($route === '/clubs' && $method === 'GET') {
+    $clubsList = [];
+    if ($pdo) {
+        try {
+            $stmt = $pdo->query("SELECT * FROM clubs ORDER BY created_at DESC");
+            $rows = $stmt->fetchAll();
+            foreach ($rows as $r) {
+                $clubsList[] = [
+                    'id' => $r['id'],
+                    'name' => $r['name'],
+                    'city' => $r['city'] ?? 'Brasil',
+                    'members' => (int) ($r['members_count'] ?? 1),
+                    'rating' => (float) ($r['rating'] ?? 5.0),
+                    'image' => $r['image_url'] ?? '',
+                    'logo' => $r['logo_url'] ?? '',
+                    'description' => $r['description'] ?? '',
+                    'category' => $r['category'] ?? 'Mista'
+                ];
+            }
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'clubs' => $clubsList]);
+    exit;
+}
+
+if ($route === '/clubs' && $method === 'POST') {
+    $id = $body['id'] ?? ('club_' . round(microtime(true) * 1000));
+    $name = $body['name'] ?? 'Moto Clube';
+    $city = $body['city'] ?? 'Brasil';
+    $members = (int) ($body['members'] ?? 1);
+    $rating = (float) ($body['rating'] ?? 5.0);
+    $image = $body['image'] ?? '';
+    $logo = $body['logo'] ?? '';
+    $description = $body['description'] ?? '';
+    $category = $body['category'] ?? 'Cruiser';
+
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO clubs (id, name, city, members_count, rating, image_url, logo_url, description, category)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE 
+                    name = VALUES(name), city = VALUES(city), members_count = VALUES(members_count),
+                    image_url = VALUES(image_url), logo_url = VALUES(logo_url), description = VALUES(description),
+                    category = VALUES(category);
+            ");
+            $stmt->execute([$id, $name, $city, $members, $rating, $image, $logo, $description, $category]);
+        } catch (Exception $e) {}
+    }
+    echo json_encode(['success' => true, 'club' => array_merge($body, ['id' => $id])]);
     exit;
 }
 
