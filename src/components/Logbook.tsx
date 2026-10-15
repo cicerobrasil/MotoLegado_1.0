@@ -256,8 +256,46 @@ export function parseLogDate(dateStr?: string): Date | null {
 }
 
 /**
+ * Imagem padrão oficial com ícone de máquina fotográfica para cards sem foto enviada
+ */
+export const DEFAULT_CAMERA_COVER = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="ml_bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#020617" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <radialGradient id="ml_lens" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#020617" />
+    </radialGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#ml_bg)" />
+  <!-- Moldura Estilizada -->
+  <rect x="230" y="85" width="340" height="280" rx="28" fill="#0b1120" stroke="#334155" stroke-width="2" stroke-dasharray="6 6" />
+  <!-- Câmera Fotográfica Central -->
+  <g transform="translate(330, 140)">
+    <!-- Corpo da Câmera -->
+    <path d="M140 120H10c-5.5 0-10-4.5-10-10V35c0-5.5 4.5-10 10-10h28l10-18h64l10 18h28c5.5 0 10 4.5 10 10v75c0 5.5-4.5 10-10 10z" fill="#1e293b" stroke="#ea580c" stroke-width="4" stroke-linejoin="round" />
+    <!-- Flash / Visor -->
+    <rect x="120" y="38" width="14" height="10" rx="3" fill="#ea580c" />
+    <circle cx="28" cy="42" r="5" fill="#64748b" />
+    <!-- Lente da Câmera -->
+    <circle cx="75" cy="72" r="36" fill="url(#ml_lens)" stroke="#ea580c" stroke-width="4" />
+    <circle cx="75" cy="72" r="24" fill="#0f172a" stroke="#94a3b8" stroke-width="2" />
+    <circle cx="75" cy="72" r="12" fill="#ea580c" opacity="0.8" />
+    <circle cx="82" cy="65" r="4" fill="#ffffff" opacity="0.9" />
+  </g>
+  <!-- Textos de Indicação Padrão -->
+  <text x="400" y="320" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="#94a3b8" text-anchor="middle" letter-spacing="2">FOTO DE CAPA NÃO INFORMADA</text>
+  <text x="400" y="342" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="800" fill="#ea580c" text-anchor="middle" letter-spacing="1">MOTOLEGADO • DIÁRIO DE BORDO</text>
+</svg>
+`);
+
+/**
  * Higieniza e padroniza valores de distância em KM sem corromper casas decimais
- * Exemplo: "68,4 km" ou "68.4" -> "68" (em vez do antigo replace(/\D/g) que virava 684!)
+ * Exemplo: "68,4 km" ou "68.4" -> "68.4" ou "68", preservando valores como "3,4"
  */
 export function sanitizeDistanceKm(val: string | number | undefined | null): string {
   if (val === undefined || val === null) return '';
@@ -265,7 +303,8 @@ export function sanitizeDistanceKm(val: string | number | undefined | null): str
   const match = s.match(/\d+(?:\.\d+)?/);
   if (!match) return '';
   const num = parseFloat(match[0]);
-  return isNaN(num) || num <= 0 ? '' : String(Math.round(num));
+  if (isNaN(num) || num <= 0) return '';
+  return num < 10 ? String(Math.round(num * 10) / 10).replace('.', ',') : String(Math.round(num));
 }
 
 /**
@@ -410,7 +449,7 @@ export function Logbook() {
   const belongsToCurrentPilot = (log: LogEntry): boolean => {
     if (!log) return false;
     if (!log.pilot_id) return true;
-    return currentPilotSet.has(log.pilot_id.toLowerCase());
+    return currentPilotSet.has(String(log.pilot_id).toLowerCase());
   };
 
   useEffect(() => {
@@ -881,6 +920,13 @@ export function Logbook() {
 
   const isFreeLimitReached = !isProOrBonificado && thisMonthLogsCount >= 5;
 
+  // Garante que a tela sempre role para o topo ao abrir o formulário do Diário de Bordo (criação ou edição)
+  useEffect(() => {
+    if (isFormOpen) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [isFormOpen]);
+
   const handleOpenForm = () => {
     if (isFreeLimitReached) {
       setUpgradeFeature('diario_ilimitado');
@@ -910,6 +956,7 @@ export function Logbook() {
     setSelectedRouteId('');
     setFormError(null);
     setIsFormOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleEditLog = (log: LogEntry) => {
@@ -937,6 +984,7 @@ export function Logbook() {
     setSelectedRouteId('');
     setFormError(null);
     setIsFormOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteLog = async (targetId: string) => {
@@ -1292,8 +1340,29 @@ export function Logbook() {
       updated = [finalEntry, ...baseLogs.filter(l => l.id !== finalEntry.id)];
     }
     setLogs(updated);
-    localStorage.setItem(userStorageKey, JSON.stringify(updated));
-    localStorage.setItem('motolegado_logs', JSON.stringify(updated));
+    try {
+      localStorage.setItem(userStorageKey, JSON.stringify(updated));
+      localStorage.setItem('motolegado_logs', JSON.stringify(updated));
+    } catch (quotaErr) {
+      console.warn('Quota de localStorage excedida ao salvar viagem. Otimizando armazenamento:', quotaErr);
+      try {
+        const lightweight = updated.map(item => ({
+          ...item,
+          image: item.image && item.image.startsWith('data:') && item.image.length > 50000 
+            ? DEFAULT_CAMERA_COVER 
+            : item.image,
+          photos: (item.photos || []).map(p => p && p.startsWith('data:') && p.length > 50000 ? '' : p).filter(Boolean),
+          documentaryProofs: (item.documentaryProofs || []).map(dp => ({
+            ...dp,
+            url: dp.url && dp.url.startsWith('data:') && dp.url.length > 50000 ? '' : dp.url
+          }))
+        }));
+        localStorage.setItem(userStorageKey, JSON.stringify(lightweight));
+        localStorage.setItem('motolegado_logs', JSON.stringify(lightweight));
+      } catch (innerErr) {
+        console.warn('Armazenamento local cheio, dados mantidos em memória e MySQL:', innerErr);
+      }
+    }
     window.dispatchEvent(new CustomEvent('motolegado_logs_updated', { detail: { pilotId: currentPilotKey, logs: updated } }));
     window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
     window.dispatchEvent(new Event('storage'));
@@ -1394,16 +1463,17 @@ export function Logbook() {
       
       const isStockUrl = (url?: string) => !url || url.includes('images.unsplash.com');
 
-      // Foto enviada pelo usuário em Provas Documentais ou na Capa tem prioridade MÁXIMA
+      // Foto de Capa: Se o usuário selecionou uma foto explicitamente, ela tem prioridade total
+      const userDirectCover = (image && image.trim() !== '' && !isStockUrl(image)) 
+        ? image 
+        : (image && image.trim() !== '' ? image : null);
       const userProofPhoto = documentaryProofs.find(p => p.url && !isStockUrl(p.url))?.url;
-      const userDirectCover = image && !isStockUrl(image) ? image : null;
 
-      // Se o usuário enviou uma foto, ela DEVE ser a capa principal do card
-      const finalCover = userProofPhoto 
-        || userDirectCover 
+      // Se o usuário selecionou uma foto na capa, usa ela. Se não, usa a prova documental ou o ícone padrão de câmera
+      const finalCover = userDirectCover 
+        || userProofPhoto 
         || (documentaryProofs.length > 0 ? documentaryProofs[0].url : null) 
-        || image 
-        || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&q=80&w=800';
+        || DEFAULT_CAMERA_COVER;
 
       // Organiza fotos para que as fotos reais do usuário sempre fiquem em primeiro lugar
       const proofUrls = documentaryProofs.map(p => p.url).filter(Boolean);
@@ -1470,7 +1540,7 @@ export function Logbook() {
       setIsFormOpen(false);
     } catch (err: any) {
       console.error('Erro ao salvar no Diário de Bordo:', err);
-      setFormError('Falha ao processar o salvamento do registro. Por favor, tente novamente.');
+      setFormError(err?.message ? `Falha ao processar o salvamento: ${err.message}` : 'Falha ao processar o salvamento do registro. Por favor, tente novamente.');
     } finally {
       setIsSaving(false);
     }
@@ -2214,15 +2284,19 @@ export function Logbook() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">FOTO DE CAPA PRINCIPAL DO CARD</label>
-                    {image && (
+                    {image ? (
                       <button
                         type="button"
                         onClick={() => setImage('')}
                         className="text-[9px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1"
                       >
                         <Trash2 size={11} />
-                        <span>Remover Foto</span>
+                        <span>Remover Foto (Usar Ícone Padrão de Câmera)</span>
                       </button>
+                    ) : (
+                      <span className="text-[9px] font-bold text-slate-400">
+                        Ícone padrão de câmera ativo
+                      </span>
                     )}
                   </div>
 
@@ -2233,7 +2307,7 @@ export function Logbook() {
                         "w-full aspect-[2/1] rounded-2xl border-2 flex flex-col items-center justify-center cursor-pointer transition-all relative overflow-hidden group",
                         image 
                           ? "border-slate-800 bg-slate-950 shadow-lg" 
-                          : "border-dashed border-slate-800/80 bg-slate-900/20 hover:border-orange-500/50 hover:bg-slate-900/40"
+                          : "border-slate-800 bg-slate-950 shadow-lg hover:border-orange-500/50"
                       )}
                     >
                       {isUploadingPhoto ? (
@@ -2252,14 +2326,19 @@ export function Logbook() {
                           </div>
                         </>
                       ) : (
-                        <div className="flex flex-col items-center gap-2 text-center p-4">
-                          <div className="w-12 h-12 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-600 group-hover:text-orange-500 group-hover:scale-110 transition-all">
-                            <Camera size={20} />
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-white transition-colors">
-                              Capa do Roteiro (ou selecione das provas acima)
-                            </p>
+                        <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden">
+                          <img 
+                            src={DEFAULT_CAMERA_COVER} 
+                            alt="Capa Padrão com Ícone de Câmera" 
+                            className="w-full h-full object-cover opacity-85 group-hover:opacity-100 transition-all duration-300"
+                          />
+                          <div className="absolute inset-0 bg-slate-950/40 group-hover:bg-slate-950/20 transition-all flex flex-col items-center justify-center gap-2 backdrop-blur-[1px]">
+                            <div className="w-12 h-12 rounded-full bg-slate-900/90 border border-orange-500/60 flex items-center justify-center text-orange-400 group-hover:scale-110 shadow-lg shadow-orange-500/20 transition-all">
+                              <Camera size={22} />
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white drop-shadow-md">
+                              Clique para Escolher Foto da Galeria
+                            </span>
                           </div>
                         </div>
                       )}
@@ -2894,8 +2973,15 @@ export function Logbook() {
                 >
                   <div className="grid grid-cols-1 lg:grid-cols-12">
                     {/* Image Side */}
-                    <div className="lg:col-span-4 aspect-video lg:aspect-auto relative overflow-hidden">
-                       <img src={log.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" alt={log.title} />
+                    <div className="lg:col-span-4 aspect-video lg:aspect-auto relative overflow-hidden bg-slate-950 flex items-center justify-center">
+                       <img 
+                         src={(log.image && !log.image.includes('images.unsplash.com')) ? log.image : DEFAULT_CAMERA_COVER} 
+                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" 
+                         alt={log.title} 
+                         onError={(e) => {
+                           (e.target as HTMLImageElement).src = DEFAULT_CAMERA_COVER;
+                         }}
+                       />
                        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 to-transparent lg:hidden" />
                     </div>
                     

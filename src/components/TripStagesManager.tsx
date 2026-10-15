@@ -23,7 +23,7 @@ import {
   Download
 } from 'lucide-react';
 import { apiParseGoogleMapsRoute } from '../lib/api';
-import { parseGoogleMapsRouteClient } from '../lib/mapsParserClient';
+import { parseGoogleMapsRouteClient, extractMetricsFromTextClient } from '../lib/mapsParserClient';
 import { 
   resolvePlaceCoordinates, 
   interpolateTrackPoints, 
@@ -130,8 +130,21 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
 }) => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importInput, setImportInput] = useState('');
+  const [mapsDistance, setMapsDistance] = useState('');
+  const [mapsDuration, setMapsDuration] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importFeedback, setImportFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleImportInputChange = (val: string) => {
+    setImportInput(val);
+    const metrics = extractMetricsFromTextClient(val);
+    if (metrics.distanceKm) {
+      setMapsDistance(String(metrics.distanceKm).replace('.', ','));
+    }
+    if (metrics.duration) {
+      setMapsDuration(metrics.duration);
+    }
+  };
   
   // Estado para controle e cancelamento de importação do Google Maps
   const [hasImportedFromMaps, setHasImportedFromMaps] = useState(false);
@@ -312,15 +325,17 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
 
       // Preenchimento automático da distância e duração exatas do Google Maps
       const rawKm = estimatedDistanceKm ?? res?.data?.estimatedDistanceKm;
-      const finalDuration = estimatedDuration || res?.data?.estimatedDuration;
+      const parsedDuration = estimatedDuration || res?.data?.estimatedDuration;
 
-      let finalKmStr = '';
-      if (rawKm !== undefined && rawKm !== null) {
+      let finalKmStr = mapsDistance.trim();
+      if (!finalKmStr && rawKm !== undefined && rawKm !== null) {
         const num = typeof rawKm === 'number' ? rawKm : parseFloat(String(rawKm).replace(',', '.'));
         if (!isNaN(num) && num > 0) {
-          finalKmStr = String(Math.round(num));
+          finalKmStr = num < 10 ? String(Math.round(num * 10) / 10).replace('.', ',') : String(Math.round(num));
         }
       }
+
+      const finalDuration = mapsDuration.trim() || parsedDuration;
 
       if (setDistance && finalKmStr) {
         setDistance(finalKmStr);
@@ -602,14 +617,50 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
             <input
               type="text"
               value={importInput}
-              onChange={(e) => setImportInput(e.target.value)}
-              placeholder="Ex: https://maps.app.goo.gl/... ou Curitiba -> Morretes -> Antonina"
+              onChange={(e) => handleImportInputChange(e.target.value)}
+              placeholder="Ex: Cole o link do Google Maps (https://maps.app.goo.gl/...) ou texto com paradas"
               className="flex-1 bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-400 outline-none transition-colors"
             />
           </div>
 
+          {/* Campos de Confirmação da Distância e Duração Exatas do Google Maps */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-950/80 rounded-xl border border-slate-800">
+            <div>
+              <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block mb-1 flex items-center justify-between">
+                <span>Distância no Google Maps</span>
+                <span className="text-[9px] text-sky-400 font-bold lowercase">importação fiel</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={mapsDistance}
+                  onChange={(e) => setMapsDistance(e.target.value)}
+                  placeholder="Ex: 3,4 ou 85"
+                  className="w-full bg-slate-900 border border-slate-700 focus:border-sky-500 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder:text-slate-500 outline-none"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-orange-400">KM</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block mb-1 flex items-center justify-between">
+                <span>Tempo / Duração no Google Maps</span>
+                <span className="text-[9px] text-sky-400 font-bold lowercase">do app de mapas</span>
+              </label>
+              <input
+                type="text"
+                value={mapsDuration}
+                onChange={(e) => setMapsDuration(e.target.value)}
+                placeholder="Ex: 12 min ou 1h 29min"
+                className="w-full bg-slate-900 border border-slate-700 focus:border-sky-500 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder:text-slate-500 outline-none"
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-sky-300/90 leading-tight">
+            💡 <strong>Sincronização com o Google Maps:</strong> Se você copiou o trajeto do Google Maps, a distância e o tempo exatos aparecem acima e serão importados fielmente para o Diário de Bordo.
+          </p>
+
           {/* Botões de Ação do Modal: Cancelar / Desfazer / Processar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/60">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -642,12 +693,12 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
               {isImporting ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  <span>Calculando Rota...</span>
+                  <span>Importando Dados...</span>
                 </>
               ) : (
                 <>
                   <Sparkles size={14} />
-                  <span>Processar Rota & Calcular Métricas</span>
+                  <span>Importar Dados do Google Maps</span>
                 </>
               )}
             </button>

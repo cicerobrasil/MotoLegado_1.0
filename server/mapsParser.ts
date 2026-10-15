@@ -29,13 +29,13 @@ export function extractMetricsFromText(text: string): { distanceKm: number | nul
   let distanceKm: number | null = null;
   let duration: string | null = null;
 
-  // 1. Extrai distância em KM (ex: "68,4 km", "68.4 km", "185 km", "(68 km)")
+  // 1. Extrai distância em KM (ex: "68,4 km", "68.4 km", "3,4 km", "185 km", "(68 km)")
   const distMatch = text.match(/(?:^|[^\w])(\d+(?:[.,]\d+)?)\s*(?:km|kms|quilômetros|quilometros)\b/i);
   if (distMatch) {
     const rawVal = distMatch[1].replace(',', '.');
     const parsed = parseFloat(rawVal);
     if (!isNaN(parsed) && parsed > 0) {
-      distanceKm = Math.round(parsed);
+      distanceKm = parsed < 10 ? Math.round(parsed * 10) / 10 : Math.round(parsed);
     }
   }
 
@@ -121,20 +121,25 @@ export function extractCoordinatesFromUrl(url: string): Array<[number, number]> 
     }
   }
 
-  // 2. Formato Google Maps data: !1d... !2d...
-  const dataMatches = [...url.matchAll(/!1d(-?\d+(?:\.\d+)?)(?:!2d(-?\d+(?:\.\d+)?))/g)];
-  for (const m of dataMatches) {
+  // 2. Formato Google Maps data: !1d... !2d... ou !2d... !1d... ou !2m2!1d...
+  const dataMatches1 = [...url.matchAll(/(?:!1d(-?\d+(?:\.\d+)?)[^!]*!2d(-?\d+(?:\.\d+)?))/g)];
+  for (const m of dataMatches1) {
     const val1 = parseFloat(m[1]);
     const val2 = parseFloat(m[2]);
     if (!isNaN(val1) && !isNaN(val2)) {
-      if (Math.abs(val1) <= 90 && Math.abs(val2) <= 180) {
-        if (Math.abs(val1) > 90) {
-          coords.push([val1, val2]);
-        } else if (Math.abs(val2) > 90) {
-          coords.push([val2, val1]);
-        } else {
-          coords.push([val1, val2]);
-        }
+      if (Math.abs(val2) <= 90 && Math.abs(val1) <= 180) {
+        coords.push([val1, val2]); // lon, lat
+      }
+    }
+  }
+
+  const dataMatches2 = [...url.matchAll(/(?:!2d(-?\d+(?:\.\d+)?)[^!]*!1d(-?\d+(?:\.\d+)?))/g)];
+  for (const m of dataMatches2) {
+    const valLat = parseFloat(m[1]);
+    const valLon = parseFloat(m[2]);
+    if (!isNaN(valLat) && !isNaN(valLon)) {
+      if (Math.abs(valLat) <= 90 && Math.abs(valLon) <= 180) {
+        coords.push([valLon, valLat]); // lon, lat
       }
     }
   }
@@ -177,12 +182,21 @@ export function parseGoogleMapsShareText(input: string): {
   let viaRoad: string | null = null;
 
   // Padrão em português e inglês: "De <Origem> para <Destino> via <Rodovia>"
-  const deParaMatch = input.match(/(?:De|de|From|from)\s+([^,.\n]+?)\s+(?:para|p\/|a|to)\s+([^,.\n]+?)(?:\s+(?:via|pela|pelo|by)\s+([^,.\n]+?))?(?:[.]|\s+\d+\s*(?:h|min)|\s*\()/i);
+  const deParaMatch = input.match(/(?:De|de|From|from)\s+([\s\S]+?)\s+(?:para|p\/|a|to)\s+([\s\S]+)$/i);
   if (deParaMatch) {
     origin = cleanLocationName(deParaMatch[1].trim());
-    destination = cleanLocationName(deParaMatch[2].trim());
-    if (deParaMatch[3]) {
-      viaRoad = deParaMatch[3].trim();
+    let rest = deParaMatch[2].trim();
+    // Remove métricas e URLs no final do texto
+    rest = rest.replace(/(?:[.]\s*)?\d+\s*(?:h|hr|hrs|min|mins|m)\b[\s\S]*$/i, '').trim();
+    rest = rest.replace(/\(\s*\d+(?:[.,]\d+)?\s*(?:km|kms)\s*\)[\s\S]*$/i, '').trim();
+    rest = rest.replace(/https?:\/\/[^\s]+[\s\S]*$/i, '').trim();
+
+    const viaM = rest.match(/([\s\S]+?)\s+(?:via|pela|pelo|by)\s+([\s\S]+?)(?:\.\s*$|$)/i);
+    if (viaM) {
+      destination = cleanLocationName(viaM[1].trim());
+      viaRoad = cleanLocationName(viaM[2].trim().replace(/\.$/, ''));
+    } else {
+      destination = cleanLocationName(rest.replace(/\.\s*$/, '').trim());
     }
   }
 
@@ -392,7 +406,7 @@ export async function calculateRouteDistanceAndDuration(
           for (const q of candidates) {
             try {
               const controller = new AbortController();
-              const timeout = setTimeout(() => controller.abort(), 1200);
+              const timeout = setTimeout(() => controller.abort(), 3500);
 
               const photonRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`, {
                 signal: controller.signal
@@ -418,7 +432,7 @@ export async function calculateRouteDistanceAndDuration(
             for (const q of candidates.slice(0, 2)) {
               try {
                 const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 1200);
+                const timeout = setTimeout(() => controller.abort(), 3500);
 
                 const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`, {
                   signal: controller.signal,
@@ -451,7 +465,7 @@ export async function calculateRouteDistanceAndDuration(
       const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=false`;
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
+      const timeout = setTimeout(() => controller.abort(), 5000);
       const osrmRes = await fetch(osrmUrl, { signal: controller.signal });
       clearTimeout(timeout);
 
@@ -461,7 +475,8 @@ export async function calculateRouteDistanceAndDuration(
           const meters = routeData.routes[0].distance;
           const seconds = routeData.routes[0].duration;
 
-          const distanceKm = Math.max(1, Math.round(meters / 1000));
+          const distanceRaw = meters / 1000;
+          const distanceKm = distanceRaw < 10 ? Math.round(distanceRaw * 10) / 10 : Math.round(distanceRaw);
           const totalMinutes = Math.max(1, Math.round(seconds / 60));
           const hours = Math.floor(totalMinutes / 60);
           const minutes = totalMinutes % 60;
@@ -480,9 +495,11 @@ export async function calculateRouteDistanceAndDuration(
         totalHaversine += haversineDistanceKm(validCoords[i], validCoords[i + 1]);
       }
       if (totalHaversine > 0) {
-        const roadKm = Math.max(1, Math.round(totalHaversine * 1.28));
-        // Velocidade média em motocicleta de turismo com paradas (~72 km/h)
-        const totalMin = Math.round((roadKm / 72) * 60);
+        const roadRaw = totalHaversine * 1.28;
+        const roadKm = roadRaw < 10 ? Math.round(roadRaw * 10) / 10 : Math.round(roadRaw);
+        // Velocidade média em motocicleta de turismo com paradas (~72 km/h ou ~35 km/h se urbano)
+        const avgSpeed = roadKm < 20 ? 35 : 72;
+        const totalMin = Math.round((roadKm / avgSpeed) * 60);
         const h = Math.floor(totalMin / 60);
         const m = totalMin % 60;
         return {
@@ -495,9 +512,25 @@ export async function calculateRouteDistanceAndDuration(
     console.warn('[RouteCalculator] Erro no cálculo OSRM:', err);
   }
 
-  // Fallback baseado em estimativa coerente
+  // Verifica se é deslocamento urbano/metropolitano (mesma cidade ou bairro)
+  const normOrigin = (origin || '').toLowerCase();
+  const normDest = (destination || '').toLowerCase();
+  const isUrbanTrip = (normOrigin.includes('rio de janeiro') && normDest.includes('rio de janeiro')) ||
+    (normOrigin.includes('são paulo') && normDest.includes('são paulo')) ||
+    (normOrigin.includes('curitiba') && normDest.includes('curitiba')) ||
+    (normOrigin.includes('belo horizonte') && normDest.includes('belo horizonte')) ||
+    (normOrigin.includes('porto alegre') && normDest.includes('porto alegre'));
+
+  if (isUrbanTrip) {
+    return {
+      distanceKm: 5,
+      duration: '15min'
+    };
+  }
+
+  // Fallback baseado em estimativa coerente para viagens intermunicipais
   const legCount = Math.max(1, allLocations.length - 1);
-  const fallbackKm = Math.round(legCount * 85);
+  const fallbackKm = Math.round(legCount * 60);
   const fallbackTotalMin = Math.round((fallbackKm / 70) * 60);
   const h = Math.floor(fallbackTotalMin / 60);
   const m = fallbackTotalMin % 60;
