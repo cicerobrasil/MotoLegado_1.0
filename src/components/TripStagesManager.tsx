@@ -19,10 +19,18 @@ import {
   X,
   Share2,
   Info,
-  RotateCcw
+  RotateCcw,
+  Download
 } from 'lucide-react';
 import { apiParseGoogleMapsRoute } from '../lib/api';
 import { parseGoogleMapsRouteClient } from '../lib/mapsParserClient';
+import { 
+  resolvePlaceCoordinates, 
+  interpolateTrackPoints, 
+  generateGpxString, 
+  generateKmlString, 
+  triggerFileDownload 
+} from '../lib/gpsExport';
 
 export type StageType = 'fuel' | 'food' | 'scenic' | 'sleep' | 'meet' | 'service' | 'custom';
 
@@ -359,6 +367,98 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
     }
   };
 
+  // Exportar etapas planejadas para GPX (Garmin/TomTom)
+  const handleExportGpx = () => {
+    const originCoords = resolvePlaceCoordinates(origin || 'Origem');
+    const destCoords = resolvePlaceCoordinates(destination || 'Destino');
+    const waypoints: any[] = [
+      { name: origin || 'Ponto de Partida', desc: 'Início da Viagem Planejada', lat: originCoords.lat, lon: originCoords.lon, ele: originCoords.ele, type: 'start' }
+    ];
+
+    stages.forEach((stg, i) => {
+      const coords = resolvePlaceCoordinates(stg.name);
+      waypoints.push({
+        name: stg.name,
+        desc: `Etapa #${i + 1} (${stg.type}): ${stg.notes || ''}`,
+        lat: coords.lat,
+        lon: coords.lon,
+        ele: coords.ele,
+        type: stg.type || 'stage'
+      });
+    });
+
+    waypoints.push({
+      name: destination || 'Chegada / Destino',
+      desc: 'Destino Final da Viagem',
+      lat: destCoords.lat,
+      lon: destCoords.lon,
+      ele: destCoords.ele,
+      type: 'end'
+    });
+
+    const trackPoints = interpolateTrackPoints(originCoords, destCoords, 28);
+    const title = currentTitle || `${origin || 'Origem'} para ${destination || 'Destino'}`;
+    const gpx = generateGpxString({
+      title,
+      description: `Viagem planejada no MotoLegado com ${stages.length} etapas cadastradas.`,
+      author: 'MotoLegado Pilot',
+      distanceKm: currentDistance ? Number(currentDistance) : undefined,
+      duration: currentDuration,
+      originName: origin,
+      destName: destination,
+      waypoints,
+      trackPoints
+    });
+    const safeTitle = (title || 'viagem').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    triggerFileDownload(gpx, `motolegado-viagem-${safeTitle}.gpx`, 'application/gpx+xml;charset=utf-8');
+  };
+
+  // Exportar etapas planejadas para KML (Google Earth/Maps.me)
+  const handleExportKml = () => {
+    const originCoords = resolvePlaceCoordinates(origin || 'Origem');
+    const destCoords = resolvePlaceCoordinates(destination || 'Destino');
+    const waypoints: any[] = [
+      { name: origin || 'Ponto de Partida', desc: 'Início da Viagem Planejada', lat: originCoords.lat, lon: originCoords.lon, ele: originCoords.ele, type: 'start' }
+    ];
+
+    stages.forEach((stg, i) => {
+      const coords = resolvePlaceCoordinates(stg.name);
+      waypoints.push({
+        name: stg.name,
+        desc: `Etapa #${i + 1} (${stg.type}): ${stg.notes || ''}`,
+        lat: coords.lat,
+        lon: coords.lon,
+        ele: coords.ele,
+        type: stg.type || 'stage'
+      });
+    });
+
+    waypoints.push({
+      name: destination || 'Chegada / Destino',
+      desc: 'Destino Final da Viagem',
+      lat: destCoords.lat,
+      lon: destCoords.lon,
+      ele: destCoords.ele,
+      type: 'end'
+    });
+
+    const trackPoints = interpolateTrackPoints(originCoords, destCoords, 28);
+    const title = currentTitle || `${origin || 'Origem'} para ${destination || 'Destino'}`;
+    const kml = generateKmlString({
+      title,
+      description: `Viagem planejada no MotoLegado com ${stages.length} etapas cadastradas.`,
+      author: 'MotoLegado Pilot',
+      distanceKm: currentDistance ? Number(currentDistance) : undefined,
+      duration: currentDuration,
+      originName: origin,
+      destName: destination,
+      waypoints,
+      trackPoints
+    });
+    const safeTitle = (title || 'viagem').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    triggerFileDownload(kml, `motolegado-viagem-${safeTitle}.kml`, 'application/vnd.google-earth.kml+xml;charset=utf-8');
+  };
+
   const fullMapsUrl = getGoogleMapsDirectionsUrl();
 
   return (
@@ -390,6 +490,33 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
               <RotateCcw size={14} />
               <span>Cancelar Importação</span>
             </button>
+          )}
+
+          {/* Botões Exportar para GPS (GPX & KML) */}
+          {(Boolean(origin) || Boolean(destination) || stages.length > 0) && (
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={handleExportGpx}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider text-slate-300 hover:text-[#ff751f] hover:bg-slate-900 transition-all cursor-pointer"
+                title="Exportar arquivo GPX para GPS Garmin, TomTom ou apps de celular"
+              >
+                <Download size={12} className="text-[#ff751f]" />
+                <span>GPX</span>
+              </button>
+
+              <span className="text-slate-700">|</span>
+
+              <button
+                type="button"
+                onClick={handleExportKml}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider text-slate-300 hover:text-sky-400 hover:bg-slate-900 transition-all cursor-pointer"
+                title="Exportar arquivo KML para Google Earth e Maps.me"
+              >
+                <Download size={12} className="text-sky-400" />
+                <span>KML</span>
+              </button>
+            </div>
           )}
 
           {/* Botão Importar Google Maps */}

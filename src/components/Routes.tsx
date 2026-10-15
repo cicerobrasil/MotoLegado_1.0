@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   MapPin, Star, Clock, ArrowRight, Plus, Search, Sparkles, Navigation, 
   ExternalLink, RefreshCw, Check, Fuel, Info, X, Heart, Award,
   ShieldAlert, CheckCircle, XCircle, Lock, Camera, Upload, Image as ImageIcon,
-  AlertCircle, Trash2, Loader2, BookOpen
+  AlertCircle, Trash2, Loader2, BookOpen, Share2, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Route, RouteDifficulty, RouteRatingMetrics, RouteReview } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
+import { RouteShareModal } from './RouteShareModal';
+import { GpsExportModal } from './GpsExportModal';
 import { uploadImageToStorage } from '../lib/storage';
 import { clientDbService } from '../lib/dbService';
 
@@ -125,9 +127,12 @@ export function estimateRouteMetrics(route: Partial<Route>): { distance: string;
 
 export function Routes() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { profile } = useAuth();
   const isVip = isUserProOrBonificado(profile);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [sharingRoute, setSharingRoute] = useState<Route | null>(null);
+  const [exportingGpsRoute, setExportingGpsRoute] = useState<Route | null>(null);
 
   const handleLaunchInLogbook = (targetRoute: Route, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -319,6 +324,53 @@ export function Routes() {
 
     return () => { isMounted = false; };
   }, []);
+
+  // Trata abertura automática de rota/viagem compartilhada via link único (/routes?routeId=...)
+  useEffect(() => {
+    const targetRouteId = searchParams.get('routeId') || searchParams.get('id') || searchParams.get('share');
+    const tripDataParam = searchParams.get('tripData');
+
+    if (!targetRouteId && !tripDataParam) return;
+
+    // 1. Procura na lista de rotas já carregadas
+    if (routes.length > 0 && targetRouteId) {
+      const found = routes.find(r => r.id === targetRouteId);
+      if (found) {
+        setSelectedRouteDetail(found);
+        showToast(`🗺️ Roteiro compartilhado carregado: ${found.name}`, 'info');
+        return;
+      }
+    }
+
+    // 2. Se a rota não estiver na lista local (enviada de outro dispositivo), decodifica o payload
+    if (tripDataParam) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(tripDataParam))));
+        if (decoded && decoded.name) {
+          const reconstructedRoute: Route = {
+            id: decoded.id || targetRouteId || `shared-${Date.now()}`,
+            name: decoded.name,
+            mapsAddress: decoded.mapsAddress || 'Destino da rota',
+            mapsUrl: decoded.mapsUrl,
+            description: decoded.description || 'Roteiro compartilhado por um piloto da comunidade.',
+            riderTips: decoded.riderTips || '',
+            difficulty: decoded.difficulty || RouteDifficulty.MEDIUM,
+            image: decoded.image || DEFAULT_ROUTE_FALLBACK,
+            distance: decoded.distance,
+            duration: decoded.duration,
+            rating: 5.0,
+            totalRatingsCount: 1,
+            ratingMetrics: { paisagem: 5, asfalto: 5, curvas: 5, seguranca: 5, infraestrutura: 5 },
+            status: 'aprovado'
+          };
+          setSelectedRouteDetail(reconstructedRoute);
+          showToast(`🗺️ Roteiro compartilhado carregado: ${reconstructedRoute.name}`, 'info');
+        }
+      } catch (err) {
+        console.warn('[Routes] Falha ao decodificar dados do link compartilhado:', err);
+      }
+    }
+  }, [searchParams, routes]);
 
   const saveRoutes = (updated: Route[], routeToPersist?: Route) => {
     setRoutes(updated);
@@ -712,17 +764,41 @@ export function Routes() {
                       )}
                     </div>
 
-                    <button 
-                      onClick={(e) => handleToggleFavorite(route.id, e)}
-                      className={cn(
-                        "p-2 rounded-full backdrop-blur-md border transition-all shrink-0",
-                        route.isFavorite 
-                          ? "bg-rose-600/80 text-white border-rose-500" 
-                          : "bg-slate-950/60 text-slate-400 border-slate-800 hover:text-white"
-                      )}
-                    >
-                      <Heart size={14} className={route.isFavorite ? "fill-white" : ""} />
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExportingGpsRoute(route);
+                        }}
+                        className="p-2 rounded-full backdrop-blur-md border border-slate-800 bg-slate-950/70 text-slate-300 hover:text-sky-400 hover:border-sky-500/50 transition-all cursor-pointer shadow-md active:scale-95"
+                        title="Exportar para GPS (GPX / KML)"
+                      >
+                        <Download size={14} />
+                      </button>
+
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSharingRoute(route);
+                        }}
+                        className="p-2 rounded-full backdrop-blur-md border border-slate-800 bg-slate-950/70 text-slate-300 hover:text-[#ff751f] hover:border-[#ff751f]/50 transition-all cursor-pointer shadow-md active:scale-95"
+                        title="Compartilhar Roteiro / Viagem"
+                      >
+                        <Share2 size={14} />
+                      </button>
+
+                      <button 
+                        onClick={(e) => handleToggleFavorite(route.id, e)}
+                        className={cn(
+                          "p-2 rounded-full backdrop-blur-md border transition-all shrink-0 cursor-pointer",
+                          route.isFavorite 
+                            ? "bg-rose-600/80 text-white border-rose-500" 
+                            : "bg-slate-950/60 text-slate-400 border-slate-800 hover:text-white"
+                        )}
+                      >
+                        <Heart size={14} className={route.isFavorite ? "fill-white" : ""} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Title on Image */}
@@ -796,22 +872,34 @@ export function Routes() {
                     <span>ENVIAR P/ DIÁRIO (NOVA VIAGEM)</span>
                   </button>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSharingRoute(route);
+                      }}
+                      className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-[#ff751f] border border-slate-800 hover:border-[#ff751f]/40 text-[9px] sm:text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-sm group/share active:scale-95"
+                      title="Compartilhar este roteiro com amigos ou redes sociais"
+                    >
+                      <Share2 size={12} className="text-[#ff751f] group-hover/share:scale-110 transition-transform shrink-0" />
+                      <span className="truncate">Compartilhar</span>
+                    </button>
+
                     <button 
                       onClick={(e) => handleCompleteRouteWithCamera(route, e)}
-                      className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm group/cam active:scale-95"
+                      className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-[9px] sm:text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-sm group/cam active:scale-95"
                       title="Tirar foto com a câmera para comprovar e concluir este roteiro no Diário de Bordo"
                     >
-                      <Camera size={13} className="text-orange-500 group-hover/cam:scale-110 transition-transform" />
-                      <span>Comprovar</span>
+                      <Camera size={12} className="text-orange-500 group-hover/cam:scale-110 transition-transform shrink-0" />
+                      <span className="truncate">Comprovar</span>
                     </button>
 
                     <button 
                       onClick={() => setSelectedRouteDetail(route)}
-                      className="py-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-orange-500/50 text-[10px] font-black uppercase tracking-wider text-slate-200 hover:bg-slate-900 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="py-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-orange-500/50 text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-200 hover:bg-slate-900 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer"
                     >
-                      <span>Detalhes</span>
-                      <ArrowRight size={13} />
+                      <span className="truncate">Detalhes</span>
+                      <ArrowRight size={12} className="shrink-0" />
                     </button>
                   </div>
                 </div>
@@ -1216,6 +1304,24 @@ export function Routes() {
 
                 <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
                   <button 
+                    onClick={() => setExportingGpsRoute(selectedRouteDetail)}
+                    className="px-3.5 py-1.5 bg-slate-900/90 hover:bg-slate-800 border border-[#ff751f]/40 hover:border-[#ff751f] text-slate-100 hover:text-[#ff751f] font-black text-xs uppercase tracking-wider rounded-full flex items-center gap-1.5 backdrop-blur-md transition-all shadow-md cursor-pointer active:scale-95"
+                    title="Exportar roteiro para GPS Garmin, TomTom ou Google Earth (GPX / KML)"
+                  >
+                    <Download size={13} className="text-[#ff751f]" />
+                    <span>Exportar GPS</span>
+                  </button>
+
+                  <button 
+                    onClick={() => setSharingRoute(selectedRouteDetail)}
+                    className="px-3.5 py-1.5 bg-[#ff751f] hover:bg-[#ff853a] text-slate-950 font-black text-xs uppercase tracking-wider rounded-full flex items-center gap-1.5 backdrop-blur-md transition-all shadow-md cursor-pointer active:scale-95"
+                    title="Compartilhar este roteiro com amigos ou redes sociais"
+                  >
+                    <Share2 size={13} />
+                    <span>Compartilhar</span>
+                  </button>
+
+                  <button 
                     onClick={() => detailPhotoInputRef.current?.click()}
                     disabled={isUploadingDetailPhoto}
                     className="px-3 py-1.5 bg-slate-950/80 hover:bg-slate-900 border border-slate-700 hover:border-orange-500 text-xs font-bold text-white rounded-full flex items-center gap-1.5 backdrop-blur-md transition-all shadow-md cursor-pointer disabled:opacity-50"
@@ -1343,6 +1449,26 @@ export function Routes() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setExportingGpsRoute(selectedRouteDetail)}
+                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-[#ff751f]/50 hover:border-[#ff751f] text-slate-100 hover:text-[#ff751f] font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95 shrink-0"
+                      title="Exportar roteiro em formato GPX (Garmin / TomTom) ou KML (Google Earth)"
+                    >
+                      <Download size={14} className="text-[#ff751f]" />
+                      EXPORTAR GPS (GPX / KML)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSharingRoute(selectedRouteDetail)}
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#ff751f] to-amber-500 hover:from-[#ff853a] hover:to-amber-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-[#ff751f]/20 cursor-pointer transition-all active:scale-95 shrink-0"
+                      title="Compartilhar este roteiro com amigos ou redes sociais"
+                    >
+                      <Share2 size={14} className="stroke-[2.5]" />
+                      COMPARTILHAR
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => handleLaunchInLogbook(selectedRouteDetail)}
@@ -1637,6 +1763,22 @@ export function Routes() {
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
         feature="criar_roteiro" 
+      />
+
+      {/* Modal de Compartilhamento com Link Único e Redes Sociais */}
+      <RouteShareModal 
+        route={sharingRoute}
+        isOpen={!!sharingRoute}
+        onClose={() => setSharingRoute(null)}
+        onToast={showToast}
+      />
+
+      {/* Modal de Exportação para GPS Externo (GPX / KML) */}
+      <GpsExportModal 
+        route={exportingGpsRoute}
+        isOpen={!!exportingGpsRoute}
+        onClose={() => setExportingGpsRoute(null)}
+        onToast={showToast}
       />
     </div>
   );

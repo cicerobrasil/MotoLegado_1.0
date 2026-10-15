@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, ChangeEvent } from 'react';
-import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown, Navigation, ExternalLink, ShieldCheck, Layers, CheckCircle2, Filter, RotateCcw, TrendingUp, Pencil, Check, Wrench, Users, Tag, ChevronDown, CloudFog, Wind } from 'lucide-react';
+import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown, Navigation, ExternalLink, ShieldCheck, Layers, CheckCircle2, Filter, RotateCcw, TrendingUp, Pencil, Check, Wrench, Users, Tag, ChevronDown, CloudFog, Wind, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -17,6 +17,13 @@ import { estimateRouteMetrics } from './Routes';
 import { DocumentaryCameraModal, PROOF_TYPES } from './DocumentaryCameraModal';
 import { ProofLightboxModal } from './ProofLightboxModal';
 import { RouteMetricsPanel, parseDurationToMinutes, formatMinutesToReadable } from './RouteMetricsPanel';
+import { 
+  resolvePlaceCoordinates, 
+  interpolateTrackPoints, 
+  generateGpxString, 
+  generateKmlString, 
+  triggerFileDownload 
+} from '../lib/gpsExport';
 
 export type LogbookCategory = 'Viagem' | 'Manutenção' | 'Passeio' | 'Encontro' | 'Outro';
 
@@ -412,6 +419,106 @@ export function Logbook() {
       return () => clearTimeout(timer);
     }
   }, [successToast]);
+
+  // Exportação de viagem planejada / realizada para GPX (Garmin / TomTom)
+  const handleExportLogGpx = (log: LogEntry) => {
+    try {
+      const originCoords = resolvePlaceCoordinates(log.origin || 'Origem');
+      const destCoords = resolvePlaceCoordinates(log.destination || 'Destino');
+      const waypoints: any[] = [
+        { name: log.origin || 'Partida', desc: 'Ponto de Partida', lat: originCoords.lat, lon: originCoords.lon, ele: originCoords.ele, type: 'start' }
+      ];
+      if (log.stages && log.stages.length > 0) {
+        log.stages.forEach((stg, i) => {
+          const coords = resolvePlaceCoordinates(stg.name);
+          waypoints.push({
+            name: stg.name,
+            desc: `Etapa #${i + 1} (${stg.type}): ${stg.notes || ''}`,
+            lat: coords.lat,
+            lon: coords.lon,
+            ele: coords.ele,
+            type: stg.type || 'stage'
+          });
+        });
+      }
+      waypoints.push({
+        name: log.destination || 'Chegada',
+        desc: 'Destino da Viagem',
+        lat: destCoords.lat,
+        lon: destCoords.lon,
+        ele: destCoords.ele,
+        type: 'end'
+      });
+
+      const trackPoints = interpolateTrackPoints(originCoords, destCoords, 28);
+      const gpx = generateGpxString({
+        title: log.title || `${log.origin} para ${log.destination}`,
+        description: log.content || `Viagem registrada no MotoLegado. Distância: ${log.distance} km.`,
+        author: 'MotoLegado Pilot',
+        distanceKm: log.distance ? Number(log.distance) : undefined,
+        duration: log.duration,
+        originName: log.origin,
+        destName: log.destination,
+        waypoints,
+        trackPoints
+      });
+      const safeTitle = (log.title || 'viagem').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      triggerFileDownload(gpx, `motolegado-viagem-${safeTitle}.gpx`, 'application/gpx+xml;charset=utf-8');
+      setSuccessToast(`Arquivo GPX gerado para "${log.title}". Pronto para o GPS!`);
+    } catch (err) {
+      console.warn('Erro ao exportar GPX:', err);
+    }
+  };
+
+  // Exportação de viagem planejada / realizada para KML (Google Earth)
+  const handleExportLogKml = (log: LogEntry) => {
+    try {
+      const originCoords = resolvePlaceCoordinates(log.origin || 'Origem');
+      const destCoords = resolvePlaceCoordinates(log.destination || 'Destino');
+      const waypoints: any[] = [
+        { name: log.origin || 'Partida', desc: 'Ponto de Partida', lat: originCoords.lat, lon: originCoords.lon, ele: originCoords.ele, type: 'start' }
+      ];
+      if (log.stages && log.stages.length > 0) {
+        log.stages.forEach((stg, i) => {
+          const coords = resolvePlaceCoordinates(stg.name);
+          waypoints.push({
+            name: stg.name,
+            desc: `Etapa #${i + 1} (${stg.type}): ${stg.notes || ''}`,
+            lat: coords.lat,
+            lon: coords.lon,
+            ele: coords.ele,
+            type: stg.type || 'stage'
+          });
+        });
+      }
+      waypoints.push({
+        name: log.destination || 'Chegada',
+        desc: 'Destino da Viagem',
+        lat: destCoords.lat,
+        lon: destCoords.lon,
+        ele: destCoords.ele,
+        type: 'end'
+      });
+
+      const trackPoints = interpolateTrackPoints(originCoords, destCoords, 28);
+      const kml = generateKmlString({
+        title: log.title || `${log.origin} para ${log.destination}`,
+        description: log.content || `Viagem registrada no MotoLegado. Distância: ${log.distance} km.`,
+        author: 'MotoLegado Pilot',
+        distanceKm: log.distance ? Number(log.distance) : undefined,
+        duration: log.duration,
+        originName: log.origin,
+        destName: log.destination,
+        waypoints,
+        trackPoints
+      });
+      const safeTitle = (log.title || 'viagem').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      triggerFileDownload(kml, `motolegado-viagem-${safeTitle}.kml`, 'application/vnd.google-earth.kml+xml;charset=utf-8');
+      setSuccessToast(`Arquivo KML gerado para "${log.title}". Pronto para o Google Earth!`);
+    } catch (err) {
+      console.warn('Erro ao exportar KML:', err);
+    }
+  };
 
   // Filtros de Data para o Histórico e Métricas do Diário
   const [startDateFilter, setStartDateFilter] = useState<string>('');
@@ -2933,15 +3040,38 @@ export function Logbook() {
                                   <Navigation size={13} className="text-orange-500" />
                                   Etapas & Paradas do Roteiro ({log.stages.length})
                                 </span>
-                                <a
-                                  href={log.mapsUrl || `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(log.origin)}&destination=${encodeURIComponent(log.destination)}&waypoints=${log.stages.map(s => encodeURIComponent(s.name)).join('|')}&travelmode=driving`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[10px] font-bold text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors bg-sky-500/10 hover:bg-sky-500/20 px-2 py-0.5 rounded-lg border border-sky-500/30"
-                                >
-                                  <ExternalLink size={11} />
-                                  <span>Abrir no Google Maps</span>
-                                </a>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <a
+                                    href={log.mapsUrl || `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(log.origin)}&destination=${encodeURIComponent(log.destination)}&waypoints=${log.stages.map(s => encodeURIComponent(s.name)).join('|')}&travelmode=driving`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] font-bold text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors bg-sky-500/10 hover:bg-sky-500/20 px-2 py-0.5 rounded-lg border border-sky-500/30"
+                                    title="Abrir no Google Maps"
+                                  >
+                                    <ExternalLink size={11} />
+                                    <span>Google Maps</span>
+                                  </a>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleExportLogGpx(log)}
+                                    className="text-[10px] font-black uppercase tracking-wider text-[#ff751f] hover:text-white flex items-center gap-1 transition-colors bg-[#ff751f]/10 hover:bg-[#ff751f]/30 px-2 py-0.5 rounded-lg border border-[#ff751f]/30 cursor-pointer"
+                                    title="Exportar roteiro em formato GPX para Garmin / TomTom"
+                                  >
+                                    <Download size={11} />
+                                    <span>GPX</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleExportLogKml(log)}
+                                    className="text-[10px] font-black uppercase tracking-wider text-sky-400 hover:text-white flex items-center gap-1 transition-colors bg-sky-500/10 hover:bg-sky-500/30 px-2 py-0.5 rounded-lg border border-sky-500/30 cursor-pointer"
+                                    title="Exportar roteiro em formato KML para Google Earth / Maps.me"
+                                  >
+                                    <Download size={11} />
+                                    <span>KML</span>
+                                  </button>
+                                </div>
                               </div>
 
                               <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin">
