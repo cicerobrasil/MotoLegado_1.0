@@ -20,9 +20,18 @@ interface PingResult {
 interface MySqlPingTestProps {
   className?: string;
   autoRunOnMount?: boolean;
+  onInitTables?: () => Promise<void> | void;
+  isInitializingTables?: boolean;
+  initMessage?: string | null;
 }
 
-export function MySqlPingTest({ className, autoRunOnMount = true }: MySqlPingTestProps) {
+export function MySqlPingTest({ 
+  className, 
+  autoRunOnMount = true,
+  onInitTables,
+  isInitializingTables = false,
+  initMessage = null
+}: MySqlPingTestProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [pingData, setPingData] = useState<PingResult | null>(null);
   const [hasRun, setHasRun] = useState(false);
@@ -103,21 +112,46 @@ export function MySqlPingTest({ className, autoRunOnMount = true }: MySqlPingTes
           </div>
         </div>
 
-        {/* Action Button */}
-        <button
-          onClick={executePing}
-          disabled={isRunning}
-          className={cn(
-            "px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg active:scale-95 shrink-0",
-            isRunning 
-              ? "bg-slate-800 text-slate-400 border border-slate-700 cursor-not-allowed" 
-              : "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/10 hover:shadow-amber-500/20"
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          {onInitTables && (
+            <button
+              onClick={() => onInitTables()}
+              disabled={isInitializingTables || isRunning}
+              className={cn(
+                "px-3.5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer border shrink-0",
+                isInitializingTables
+                  ? "bg-slate-800 text-slate-400 border-slate-700 cursor-not-allowed"
+                  : "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-600"
+              )}
+            >
+              <Server size={14} className={cn(isInitializingTables && "animate-spin text-amber-400")} />
+              <span>{isInitializingTables ? "Inicializando..." : "Inicializar Tabelas"}</span>
+            </button>
           )}
-        >
-          <RefreshCw size={14} className={cn(isRunning && "animate-spin text-slate-950")} />
-          <span>{isRunning ? "Executando Query..." : "Executar SELECT 1"}</span>
-        </button>
+
+          <button
+            onClick={executePing}
+            disabled={isRunning}
+            className={cn(
+              "px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg active:scale-95 shrink-0",
+              isRunning 
+                ? "bg-slate-800 text-slate-400 border border-slate-700 cursor-not-allowed" 
+                : "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/10 hover:shadow-amber-500/20"
+            )}
+          >
+            <RefreshCw size={14} className={cn(isRunning && "animate-spin text-slate-950")} />
+            <span>{isRunning ? "Executando Query..." : "Executar SELECT 1"}</span>
+          </button>
+        </div>
       </div>
+
+      {initMessage && (
+        <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center gap-2">
+          <Server size={14} className="shrink-0" />
+          <span>{initMessage}</span>
+        </div>
+      )}
 
       {/* Main Status Display */}
       <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">

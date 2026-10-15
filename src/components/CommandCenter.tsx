@@ -56,6 +56,7 @@ import { estimateRouteMetrics } from './Routes';
 import { getDbStatus, initDbTables, getPilotsFromHostinger, syncPilotToHostinger } from '../lib/api';
 import { clientDbService } from '../lib/dbService';
 import { DateInput } from './DateInput';
+import { MySqlPingTest } from './MySqlPingTest';
 
 // Helper to format date cleanly
 function formatDisplayDate(dateStr?: string) {
@@ -2937,71 +2938,12 @@ export function CommandCenter() {
               </div>
             </div>
 
-            {/* Diagnóstico do Banco de Dados MySQL na Hostinger */}
-            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-900 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <Database size={20} className="text-amber-400" />
-                  <div>
-                    <h3 className="text-sm font-bold text-white uppercase tracking-tight">Banco de Dados MySQL na Hostinger</h3>
-                    <p className="text-[11px] text-slate-400">Diagnóstico e sincronização direta dos registros de pilotos em produção</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={checkHostingerDb}
-                    disabled={checkingDb}
-                    className="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <RefreshCw size={12} className={cn(checkingDb && "animate-spin text-amber-400")} />
-                    {checkingDb ? 'Testando...' : 'Testar Conexão'}
-                  </button>
-                  <button
-                    onClick={handleInitTables}
-                    disabled={initializingDb}
-                    className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase flex items-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Server size={12} />
-                    {initializingDb ? 'Inicializando...' : 'Inicializar Tabelas'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <span className="text-[10px] uppercase text-slate-500 font-bold block">Status da Conexão</span>
-                  <span className={cn(
-                    "text-sm font-bold flex items-center gap-1.5 mt-1",
-                    dbInfo?.status === 'connected' ? "text-emerald-400" : "text-amber-400"
-                  )}>
-                    <span className={cn("w-2 h-2 rounded-full", dbInfo?.status === 'connected' ? "bg-emerald-500" : "bg-amber-500")} />
-                    {dbInfo?.status === 'connected' ? 'Conectado e Operando' : (dbInfo?.status ? 'Aguardando Credenciais' : 'Clique em Testar')}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <span className="text-[10px] uppercase text-slate-500 font-bold block">Base MySQL</span>
-                  <span className="text-sm font-bold text-white mt-1 block truncate">u342198764_motolegado</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <span className="text-[10px] uppercase text-slate-500 font-bold block">Usuário da Base</span>
-                  <span className="text-sm font-bold text-white mt-1 block truncate">u342198764_admsql</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <span className="text-[10px] uppercase text-slate-500 font-bold block">Host do Servidor</span>
-                  <span className="text-sm font-bold text-amber-300 mt-1 block">localhost (Hostinger)</span>
-                </div>
-              </div>
-
-              {dbMessage && (
-                <div className={cn(
-                  "p-3 rounded-xl border text-xs flex items-center gap-2",
-                  dbInfo?.status === 'connected' ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-300" : "bg-amber-950/20 border-amber-500/30 text-amber-300"
-                )}>
-                  <Info size={14} className="shrink-0" />
-                  <span>{dbMessage}</span>
-                </div>
-              )}
-            </div>
+            {/* Componente Integrado de Teste Direto MySQL (SELECT 1 via mysql2) e Inicialização */}
+            <MySqlPingTest 
+              onInitTables={handleInitTables}
+              isInitializingTables={initializingDb}
+              initMessage={dbMessage}
+            />
 
             <div className="space-y-2">
               <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Histórico de Registros do Administrador:</h3>
