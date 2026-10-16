@@ -111,46 +111,39 @@ export function extractCoordinatesFromUrl(url: string): Array<[number, number]> 
   const coords: Array<[number, number]> = [];
   if (!url) return coords;
 
-  // 1. Formato !3d<lat>!4d<lon> (Google Maps places e waypoints)
-  const placeMatches = [...url.matchAll(/!3d(-?\d+(?:\.\d+)?)(?:!4d(-?\d+(?:\.\d+)?))/g)];
-  for (const m of placeMatches) {
-    const lat = parseFloat(m[1]);
-    const lon = parseFloat(m[2]);
-    if (!isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+  const addUniqueCoord = (lon: number, lat: number) => {
+    if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return;
+    const isDup = coords.some(c => Math.abs(c[0] - lon) < 0.0002 && Math.abs(c[1] - lat) < 0.0002);
+    if (!isDup) {
       coords.push([lon, lat]);
     }
-  }
+  };
 
-  // 2. Formato Google Maps data: !1d... !2d... ou !2d... !1d... ou !2m2!1d...
-  const dataMatches1 = [...url.matchAll(/(?:!1d(-?\d+(?:\.\d+)?)[^!]*!2d(-?\d+(?:\.\d+)?))/g)];
+  // 1. Formato Google Maps data waypoints: !1d<lon>!2d<lat> (muito comum em rotas com direções)
+  const dataMatches1 = [...url.matchAll(/!1d(-?\d+(?:\.\d+)?)[^!]*!2d(-?\d+(?:\.\d+)?)/g)];
   for (const m of dataMatches1) {
-    const val1 = parseFloat(m[1]);
-    const val2 = parseFloat(m[2]);
-    if (!isNaN(val1) && !isNaN(val2)) {
-      if (Math.abs(val2) <= 90 && Math.abs(val1) <= 180) {
-        coords.push([val1, val2]); // lon, lat
-      }
+    addUniqueCoord(parseFloat(m[1]), parseFloat(m[2]));
+  }
+
+  // 2. Formato !3d<lat>!4d<lon> (Google Maps places e waypoints clássicos)
+  if (coords.length === 0) {
+    const placeMatches = [...url.matchAll(/!3d(-?\d+(?:\.\d+)?)(?:!4d(-?\d+(?:\.\d+)?))/g)];
+    for (const m of placeMatches) {
+      addUniqueCoord(parseFloat(m[2]), parseFloat(m[1]));
     }
   }
 
-  const dataMatches2 = [...url.matchAll(/(?:!2d(-?\d+(?:\.\d+)?)[^!]*!1d(-?\d+(?:\.\d+)?))/g)];
-  for (const m of dataMatches2) {
-    const valLat = parseFloat(m[1]);
-    const valLon = parseFloat(m[2]);
-    if (!isNaN(valLat) && !isNaN(valLon)) {
-      if (Math.abs(valLat) <= 90 && Math.abs(valLon) <= 180) {
-        coords.push([valLon, valLat]); // lon, lat
-      }
-    }
+  // 3. Formato /dir/lat,lon/lat,lon/
+  const dirCoordsMatches = [...url.matchAll(/\/(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/g)];
+  for (const m of dirCoordsMatches) {
+    addUniqueCoord(parseFloat(m[2]), parseFloat(m[1]));
   }
 
-  // 3. Formato @<lat>,<lon> (centro/mapa do Google Maps)
-  const atMatch = url.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
-  if (atMatch && coords.length === 0) {
-    const lat = parseFloat(atMatch[1]);
-    const lon = parseFloat(atMatch[2]);
-    if (!isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
-      coords.push([lon, lat]);
+  // 4. Formato @<lat>,<lon> (centro do mapa, caso não tenha pontos intermediários)
+  if (coords.length === 0) {
+    const atMatch = url.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+    if (atMatch) {
+      addUniqueCoord(parseFloat(atMatch[2]), parseFloat(atMatch[1]));
     }
   }
 
@@ -583,10 +576,13 @@ export function parseGoogleMapsRoute(urlOrText: string, originalInput?: string):
     }
   }
 
-  // Extrai coordenadas da URL se existirem
-  const urlCoords = extractCoordinatesFromUrl(input).concat(extractCoordinatesFromUrl(rawSource));
-  if (urlCoords.length >= 2) {
-    result.coords = urlCoords;
+  // Extrai coordenadas da URL se existirem sem duplicar
+  const rawCoords = extractCoordinatesFromUrl(input);
+  if (rawCoords.length < 2 && rawSource && rawSource !== input) {
+    rawCoords.push(...extractCoordinatesFromUrl(rawSource));
+  }
+  if (rawCoords.length >= 2) {
+    result.coords = rawCoords;
   }
 
   // 2. Tenta formato com /maps/dir/ ponto1 / ponto2 / ponto3...

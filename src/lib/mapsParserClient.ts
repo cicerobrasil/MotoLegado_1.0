@@ -305,7 +305,35 @@ export function parseGoogleMapsRouteClient(urlOrText: string): ParsedRouteClient
     result.fullRouteUrl = `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}${waypointsParam}&travelmode=driving`;
   }
 
-  // Se não foi extraída distância do texto, calcula estimativa coerente
+  // 5. Se houver coordenadas na URL (!1d... !2d... ou @lat,lng), calcula distância direta com precisão
+  if (!result.estimatedDistanceKm) {
+    const coords: Array<[number, number]> = [];
+    const addUnique = (lon: number, lat: number) => {
+      if (!isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+        if (!coords.some(c => Math.abs(c[0] - lon) < 0.0002 && Math.abs(c[1] - lat) < 0.0002)) {
+          coords.push([lon, lat]);
+        }
+      }
+    };
+    const m1 = [...input.matchAll(/!1d(-?\d+(?:\.\d+)?)[^!]*!2d(-?\d+(?:\.\d+)?)/g)];
+    for (const m of m1) addUnique(parseFloat(m[1]), parseFloat(m[2]));
+    
+    if (coords.length >= 2) {
+      let totalKm = 0;
+      for (let i = 0; i < coords.length - 1; i++) {
+        const [lon1, lat1] = coords[i];
+        const [lon2, lat2] = coords[i + 1];
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+        totalKm += 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+      const roadKm = totalKm * 1.32;
+      result.estimatedDistanceKm = roadKm < 10 ? Math.round(roadKm * 10) / 10 : Math.round(roadKm);
+    }
+  }
+
+  // Se não foi extraída distância do texto ou coordenadas, calcula estimativa coerente
   if (!result.estimatedDistanceKm) {
     const normOrigin = (result.origin || '').toLowerCase();
     const normDest = (result.destination || '').toLowerCase();

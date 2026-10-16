@@ -523,21 +523,43 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
 
       if (urlToFetch) {
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-          const response = await fetch(urlToFetch, {
-            method: 'GET',
-            redirect: 'follow',
-            signal: controller.signal,
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          // 1. Para links encurtados (maps.app.goo.gl, goo.gl), busca redirecionamento 302 manual (ultra-rápido, ~200ms)
+          if (urlToFetch.includes('goo.gl') || urlToFetch.includes('maps.app')) {
+            try {
+              const headRes = await fetch(urlToFetch, {
+                method: 'HEAD',
+                redirect: 'manual',
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                }
+              });
+              const loc = headRes.headers.get('location');
+              if (loc) {
+                targetUrl = loc.startsWith('http') ? loc : new URL(loc, urlToFetch).href;
+              }
+            } catch (headErr) {
+              console.warn('[ParseMaps] HEAD redirect rápido falhou, tentando GET follow:', headErr);
             }
-          });
-          clearTimeout(timeoutId);
-          targetUrl = response.url || urlToFetch;
-          responseHtml = await response.text();
+          }
+
+          // 2. Se ainda não resolveu rota completa com /dir/, faz GET follow
+          if (!targetUrl.includes('/dir/') && !targetUrl.includes('origin=')) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const response = await fetch(urlToFetch, {
+              method: 'GET',
+              redirect: 'follow',
+              signal: controller.signal,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+              }
+            });
+            clearTimeout(timeoutId);
+            targetUrl = response.url || targetUrl;
+            responseHtml = await response.text();
+          }
         } catch (fetchErr: any) {
           console.warn('[ParseMaps] Falha ao seguir redirecionamento automático:', fetchErr?.message || fetchErr);
         }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   MapPin, 
   Navigation, 
@@ -133,7 +133,64 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
   const [mapsDistance, setMapsDistance] = useState('');
   const [mapsDuration, setMapsDuration] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [isResolvingMetrics, setIsResolvingMetrics] = useState(false);
+  const [autoResolvedRoute, setAutoResolvedRoute] = useState<any>(null);
   const [importFeedback, setImportFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const resolveTimeoutRef = useRef<any>(null);
+
+  // Consulta e decodifica a rota e métricas do Google Maps automaticamente assim que o link é inserido
+  const resolveLinkMetrics = async (rawText: string) => {
+    const text = (rawText || '').trim();
+    if (!text) return;
+
+    // 1. Extração imediata client-side se houver métricas no texto colado (ex: "10 min (3,4 km)")
+    const clientMetrics = extractMetricsFromTextClient(text);
+    if (clientMetrics.distanceKm) {
+      setMapsDistance(String(clientMetrics.distanceKm).replace('.', ','));
+    }
+    if (clientMetrics.duration) {
+      setMapsDuration(clientMetrics.duration);
+    }
+
+    // 2. Se for link do Google Maps (maps.app.goo.gl, /dir/, etc.) ou texto de trajeto, consulta API para resolução exata
+    if (text.includes('maps') || text.includes('http') || text.includes('/dir/') || text.length > 8) {
+      setIsResolvingMetrics(true);
+      try {
+        const res = await apiParseGoogleMapsRoute(text);
+        if (res.data && res.data.success) {
+          setAutoResolvedRoute(res.data);
+          if (res.data.estimatedDistanceKm !== undefined && res.data.estimatedDistanceKm !== null) {
+            const num = typeof res.data.estimatedDistanceKm === 'number' 
+              ? res.data.estimatedDistanceKm 
+              : parseFloat(String(res.data.estimatedDistanceKm).replace(',', '.'));
+            if (!isNaN(num) && num > 0) {
+              const kmFormatted = num < 10 ? String(Math.round(num * 10) / 10).replace('.', ',') : String(Math.round(num));
+              setMapsDistance(kmFormatted);
+            }
+          }
+          if (res.data.estimatedDuration) {
+            setMapsDuration(res.data.estimatedDuration);
+          }
+        } else {
+          // Fallback resiliente no cliente
+          const clientParsed = parseGoogleMapsRouteClient(text);
+          if (clientParsed.origin || clientParsed.destination || clientParsed.waypoints.length > 0) {
+            setAutoResolvedRoute(clientParsed);
+          }
+          if (clientParsed.estimatedDistanceKm) {
+            setMapsDistance(String(clientParsed.estimatedDistanceKm).replace('.', ','));
+          }
+          if (clientParsed.estimatedDuration) {
+            setMapsDuration(clientParsed.estimatedDuration);
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao auto-resolver métricas do Google Maps:', err);
+      } finally {
+        setIsResolvingMetrics(false);
+      }
+    }
+  };
 
   const handleImportInputChange = (val: string) => {
     setImportInput(val);
@@ -143,6 +200,27 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
     }
     if (metrics.duration) {
       setMapsDuration(metrics.duration);
+    }
+
+    if (resolveTimeoutRef.current) {
+      clearTimeout(resolveTimeoutRef.current);
+    }
+    // Debounce rápido de 250ms para resolução automática imediata ao colar link
+    resolveTimeoutRef.current = setTimeout(() => {
+      resolveLinkMetrics(val);
+    }, 250);
+  };
+
+  // Resolução instantânea no evento de colar (paste)
+  const handleInputPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text');
+    if (pasted) {
+      if (resolveTimeoutRef.current) {
+        clearTimeout(resolveTimeoutRef.current);
+      }
+      setTimeout(() => {
+        resolveLinkMetrics(pasted);
+      }, 50);
     }
   };
   
@@ -245,7 +323,10 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
   // Processar importação de link ou texto do Google Maps
   const handleProcessImport = async () => {
     const clean = importInput.trim();
-    if (!clean) {
+    const hasExistingRoute = Boolean(origin && destination);
+    const hasManualMetrics = Boolean(mapsDistance.trim());
+
+    if (!clean && !hasExistingRoute && !hasManualMetrics) {
       setImportFeedback({ type: 'error', message: 'Cole o link compartilhado do Google Maps ou descreva a rota.' });
       return;
     }
@@ -254,35 +335,36 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
     setImportFeedback(null);
 
     try {
-      let routeData: any = null;
-      const res = await apiParseGoogleMapsRoute(clean);
-      if (res.data && res.data.success && (res.data.origin || res.data.destination || (res.data.waypoints && res.data.waypoints.length > 0))) {
-        routeData = res.data;
-      } else {
-        // Fallback resiliente no cliente para extração imediata
-        const clientParsed = parseGoogleMapsRouteClient(clean);
-        if (clientParsed.origin || clientParsed.destination || clientParsed.waypoints.length > 0) {
-          routeData = {
-            success: true,
-            origin: clientParsed.origin,
-            destination: clientParsed.destination,
-            waypoints: clientParsed.waypoints,
-            title: clientParsed.title,
-            suggestedStages: clientParsed.suggestedStages,
-            fullRouteUrl: clientParsed.fullRouteUrl,
-            estimatedDistanceKm: clientParsed.estimatedDistanceKm,
-            estimatedDuration: clientParsed.estimatedDuration
-          };
-        }
-      }
+      let routeData: any = autoResolvedRoute || null;
 
-      if (!routeData) {
-        setImportFeedback({ 
-          type: 'error', 
-          message: res?.error || 'Não foi possível identificar a rota. Verifique se o link possui origem e destino ou descreva os pontos separados por "->".' 
-        });
-        setIsImporting(false);
-        return;
+      if (!routeData && clean) {
+        const res = await apiParseGoogleMapsRoute(clean);
+        if (res.data && res.data.success && (res.data.origin || res.data.destination || (res.data.waypoints && res.data.waypoints.length > 0))) {
+          routeData = res.data;
+        } else {
+          // Fallback resiliente no cliente para extração imediata
+          const clientParsed = parseGoogleMapsRouteClient(clean);
+          if (clientParsed.origin || clientParsed.destination || clientParsed.waypoints.length > 0) {
+            routeData = {
+              success: true,
+              origin: clientParsed.origin,
+              destination: clientParsed.destination,
+              waypoints: clientParsed.waypoints,
+              title: clientParsed.title,
+              suggestedStages: clientParsed.suggestedStages,
+              fullRouteUrl: clientParsed.fullRouteUrl,
+              estimatedDistanceKm: clientParsed.estimatedDistanceKm,
+              estimatedDuration: clientParsed.estimatedDuration
+            };
+          }
+        }
+      } else if (!routeData && hasExistingRoute) {
+        // Se não colou link mas já tem origem e destino preenchidos no formulário
+        const currentRouteQuery = `${origin} -> ${stages.map(s => s.name).filter(Boolean).join(' -> ')}${stages.length > 0 ? ' -> ' : ''}${destination}`;
+        const res = await apiParseGoogleMapsRoute(currentRouteQuery);
+        if (res.data && res.data.success) {
+          routeData = res.data;
+        }
       }
 
       // Salva snapshot prévio completo para permitir que o usuário cancele a importação caso queira
@@ -296,36 +378,9 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
         mapsUrl: currentMapsUrl || ''
       });
 
-      const { 
-        origin: parsedOrigin, 
-        destination: parsedDest, 
-        suggestedStages, 
-        title: parsedTitle, 
-        fullRouteUrl,
-        estimatedDistanceKm,
-        estimatedDuration 
-      } = routeData;
-
-      if (parsedOrigin) {
-        setOrigin(parsedOrigin);
-      }
-      if (parsedDest) {
-        setDestination(parsedDest);
-      }
-
-      if (suggestedStages && suggestedStages.length > 0) {
-        const newStages: TripStage[] = suggestedStages.map((s, idx) => ({
-          id: 'stage_' + Date.now() + '_' + idx,
-          name: s.name,
-          type: s.type || 'scenic',
-          notes: s.notes || ''
-        }));
-        setStages(newStages);
-      }
-
-      // Preenchimento automático da distância e duração exatas do Google Maps
-      const rawKm = estimatedDistanceKm ?? res?.data?.estimatedDistanceKm;
-      const parsedDuration = estimatedDuration || res?.data?.estimatedDuration;
+      // Extrai métricas exatas
+      const rawKm = routeData?.estimatedDistanceKm;
+      const parsedDuration = routeData?.estimatedDuration;
 
       let finalKmStr = mapsDistance.trim();
       if (!finalKmStr && rawKm !== undefined && rawKm !== null) {
@@ -335,23 +390,51 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
         }
       }
 
-      const finalDuration = mapsDuration.trim() || parsedDuration;
+      const finalDuration = mapsDuration.trim() || parsedDuration || '';
 
+      if (routeData) {
+        const { 
+          origin: parsedOrigin, 
+          destination: parsedDest, 
+          suggestedStages, 
+          title: parsedTitle, 
+          fullRouteUrl 
+        } = routeData;
+
+        if (parsedOrigin) {
+          setOrigin(parsedOrigin);
+        }
+        if (parsedDest) {
+          setDestination(parsedDest);
+        }
+
+        if (suggestedStages && suggestedStages.length > 0) {
+          const newStages: TripStage[] = suggestedStages.map((s: any, idx: number) => ({
+            id: 'stage_' + Date.now() + '_' + idx,
+            name: s.name,
+            type: s.type || 'scenic',
+            notes: s.notes || ''
+          }));
+          setStages(newStages);
+        }
+
+        if (setTitle && (!currentTitle || currentTitle.trim() === 'EXPEDIÇÃO PERSONALIZADA' || currentTitle.trim() === 'NOVO ROTEIRO')) {
+          if (parsedTitle) {
+            setTitle(parsedTitle.toUpperCase());
+          }
+        }
+
+        if (onMapsUrlGenerated && fullRouteUrl) {
+          onMapsUrlGenerated(fullRouteUrl);
+        }
+      }
+
+      // Aplica obrigatoriamente a distância e a duração no Diário de Bordo
       if (setDistance && finalKmStr) {
         setDistance(finalKmStr);
       }
       if (setDuration && finalDuration) {
         setDuration(finalDuration);
-      }
-
-      if (setTitle && (!currentTitle || currentTitle.trim() === 'EXPEDIÇÃO PERSONALIZADA' || currentTitle.trim() === 'NOVO ROTEIRO')) {
-        if (parsedTitle) {
-          setTitle(parsedTitle.toUpperCase());
-        }
-      }
-
-      if (onMapsUrlGenerated && fullRouteUrl) {
-        onMapsUrlGenerated(fullRouteUrl);
       }
 
       setHasImportedFromMaps(true);
@@ -363,19 +446,19 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
 
       setImportFeedback({ 
         type: 'success', 
-        message: `✓ Rota importada com sucesso! ${metricDetails ? `Distância & Duração: ${metricDetails} | ` : ''}${suggestedStages?.length || 0} paradas identificadas.` 
+        message: `✓ Informações importadas com sucesso! ${metricDetails ? `Distância & Duração: ${metricDetails}` : ''}` 
       });
 
       setTimeout(() => {
         setIsImportModalOpen(false);
         setImportInput('');
         setImportFeedback(null);
-      }, 1600);
+      }, 1400);
 
     } catch (err: any) {
       setImportFeedback({ 
         type: 'error', 
-        message: 'Erro de comunicação ao processar rota: ' + (err?.message || String(err)) 
+        message: 'Erro ao processar rota: ' + (err?.message || String(err)) 
       });
     } finally {
       setIsImporting(false);
@@ -614,13 +697,21 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
           </p>
 
           <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="text"
-              value={importInput}
-              onChange={(e) => handleImportInputChange(e.target.value)}
-              placeholder="Ex: Cole o link do Google Maps (https://maps.app.goo.gl/...) ou texto com paradas"
-              className="flex-1 bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-400 outline-none transition-colors"
-            />
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={importInput}
+                onChange={(e) => handleImportInputChange(e.target.value)}
+                onPaste={handleInputPaste}
+                placeholder="Ex: Cole o link do Google Maps (https://maps.app.goo.gl/...) ou texto com paradas"
+                className="w-full bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-400 outline-none transition-colors pr-10"
+              />
+              {isResolvingMetrics && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 size={15} className="animate-spin text-sky-400" />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Campos de Confirmação da Distância e Duração Exatas do Google Maps */}
@@ -628,15 +719,29 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
             <div>
               <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block mb-1 flex items-center justify-between">
                 <span>Distância no Google Maps</span>
-                <span className="text-[9px] text-sky-400 font-bold lowercase">importação fiel</span>
+                {isResolvingMetrics ? (
+                  <span className="text-[9px] text-sky-400 font-bold lowercase flex items-center gap-1 animate-pulse">
+                    <Loader2 size={10} className="animate-spin" /> consultando maps...
+                  </span>
+                ) : mapsDistance ? (
+                  <span className="text-[9px] text-emerald-400 font-bold lowercase flex items-center gap-1">
+                    <Check size={11} /> importação fiel ativa
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-sky-400 font-bold lowercase">importação fiel</span>
+                )}
               </label>
               <div className="relative">
                 <input
                   type="text"
                   value={mapsDistance}
                   onChange={(e) => setMapsDistance(e.target.value)}
-                  placeholder="Ex: 3,4 ou 85"
-                  className="w-full bg-slate-900 border border-slate-700 focus:border-sky-500 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder:text-slate-500 outline-none"
+                  placeholder={isResolvingMetrics ? "Calculando..." : "Ex: 3,4 ou 85"}
+                  className={`w-full bg-slate-900 border rounded-lg px-3 py-2 text-xs font-mono outline-none transition-colors ${
+                    mapsDistance 
+                      ? 'border-emerald-500/50 bg-emerald-950/20 text-emerald-300 font-bold' 
+                      : 'border-slate-700 focus:border-sky-500 text-white placeholder:text-slate-500'
+                  }`}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-orange-400">KM</span>
               </div>
@@ -644,19 +749,64 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
             <div>
               <label className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block mb-1 flex items-center justify-between">
                 <span>Tempo / Duração no Google Maps</span>
-                <span className="text-[9px] text-sky-400 font-bold lowercase">do app de mapas</span>
+                {isResolvingMetrics ? (
+                  <span className="text-[9px] text-sky-400 font-bold lowercase flex items-center gap-1 animate-pulse">
+                    <Loader2 size={10} className="animate-spin" /> consultando maps...
+                  </span>
+                ) : mapsDuration ? (
+                  <span className="text-[9px] text-emerald-400 font-bold lowercase flex items-center gap-1">
+                    <Check size={11} /> do app de mapas
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-sky-400 font-bold lowercase">do app de mapas</span>
+                )}
               </label>
               <input
                 type="text"
                 value={mapsDuration}
                 onChange={(e) => setMapsDuration(e.target.value)}
-                placeholder="Ex: 12 min ou 1h 29min"
-                className="w-full bg-slate-900 border border-slate-700 focus:border-sky-500 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder:text-slate-500 outline-none"
+                placeholder={isResolvingMetrics ? "Calculando..." : "Ex: 12 min ou 1h 29min"}
+                className={`w-full bg-slate-900 border rounded-lg px-3 py-2 text-xs font-mono outline-none transition-colors ${
+                  mapsDuration 
+                    ? 'border-emerald-500/50 bg-emerald-950/20 text-emerald-300 font-bold' 
+                    : 'border-slate-700 focus:border-sky-500 text-white placeholder:text-slate-500'
+                }`}
               />
             </div>
           </div>
+
+          {/* Card com Detalhes do Trajeto Detectado */}
+          {autoResolvedRoute && (
+            <div className="p-3 rounded-xl bg-sky-950/30 border border-sky-500/30 text-xs space-y-1.5 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2 text-sky-300 font-bold text-[11px]">
+                <Sparkles size={13} className="text-sky-400" />
+                <span>Roteiro Detectado pelo Google Maps:</span>
+              </div>
+              <div className="text-slate-300 text-[11px] space-y-1">
+                {autoResolvedRoute.origin && (
+                  <div className="flex items-start gap-1.5">
+                    <span className="text-emerald-400 font-bold shrink-0">📍 Origem:</span>
+                    <span className="text-slate-200 line-clamp-1">{autoResolvedRoute.origin}</span>
+                  </div>
+                )}
+                {autoResolvedRoute.waypoints && autoResolvedRoute.waypoints.length > 0 && (
+                  <div className="flex items-start gap-1.5">
+                    <span className="text-orange-400 font-bold shrink-0">🛑 Paradas ({autoResolvedRoute.waypoints.length}):</span>
+                    <span className="text-slate-200 line-clamp-1">{autoResolvedRoute.waypoints.join(' • ')}</span>
+                  </div>
+                )}
+                {autoResolvedRoute.destination && (
+                  <div className="flex items-start gap-1.5">
+                    <span className="text-sky-400 font-bold shrink-0">🏁 Destino:</span>
+                    <span className="text-slate-200 line-clamp-1">{autoResolvedRoute.destination}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <p className="text-[10px] text-sky-300/90 leading-tight">
-            💡 <strong>Sincronização com o Google Maps:</strong> Se você copiou o trajeto do Google Maps, a distância e o tempo exatos aparecem acima e serão importados fielmente para o Diário de Bordo.
+            💡 <strong>Sincronização com o Google Maps:</strong> Ao colar o link ou compartilhar o trajeto, a distância e o tempo exatos aparecem preenchidos acima e são importados fielmente para o Diário de Bordo.
           </p>
 
           {/* Botões de Ação do Modal: Cancelar / Desfazer / Processar */}
