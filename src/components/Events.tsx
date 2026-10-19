@@ -22,7 +22,8 @@ import {
   Eye,
   Info,
   Edit3,
-  Lock
+  Lock,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -101,6 +102,7 @@ export interface MotoEvent {
   isCustomImage?: boolean;
   status?: 'aprovado' | 'pendente' | 'rejeitado';
   createdBy?: string;
+  organizer?: string;
   createdAt?: string;
   rejectionReason?: string;
 }
@@ -192,9 +194,10 @@ const DEFAULT_FALLBACK_IMAGE = generateCategorySvgCover("Geral");
 const CATEGORY_TAGS = ["Todos", "Geral", "Festas & Encontros", "On-Road", "Off-Road", "Misto"];
 
 export function Events() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const isVip = isUserProOrBonificado(profile);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [events, setEvents] = useState<MotoEvent[]>([]);
   const [activeTab, setActiveTab] = useState<'explorar' | 'meus' | 'criar'>('explorar');
@@ -312,83 +315,109 @@ export function Events() {
     triggerToast("Imagem de capa removida.", "info");
   };
 
-  // Load events from Hostinger MySQL Database (com fallback resiliente de cache)
+  // Load events from Hostinger MySQL Database (com carregamento instantâneo de cache e mesclagem resiliente)
   useEffect(() => {
     let isMounted = true;
+
+    // 1. Carrega imediatamente do localStorage para renderização sem nenhum delay
+    const saved = localStorage.getItem('motolegado_events');
+    let localList: MotoEvent[] = [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const mockIds = ['e_pend_1', 'e_pend_2', 'e_fest_1', 'e_fest_2', 'e_sul_1', 'e0', 'e1', 'e2', 'e3', 'e4', 'e5'];
+          localList = parsed.filter((evt: MotoEvent) => !mockIds.includes(evt.id));
+          setEvents(localList);
+        }
+      } catch {}
+    }
+
+    // 2. Sincroniza em background com o MySQL da Hostinger preservando check-ins e eventos locais
     clientDbService.events.getAll()
       .then((dbEvents) => {
         if (!isMounted) return;
-        if (Array.isArray(dbEvents) && dbEvents.length > 0) {
-          setEvents(dbEvents);
-          localStorage.setItem('motolegado_events', JSON.stringify(dbEvents));
-          return;
-        }
+        if (Array.isArray(dbEvents)) {
+          setEvents(prevEvents => {
+            const checkInMap = new Map<string, boolean>();
+            prevEvents.forEach(e => { if (e.checkedIn) checkInMap.set(e.id, true); });
+            localList.forEach(e => { if (e.checkedIn) checkInMap.set(e.id, true); });
 
-        const saved = localStorage.getItem('motolegado_events');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            const mockIds = ['e_pend_1', 'e_pend_2', 'e_fest_1', 'e_fest_2', 'e_sul_1', 'e0', 'e1', 'e2', 'e3', 'e4', 'e5'];
-            const cleaned = parsed.filter((evt: MotoEvent) => !mockIds.includes(evt.id));
-            setEvents(cleaned);
-            return;
-          } catch {}
+            const mergedMap = new Map<string, MotoEvent>();
+            
+            // Adiciona primeiro os eventos do banco MySQL com status de check-in preservado
+            dbEvents.forEach(e => {
+              mergedMap.set(e.id, {
+                ...e,
+                checkedIn: checkInMap.get(e.id) ?? Boolean(e.checkedIn)
+              });
+            });
+
+            // Mantém eventos locais recém-cadastrados ou pendentes
+            prevEvents.forEach(e => {
+              if (!mergedMap.has(e.id)) {
+                mergedMap.set(e.id, e);
+              }
+            });
+
+            const mergedList = Array.from(mergedMap.values());
+            localStorage.setItem('motolegado_events', JSON.stringify(mergedList));
+            return mergedList;
+          });
         }
-        setEvents([]);
       })
       .catch((err) => {
-        console.warn('[Events] Aviso ao carregar eventos do MySQL:', err);
-        if (!isMounted) return;
-        const saved = localStorage.getItem('motolegado_events');
-        if (saved) {
-          try {
-            setEvents(JSON.parse(saved));
-          } catch {}
-        }
+        console.warn('[Events] Aviso ao sincronizar eventos do MySQL:', err);
       });
 
     return () => { isMounted = false; };
   }, []);
 
-  const saveEvents = (updatedEvents: MotoEvent[], eventToPersist?: MotoEvent) => {
+  const saveEvents = async (updatedEvents: MotoEvent[], eventToPersist?: MotoEvent) => {
     setEvents(updatedEvents);
     localStorage.setItem('motolegado_events', JSON.stringify(updatedEvents));
 
     // Sincroniza persistência com o MySQL da Hostinger
     if (eventToPersist) {
-      clientDbService.events.save(eventToPersist).catch((e) => {
+      try {
+        await clientDbService.events.save(eventToPersist);
+      } catch (e) {
         console.warn('[Events] Aviso ao persistir evento no MySQL:', e);
-      });
+      }
     }
   };
 
   const handleToggleCheckIn = (id: string) => {
-    const updated = events.map(evt => {
-      if (evt.id === id) {
-        const checked = !evt.checkedIn;
-        const currentCount = evt.memberCount || 10;
-        return {
-          ...evt,
-          checkedIn: checked,
-          memberCount: checked ? currentCount + 1 : Math.max(0, currentCount - 1)
-        };
-      }
-      return evt;
-    });
+    setEvents(prevEvents => {
+      const updated = prevEvents.map(evt => {
+        if (evt.id === id) {
+          const checked = !evt.checkedIn;
+          const currentCount = evt.memberCount || 10;
+          return {
+            ...evt,
+            checkedIn: checked,
+            memberCount: checked ? currentCount + 1 : Math.max(0, currentCount - 1)
+          };
+        }
+        return evt;
+      });
 
-    saveEvents(updated);
-    
-    const target = updated.find(e => e.id === id);
-    if (target?.checkedIn) {
-      triggerToast(`Check-in confirmado em ${target.title}! +150 PTS adicionados! 🎟️`, 'success');
-      window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
-    } else if (target) {
-      triggerToast(`Presença cancelada em: ${target.title}.`, 'info');
-      window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
-    }
+      saveEvents(updated);
+      
+      const target = updated.find(e => e.id === id);
+      if (target?.checkedIn) {
+        triggerToast(`Check-in confirmado em ${target.title}! +150 PTS adicionados! 🎟️`, 'success');
+        window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
+      } else if (target) {
+        triggerToast(`Presença cancelada em: ${target.title}.`, 'info');
+        window.dispatchEvent(new CustomEvent('motolegado_gamification_updated'));
+      }
+
+      return updated;
+    });
   };
 
-  const handleSaveEditedEvent = (e: FormEvent) => {
+  const handleSaveEditedEvent = async (e: FormEvent) => {
     e.preventDefault();
     if (!editingEvent) return;
     if (!editingEvent.title.trim() || !editingEvent.location.trim() || !editingEvent.date.trim()) {
@@ -396,8 +425,12 @@ export function Events() {
       return;
     }
 
-    const updated = events.map(evt => evt.id === editingEvent.id ? editingEvent : evt);
-    saveEvents(updated, editingEvent);
+    setEvents(prevEvents => {
+      const updated = prevEvents.map(evt => evt.id === editingEvent.id ? editingEvent : evt);
+      saveEvents(updated, editingEvent);
+      return updated;
+    });
+
     triggerToast("Informações do evento salvas com sucesso!", "success");
     setEditingEvent(null);
   };
@@ -409,69 +442,103 @@ export function Events() {
     }, 4000);
   };
 
-  const handleCreateEvent = (e: FormEvent) => {
+  const handleCreateEvent = async (e: FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim() || !formData.location.trim() || !formData.startDate.trim() || !formData.startTime.trim()) {
       triggerToast("Preencha todos os campos obrigatórios (*): Título, Local, Data Inicial e Horário Inicial!", "info");
       return;
     }
 
-    // Format time display (e.g., "09:00 ÀS 18:00" or "16:00")
-    let formattedTime = formData.startTime.toUpperCase();
-    if (formData.endTime.trim()) {
-      formattedTime += ` ÀS ${formData.endTime.toUpperCase()}`;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      // Format time display (e.g., "09:00 ÀS 18:00" or "16:00")
+      let formattedTime = formData.startTime.toUpperCase();
+      if (formData.endTime.trim()) {
+        formattedTime += ` ÀS ${formData.endTime.toUpperCase()}`;
+      }
+
+      // Format date string
+      const formattedDate = formData.startDate;
+      const authorName = profile?.name || (user as any)?.name || user?.email || 'Piloto';
+
+      const newEvent: MotoEvent = {
+        id: 'e_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        title: formData.title.trim(),
+        desc: formData.desc.trim() || "Evento oficial da comunidade MotoLegado.",
+        date: formattedDate,
+        endDate: formData.endDate.trim() || undefined,
+        time: formattedTime,
+        endTime: formData.endTime.trim() || undefined,
+        location: formData.location.trim(),
+        distance: formData.distance === '' ? 0 : Number(formData.distance),
+        category: formData.category,
+        image: formData.image.trim() || DEFAULT_FALLBACK_IMAGE,
+        checkedIn: true, // Auto check-in upon event creation
+        memberCount: 1,
+        status: 'pendente',
+        createdBy: authorName,
+        createdAt: new Date().toISOString().split('T')[0]
+      };
+
+      // 1. Atualização atômica funcional de estado para gravação imediata
+      setEvents(prevEvents => {
+        const next = [newEvent, ...prevEvents.filter(ev => ev.id !== newEvent.id)];
+        localStorage.setItem('motolegado_events', JSON.stringify(next));
+        return next;
+      });
+
+      // 2. Limpeza imediata do formulário para evitar duplicação ou retenção de dados antigos
+      setFormData({
+        title: '',
+        category: 'Geral',
+        location: '',
+        startDate: '',
+        endDate: '',
+        startTime: '',
+        endTime: '',
+        distance: '',
+        desc: '',
+        image: ''
+      });
+      setIsCustomImage(false);
+      setCoverSource('upload');
+      setCustomUrlInput('');
+
+      triggerToast("Evento cadastrado com sucesso! Enviado para a moderação e adicionado à sua lista.", "success");
+      setActiveTab('meus');
+
+      // 3. Persistência garantida no banco de dados MySQL de forma assíncrona/background
+      try {
+        await clientDbService.events.save(newEvent);
+      } catch (err: any) {
+        console.warn('[Events] Persistência em background MySQL:', err);
+      }
+    } catch (err: any) {
+      console.error('[Events] Erro no cadastro do evento:', err);
+      triggerToast("Evento registrado localmente e aguarda confirmação de rede.", "info");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Format date string
-    let formattedDate = formData.startDate;
-
-    const newEvent: MotoEvent = {
-      id: 'e_' + Date.now(),
-      title: formData.title.trim(),
-      desc: formData.desc.trim() || "Sem descrição informada. O evento aguarda a presença da irmandade.",
-      date: formattedDate,
-      endDate: formData.endDate.trim() || undefined,
-      time: formattedTime,
-      endTime: formData.endTime.trim() || undefined,
-      location: formData.location.trim(),
-      distance: formData.distance === '' ? 0 : Number(formData.distance),
-      category: formData.category,
-      image: formData.image.trim() || DEFAULT_FALLBACK_IMAGE,
-      checkedIn: true, // Auto check-in upon event creation
-      memberCount: 1,
-      status: 'pendente',
-      createdBy: 'Usuário Cadastrado',
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-
-    const updated = [newEvent, ...events];
-    saveEvents(updated, newEvent);
-    
-    triggerToast("Evento cadastrado com sucesso! Enviado para a fila de moderação no Centro de Comando e aguarda aprovação.", "success");
-    setActiveTab('meus');
-    
-    // Reset form
-    setFormData({
-      title: '',
-      category: 'Geral',
-      location: '',
-      startDate: '',
-      endDate: '',
-      startTime: '',
-      endTime: '',
-      distance: '',
-      desc: '',
-      image: ''
-    });
-    setIsCustomImage(false);
-    setCoverSource('upload');
-    setCustomUrlInput('');
   };
 
   // Helper filters
+  const currentPilotKey = (profile?.name || (user as any)?.name || user?.email || '').toLowerCase().trim();
+  const isAuthor = (evt: MotoEvent) => {
+    if (!currentPilotKey) return false;
+    const author = (evt.createdBy || evt.organizer || '').toLowerCase().trim();
+    return author === currentPilotKey;
+  };
+
   const approvedEvents = events.filter(evt => evt.status === 'aprovado' || !evt.status);
 
-  const filteredExploreEvents = approvedEvents.filter(evt => {
+  const visibleExploreEvents = events.filter(evt => {
+    const isApproved = evt.status === 'aprovado' || !evt.status;
+    return isApproved || isAuthor(evt) || evt.checkedIn;
+  });
+
+  const filteredExploreEvents = visibleExploreEvents.filter(evt => {
     const matchesSearch = 
       evt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       evt.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -481,7 +548,7 @@ export function Events() {
     return matchesSearch && matchesCategory && matchesDate;
   });
 
-  const checkedInEvents = events.filter(evt => evt.checkedIn);
+  const checkedInEvents = events.filter(evt => evt.checkedIn || isAuthor(evt));
   const filteredCheckedInEvents = checkedInEvents.filter(evt => {
     const matchesSearch = 
       evt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -686,80 +753,98 @@ export function Events() {
                     </span>
                   </div>
 
-                  {/* Pré-visualização da Capa */}
-                  {editingEvent.image && (
-                    <div className="relative rounded-xl overflow-hidden aspect-video max-h-48 border border-slate-800 bg-slate-950 group">
-                      <img 
-                        src={editingEvent.image} 
-                        alt="Capa do evento" 
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = DEFAULT_FALLBACK_IMAGE;
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-60" />
-                      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-                        <span className="text-[9px] font-bold text-slate-300 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700/50">
-                          Pré-visualização da Capa
-                        </span>
+                  {/* Pré-visualização da Capa se houver imagem cadastrada */}
+                  {editingEvent.image && editingEvent.image.trim() !== '' ? (
+                    <div className="space-y-3">
+                      <div className="relative rounded-2xl overflow-hidden aspect-video max-h-52 border border-slate-700/80 bg-slate-950 shadow-inner group">
+                        <img 
+                          src={editingEvent.image} 
+                          alt="Capa do evento" 
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = DEFAULT_FALLBACK_IMAGE;
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent pointer-events-none" />
+                        
+                        <div className="absolute top-3 left-3">
+                          <span className="text-[9px] font-black uppercase text-emerald-300 bg-emerald-950/90 border border-emerald-500/50 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-md backdrop-blur-sm">
+                            <CheckCircle size={11} className="text-emerald-400" />
+                            Imagem Cadastrada
+                          </span>
+                        </div>
+
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => editFileInputRef.current?.click()}
+                            className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-amber-600/30 transition-all cursor-pointer active:scale-95"
+                          >
+                            <Upload size={13} />
+                            Trocar Imagem
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setEditingEvent({ ...editingEvent, image: '' })}
+                            title="Remover imagem"
+                            className="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-rose-950 text-rose-300 hover:text-rose-200 text-[10px] font-black uppercase border border-rose-500/40 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                          >
+                            <X size={13} />
+                            Remover
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[9px] text-slate-500 font-bold uppercase tracking-wider px-1">
+                        <span>Arquivo de capa cadastrado</span>
                         <button
                           type="button"
-                          onClick={() => setEditingEvent({ ...editingEvent, image: '' })}
-                          title="Remover imagem"
-                          className="p-1 rounded bg-slate-900/90 text-rose-400 hover:text-rose-300 text-[10px] font-bold border border-slate-700 flex items-center gap-1 cursor-pointer"
+                          onClick={() => editFileInputRef.current?.click()}
+                          className="text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
                         >
-                          <X size={12} /> Remover
+                          <Upload size={11} /> Selecionar outro arquivo (JPG, PNG, WebP)
                         </button>
                       </div>
                     </div>
+                  ) : (
+                    /* Campo de Upload de Arquivo quando não houver imagem cadastrada */
+                    <div 
+                      onClick={() => editFileInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-700 hover:border-amber-500/60 rounded-2xl p-6 text-center bg-slate-900/40 hover:bg-amber-500/5 transition-all cursor-pointer group flex flex-col items-center justify-center space-y-2.5"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-slate-800 group-hover:bg-amber-500/20 border border-slate-700 group-hover:border-amber-500/40 flex items-center justify-center transition-all shadow-md">
+                        <Upload size={20} className="text-slate-400 group-hover:text-amber-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-wider text-slate-200 group-hover:text-amber-300">
+                          Nenhuma Imagem Cadastrada
+                        </p>
+                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                          Clique aqui para selecionar uma foto do seu dispositivo
+                        </p>
+                      </div>
+                      <span className="text-[9px] font-black text-amber-400 bg-amber-950/80 border border-amber-500/40 px-3.5 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
+                        Escolher Arquivo de Imagem
+                      </span>
+                    </div>
                   )}
 
-                  {/* Ações de Upload e URL */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    {/* Botão de Upload Local */}
-                    <div>
-                      <label 
-                        htmlFor="edit-event-cover-file"
-                        className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-amber-600/20 border border-slate-700 hover:border-amber-500/50 text-slate-200 hover:text-amber-300 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm active:scale-95"
-                      >
-                        <Upload size={14} className="text-amber-400" />
-                        <span>Fazer Upload da Capa</span>
-                      </label>
-                      <input 
-                        ref={editFileInputRef}
-                        id="edit-event-cover-file"
-                        type="file" 
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleEditFileUpload(file);
-                        }}
-                        className="hidden"
-                      />
-                      <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-1 text-center">
-                        PNG, JPG, WEBP (até 10MB)
-                      </p>
-                    </div>
-
-                    {/* Campo de URL Direta */}
-                    <div className="space-y-1">
-                      <div className="relative">
-                        <LinkIcon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                        <input
-                          type="url"
-                          placeholder="Ou cole a URL direta..."
-                          value={editingEvent.image}
-                          onChange={(e) => setEditingEvent({ ...editingEvent, image: e.target.value })}
-                          className="w-full bg-slate-900 border border-slate-700/80 rounded-xl py-3 pl-8 pr-3 text-xs font-mono text-slate-200 focus:border-amber-500 outline-none transition-all placeholder:text-slate-500"
-                        />
-                      </div>
-                      <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider text-center">
-                        Link web da imagem
-                      </p>
-                    </div>
-                  </div>
+                  {/* Input de Arquivo Oculto */}
+                  <input 
+                    ref={editFileInputRef}
+                    id="edit-event-cover-file"
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleEditFileUpload(file);
+                      e.target.value = '';
+                    }}
+                    className="hidden"
+                  />
                 </div>
 
                 <div className="space-y-1">
@@ -1066,11 +1151,16 @@ export function Events() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
                   
-                  {/* Category Pill Tag */}
-                  <div className="absolute top-4 left-4">
+                  {/* Category Pill Tag & Status */}
+                  <div className="absolute top-4 left-4 flex items-center gap-2">
                     <span className="text-[8px] font-black text-white px-3 py-1 bg-orange-600/90 backdrop-blur-md rounded-full uppercase tracking-[0.2em] italic border border-orange-400/30">
                       {evt.category}
                     </span>
+                    {evt.status === 'pendente' && (
+                      <span className="text-[8px] font-black text-amber-300 px-2.5 py-1 bg-amber-950/90 border border-amber-500/50 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-md backdrop-blur-md">
+                        <Clock size={10} className="text-amber-400" /> Moderação Pendente
+                      </span>
+                    )}
                   </div>
 
                   {/* Rating / Metricas */}
@@ -1207,11 +1297,16 @@ export function Events() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
                   
-                  {/* Category Pill Tag */}
-                  <div className="absolute top-4 left-4">
+                  {/* Category Pill Tag & Status */}
+                  <div className="absolute top-4 left-4 flex items-center gap-2">
                     <span className="text-[8px] font-black text-white px-3 py-1 bg-emerald-600/90 backdrop-blur-md rounded-full uppercase tracking-[0.2em] italic border border-emerald-400/30">
                       {evt.category}
                     </span>
+                    {evt.status === 'pendente' && (
+                      <span className="text-[8px] font-black text-amber-300 px-2.5 py-1 bg-amber-950/90 border border-amber-500/50 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-md backdrop-blur-md">
+                        <Clock size={10} className="text-amber-400" /> Aguardando Aprovação
+                      </span>
+                    )}
                   </div>
 
                   {/* Info inside cover */}
@@ -1506,9 +1601,17 @@ export function Events() {
 
               <button 
                 type="submit"
-                className="w-full py-5 bg-gradient-to-r from-orange-700 to-orange-500 text-white rounded-2xl font-black italic uppercase tracking-[0.2em] hover:from-orange-600 hover:to-orange-400 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-[0_20px_40px_-10px_rgba(255,85,0,0.35)] relative overflow-hidden group"
+                disabled={isSubmitting}
+                className="w-full py-5 bg-gradient-to-r from-orange-700 to-orange-500 text-white rounded-2xl font-black italic uppercase tracking-[0.2em] hover:from-orange-600 hover:to-orange-400 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-[0_20px_40px_-10px_rgba(255,85,0,0.35)] relative overflow-hidden group disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 cursor-pointer"
               >
-                PUBLICAR EVENTO
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin text-white" />
+                    <span>PUBLICANDO EVENTO...</span>
+                  </>
+                ) : (
+                  <span>PUBLICAR EVENTO</span>
+                )}
               </button>
             </form>
 

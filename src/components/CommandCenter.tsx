@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -27,6 +27,9 @@ import {
   Phone,
   Sparkles,
   Upload,
+  Camera,
+  Image as ImageIcon,
+  Link as LinkIcon,
   Wrench,
   UtensilsCrossed,
   GraduationCap,
@@ -157,6 +160,8 @@ export function CommandCenter() {
   const [eventFilter, setEventFilter] = useState<'pendente' | 'aprovado' | 'rejeitado' | 'todos'>('pendente');
   const [eventSearch, setEventSearch] = useState('');
   const [editingEvent, setEditingEvent] = useState<MotoEvent | null>(null);
+  const editEventFileInputRef = useRef<HTMLInputElement | null>(null);
+  const addEventFileInputRef = useRef<HTMLInputElement | null>(null);
   const [viewingEvent, setViewingEvent] = useState<MotoEvent | null>(null);
   const [rejectionModalEvent, setRejectionModalEvent] = useState<MotoEvent | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('');
@@ -568,24 +573,40 @@ export function CommandCenter() {
     );
   };
 
-  // Load events from LocalStorage
+  // Load events from LocalStorage and MySQL
   useEffect(() => {
     const savedEvents = localStorage.getItem('motolegado_events');
+    let localList: MotoEvent[] = [];
     if (savedEvents) {
       try {
         const parsed = JSON.parse(savedEvents);
         const mockIds = ['e_fest_1', 'e_fest_2', 'e_sul_1', 'e_pend_1', 'e_pend_2', 'e0', 'e1', 'e2', 'e3', 'e4', 'e5'];
-        const cleaned = Array.isArray(parsed) ? parsed.filter((e: MotoEvent) => !mockIds.includes(e.id)) : [];
-        setEvents(cleaned);
-        localStorage.setItem('motolegado_events', JSON.stringify(cleaned));
+        localList = Array.isArray(parsed) ? parsed.filter((e: MotoEvent) => !mockIds.includes(e.id)) : [];
+        setEvents(localList);
       } catch (e) {
         setEvents([]);
-        localStorage.setItem('motolegado_events', JSON.stringify([]));
       }
-    } else {
-      setEvents([]);
-      localStorage.setItem('motolegado_events', JSON.stringify([]));
     }
+
+    clientDbService.events.getAll()
+      .then((dbEvents) => {
+        if (Array.isArray(dbEvents)) {
+          setEvents(prev => {
+            const map = new Map<string, MotoEvent>();
+            dbEvents.forEach(e => map.set(e.id, e));
+            prev.forEach(e => {
+              if (!map.has(e.id)) map.set(e.id, e);
+            });
+            localList.forEach(e => {
+              if (!map.has(e.id)) map.set(e.id, e);
+            });
+            const merged = Array.from(map.values());
+            localStorage.setItem('motolegado_events', JSON.stringify(merged));
+            return merged;
+          });
+        }
+      })
+      .catch(() => {});
 
     // Load Clubs
     const savedClubs = localStorage.getItem('motolegado_clubs_moderation');
@@ -958,6 +979,46 @@ export function CommandCenter() {
     }
   };
 
+  const handleEditEventCoverFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      showToast("Selecione um arquivo de imagem válido (JPG, PNG, WebP)!", "info");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast("O arquivo de imagem deve ter no máximo 10MB.", "info");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result && typeof event.target.result === 'string') {
+        const dataUrl = event.target.result;
+        setEditingEvent(prev => prev ? ({ ...prev, image: dataUrl }) : null);
+        showToast("Nova imagem de capa carregada para o evento!", "success");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddEventCoverFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      showToast("Selecione um arquivo de imagem válido (JPG, PNG, WebP)!", "info");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast("O arquivo de imagem deve ter no máximo 10MB.", "info");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result && typeof event.target.result === 'string') {
+        const dataUrl = event.target.result;
+        setNewEventData(prev => ({ ...prev, image: dataUrl }));
+        showToast("Imagem de capa carregada para o novo evento!", "success");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const getCategoryIcon = (cat: Partner['category']) => {
     switch (cat) {
       case 'Oficina': return <Wrench className="text-orange-500" size={14} />;
@@ -1030,6 +1091,7 @@ export function CommandCenter() {
     if (!editingEvent) return;
     const updated = events.map(evt => evt.id === editingEvent.id ? editingEvent : evt);
     saveEvents(updated);
+    clientDbService.events.save(editingEvent).catch(() => {});
     addAuditLog(`Evento "${editingEvent.title}" EDITADO pelo Administrador`);
     showToast("Dados do evento atualizados!", "success");
     setEditingEvent(null);
@@ -1042,22 +1104,24 @@ export function CommandCenter() {
       return;
     }
     const createdEvt: MotoEvent = {
-      id: 'evt_cmd_' + Date.now(),
+      id: 'evt_cmd_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       title: newEventData.title || 'Novo Encontro',
       date: newEventData.date || new Date().toISOString().split('T')[0],
       time: newEventData.time || '14:00',
       location: newEventData.location || 'Brasil',
       category: newEventData.category || 'Encontro',
-      desc: newEventData.desc || 'Evento oficial cadastrado via Centro de Comando.',
-      image: newEventData.image || 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=800',
+      desc: newEventData.desc || '',
+      image: newEventData.image || '',
       price: newEventData.price || 'Gratuito',
-      organizer: newEventData.organizer || 'Administração MotoLegado',
+      organizer: newEventData.organizer || profile?.name || 'Administração MotoLegado',
+      createdBy: profile?.name || 'Administrador',
       status: 'aprovado',
       checkedIn: false,
-      memberCount: 10
+      memberCount: 1
     };
     const updated = [createdEvt, ...events];
     saveEvents(updated);
+    clientDbService.events.save(createdEvt).catch(() => {});
     addAuditLog(`Novo evento "${createdEvt.title}" CADASTRADO e PUBLICADO`);
     showToast("Evento cadastrado e publicado no portal!", "success");
     setShowAddEventModal(false);
@@ -4265,13 +4329,110 @@ export function CommandCenter() {
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">URL da Imagem de Capa</label>
+                {/* IMAGEM DE CAPA DO EVENTO: PRÉ-VISUALIZAÇÃO & UPLOAD DE ARQUIVO */}
+                <div className="space-y-3 bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-amber-400 flex items-center gap-2">
+                      <Camera size={14} className="text-amber-500" />
+                      Imagem de Capa do Evento
+                    </label>
+                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                      Upload de Arquivo de Imagem
+                    </span>
+                  </div>
+
+                  {/* Caso haja uma imagem cadastrada, mostre a mesma com opções de trocar ou remover */}
+                  {editingEvent.image && editingEvent.image.trim() !== '' ? (
+                    <div className="space-y-3">
+                      <div className="relative rounded-2xl overflow-hidden aspect-video max-h-56 border border-slate-700/80 bg-slate-950 shadow-inner group">
+                        <img 
+                          src={editingEvent.image} 
+                          alt={editingEvent.title || 'Capa do evento'} 
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=800';
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent pointer-events-none" />
+                        
+                        {/* Indicador de Imagem Cadastrada */}
+                        <div className="absolute top-3 left-3">
+                          <span className="text-[9px] font-black uppercase text-emerald-300 bg-emerald-950/90 border border-emerald-500/50 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-md backdrop-blur-sm">
+                            <CheckCircle size={11} className="text-emerald-400" />
+                            Imagem Cadastrada
+                          </span>
+                        </div>
+
+                        {/* Botões rápidos sobrepostos */}
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => editEventFileInputRef.current?.click()}
+                            className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-amber-600/30 transition-all cursor-pointer active:scale-95"
+                          >
+                            <Upload size={13} />
+                            Trocar Imagem
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setEditingEvent({ ...editingEvent, image: '' })}
+                            title="Remover imagem cadastrada"
+                            className="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-rose-950 text-rose-300 hover:text-rose-200 text-[10px] font-black uppercase border border-rose-500/40 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                          >
+                            <X size={13} />
+                            Remover
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[9px] text-slate-500 font-bold uppercase tracking-wider px-1">
+                        <span>Arquivo carregado para a moderação</span>
+                        <button
+                          type="button"
+                          onClick={() => editEventFileInputRef.current?.click()}
+                          className="text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <Upload size={11} /> Selecionar outro arquivo (JPG, PNG, WebP)
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Caso não haja imagem cadastrada, mostre o campo de upload de arquivo */
+                    <div 
+                      onClick={() => editEventFileInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-700 hover:border-amber-500/60 rounded-2xl p-6 text-center bg-slate-900/40 hover:bg-amber-500/5 transition-all cursor-pointer group flex flex-col items-center justify-center space-y-2.5"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-slate-800 group-hover:bg-amber-500/20 border border-slate-700 group-hover:border-amber-500/40 flex items-center justify-center transition-all shadow-md">
+                        <Upload size={20} className="text-slate-400 group-hover:text-amber-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-wider text-slate-200 group-hover:text-amber-300">
+                          Nenhuma Imagem Cadastrada
+                        </p>
+                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                          Clique para fazer upload do arquivo de imagem do seu computador ou celular
+                        </p>
+                      </div>
+                      <span className="text-[9px] font-black text-amber-400 bg-amber-950/80 border border-amber-500/40 px-3.5 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
+                        Escolher Arquivo de Imagem
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Input de arquivo invisível */}
                   <input
-                    type="text"
-                    value={editingEvent.image}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, image: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-300 focus:border-amber-500 outline-none"
+                    ref={editEventFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleEditEventCoverFile(file);
+                      e.target.value = '';
+                    }}
+                    className="hidden"
                   />
                 </div>
 
@@ -5128,6 +5289,51 @@ export function CommandCenter() {
                 <div>
                   <label className="text-[10px] font-black uppercase text-slate-400">Descrição:</label>
                   <textarea rows={2} value={newEventData.desc || ''} onChange={e => setNewEventData({ ...newEventData, desc: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-bold resize-none" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-slate-400 flex items-center justify-between">
+                    <span>Imagem de Capa:</span>
+                    {newEventData.image && (
+                      <button 
+                        type="button" 
+                        onClick={() => setNewEventData({ ...newEventData, image: '' })}
+                        className="text-[9px] text-rose-400 hover:text-rose-300 font-bold uppercase cursor-pointer"
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </label>
+                  {newEventData.image ? (
+                    <div className="relative rounded-xl overflow-hidden h-28 border border-slate-700 bg-slate-950">
+                      <img src={newEventData.image} alt="Capa" className="w-full h-full object-cover" />
+                      <button 
+                        type="button"
+                        onClick={() => addEventFileInputRef.current?.click()}
+                        className="absolute bottom-2 right-2 px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white text-[9px] font-black uppercase rounded-lg shadow-md flex items-center gap-1 cursor-pointer"
+                      >
+                        <Upload size={10} /> Trocar Imagem
+                      </button>
+                    </div>
+                  ) : (
+                    <div 
+                      onClick={() => addEventFileInputRef.current?.click()}
+                      className="border border-dashed border-slate-700 hover:border-amber-500/50 rounded-xl p-3 text-center bg-slate-950 hover:bg-amber-500/5 transition-all cursor-pointer flex items-center justify-center gap-2 text-slate-400 hover:text-amber-300"
+                    >
+                      <Upload size={14} className="text-amber-500" />
+                      <span className="text-xs font-bold">Fazer upload de imagem de capa</span>
+                    </div>
+                  )}
+                  <input 
+                    ref={addEventFileInputRef}
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleAddEventCoverFile(file);
+                      e.target.value = '';
+                    }}
+                    className="hidden" 
+                  />
                 </div>
                 <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
                   <button type="button" onClick={() => setShowAddEventModal(false)} className="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-black uppercase rounded-xl">Cancelar</button>

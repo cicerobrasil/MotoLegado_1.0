@@ -693,11 +693,12 @@ export class HostingerDbService {
   }
 
   async saveEvent(event: Partial<DbEvent>): Promise<DbEvent> {
-    const finalId = event.id || `evt_${Date.now()}`;
-    const title = event.title || 'Evento MotoLegado';
+    const finalId = event.id || `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const title = event.title || 'Novo Evento MotoLegado';
     const eventDate = event.event_date || event.date || new Date().toISOString().split('T')[0];
     const location = event.location || 'Brasil';
-    const status = event.status || 'aprovado';
+    const status = event.status || 'pendente';
+    const createdBy = event.created_by || (event as any).createdBy || 'Piloto';
 
     try {
       await safeMySqlQuery(`
@@ -727,28 +728,36 @@ export class HostingerDbService {
       `, [
         finalId,
         event.organizer_id || null,
-        event.created_by || null,
+        createdBy,
         title,
-        event.description || event.desc || '',
+        event.description || (event as any).desc || '',
         eventDate,
-        event.end_date || null,
+        event.end_date || (event as any).endDate || null,
         event.time || '09:00',
-        event.end_time || null,
+        event.end_time || (event as any).endTime || null,
         location,
         event.city || null,
         event.state || null,
-        event.distance || 0,
-        event.category || 'Passeios & Bate-Fica',
-        event.banner_url || event.image || null,
+        event.distance || (event as any).distance_km || 0,
+        event.category || 'Geral',
+        event.banner_url || (event as any).image || null,
         status,
-        event.rejection_reason || null,
-        event.member_count || 0
+        event.rejection_reason || (event as any).rejectionReason || null,
+        event.member_count || (event as any).memberCount || 1
       ]);
     } catch (err) {
       console.warn('[HostingerDbService] saveEvent MySQL warning:', err);
     }
 
-    return this.normalizeEventRow({ ...event, id: finalId, title, event_date: eventDate, location, status });
+    return this.normalizeEventRow({ 
+      ...event, 
+      id: finalId, 
+      title, 
+      event_date: eventDate, 
+      location, 
+      status, 
+      created_by: createdBy 
+    });
   }
 
   async updateEventStatus(id: string, status: 'aprovado' | 'pendente' | 'rejeitado', rejectionReason?: string): Promise<boolean> {
@@ -773,14 +782,42 @@ export class HostingerDbService {
   }
 
   private normalizeEventRow(row: any): DbEvent {
+    let dateStr = row.event_date || row.date;
+    if (dateStr instanceof Date) {
+      dateStr = dateStr.toISOString().split('T')[0];
+    } else if (typeof dateStr === 'string' && dateStr.includes('T')) {
+      dateStr = dateStr.split('T')[0];
+    }
+    
+    let endDateStr = row.end_date || row.endDate;
+    if (endDateStr instanceof Date) {
+      endDateStr = endDateStr.toISOString().split('T')[0];
+    } else if (typeof endDateStr === 'string' && endDateStr.includes('T')) {
+      endDateStr = endDateStr.split('T')[0];
+    }
+
+    const validStatus = (row.status && typeof row.status === 'string' && row.status.trim() !== '')
+      ? row.status.trim()
+      : 'pendente';
+
     return {
       ...row,
+      id: String(row.id),
+      title: row.title || 'Evento MotoLegado',
       desc: row.description || row.desc || '',
-      date: row.event_date ? (typeof row.event_date === 'string' ? row.event_date.split('T')[0] : new Date(row.event_date).toISOString().split('T')[0]) : row.date,
-      endDate: row.end_date ? (typeof row.end_date === 'string' ? row.end_date.split('T')[0] : new Date(row.end_date).toISOString().split('T')[0]) : undefined,
-      image: row.banner_url || row.image,
+      date: dateStr || new Date().toISOString().split('T')[0],
+      endDate: endDateStr || undefined,
+      time: row.time || '09:00',
+      endTime: row.end_time || row.endTime || undefined,
+      location: row.location || 'Brasil',
+      category: row.category || 'Geral',
+      image: row.banner_url || row.image || '',
       distance: Number(row.distance_km || row.distance || 0),
-      checkedIn: false
+      status: validStatus,
+      rejectionReason: row.rejection_reason || row.rejectionReason || undefined,
+      createdBy: row.created_by || row.createdBy || 'Piloto',
+      memberCount: Number(row.member_count || row.memberCount || 1),
+      checkedIn: Boolean(row.checkedIn)
     };
   }
 

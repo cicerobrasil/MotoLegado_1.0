@@ -297,6 +297,8 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
       "ALTER TABLE events ADD COLUMN time VARCHAR(20) DEFAULT '09:00'",
       "ALTER TABLE events ADD COLUMN end_time VARCHAR(20) NULL",
       "ALTER TABLE events ADD COLUMN distance_km DECIMAL(10,2) DEFAULT 0",
+      "ALTER TABLE events ADD COLUMN category VARCHAR(100) DEFAULT 'Passeios & Bate-Fica'",
+      "ALTER TABLE events MODIFY COLUMN status VARCHAR(30) DEFAULT 'pendente'",
       "ALTER TABLE events ADD COLUMN rejection_reason TEXT NULL",
       "ALTER TABLE events ADD COLUMN member_count INT DEFAULT 0",
       "ALTER TABLE partners ADD COLUMN news TEXT NULL",
