@@ -390,12 +390,37 @@ export interface BuildRankingOptions {
     tierAccent: string;
     isPro?: boolean;
     bio?: string;
+    role?: string;
   };
   sortBy?: RankingSortBy;
   period?: RankingPeriod;
   stateFilter?: string;
   clubFilter?: string;
   searchQuery?: string;
+}
+
+/**
+ * Identifica se um perfil é o Administrador MotoLegado
+ * Usuários com este perfil não participam da classificação nem da lista de pilotos ranqueados
+ */
+export function isAdministratorPilot(pilot?: { name?: string; handle?: string; email?: string; role?: string; clubRole?: string } | null): boolean {
+  if (!pilot) return false;
+  const name = (pilot.name || '').toLowerCase().trim();
+  const handle = (pilot.handle || '').toLowerCase().trim();
+  const email = (pilot.email || '').toLowerCase().trim();
+  const role = (pilot.role || '').toLowerCase().trim();
+  const clubRole = (pilot.clubRole || '').toLowerCase().trim();
+
+  return (
+    name.includes('administrador motolegado') ||
+    name === 'administrador' ||
+    name.includes('admin motolegado') ||
+    handle.includes('administrador') ||
+    handle.includes('admin_motolegado') ||
+    email.includes('admin@motolegado') ||
+    role === 'admin' ||
+    clubRole.toLowerCase().includes('administrador')
+  );
 }
 
 export function buildGlobalRanking(options: BuildRankingOptions): {
@@ -414,11 +439,14 @@ export function buildGlobalRanking(options: BuildRankingOptions): {
     searchQuery = ''
   } = options;
 
-  // Usa estritamente os pilotos reais carregados do banco de dados MySQL na Hostinger
-  let pilotsList: Omit<LeaderboardPilot, 'rank'>[] = [...(realPilots || [])];
+  // Usa estritamente os pilotos reais carregados, excluindo qualquer usuário administrador
+  let pilotsList: Omit<LeaderboardPilot, 'rank'>[] = (realPilots || []).filter(p => !isAdministratorPilot(p));
 
-  // Insere ou atualiza o piloto atual SOMENTE se estiver autenticado no sistema
-  if (currentPilot && currentPilot.isAuthenticated) {
+  // O usuário "ADMINISTRADOR MOTOLEGADO" não participa da classificação do Ranking nem da lista
+  const isCurrentAdmin = currentPilot && isAdministratorPilot(currentPilot);
+
+  // Insere ou atualiza o piloto atual SOMENTE se estiver autenticado e NÃO for o Administrador
+  if (currentPilot && currentPilot.isAuthenticated && !isCurrentAdmin) {
     const existingIdx = pilotsList.findIndex(p => 
       (currentPilot.id && p.id === currentPilot.id) ||
       (currentPilot.email && p.handle === `@${currentPilot.email.split('@')[0]}`) ||

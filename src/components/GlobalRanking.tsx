@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getPilotLiveGamification } from '../lib/gamification';
-import { buildGlobalRanking } from '../lib/rankingData';
+import { buildGlobalRanking, isAdministratorPilot } from '../lib/rankingData';
 import { getPilotsFromHostinger } from '../lib/api';
 import { LeaderboardPilot, RankingSortBy, RankingPeriod } from '../types';
 import { cn } from '../lib/utils';
@@ -108,41 +108,43 @@ export function GlobalRanking() {
 
   const { pointsBreakdown, rankInfo, badges } = gamification;
 
-  // Mapeia pilotos reais do MySQL na Hostinger para o ranking
+  // Mapeia pilotos reais do MySQL na Hostinger para o ranking (excluindo qualquer conta de Administrador)
   const realCommunityPilots: Omit<LeaderboardPilot, 'rank'>[] = useMemo(() => {
-    return dbPilots.map((p) => {
-      const pName = p.name || 'Piloto MotoLegado';
-      const pAvatar = (p.avatar_url && !p.avatar_url.includes('56ceb5ecca61'))
-        ? p.avatar_url
-        : `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=ea580c&color=ffffff&bold=true`;
-      const pTier = p.tier || 'Bronze';
-      const pPoints = typeof p.points === 'number' ? p.points : 0;
-      return {
-        id: String(p.id),
-        name: pName,
-        handle: p.email ? `@${p.email.split('@')[0]}` : `@piloto_${String(p.id).slice(-4)}`,
-        avatar: pAvatar,
-        motoClub: p.club_name || 'Independente',
-        clubRole: p.role === 'admin' ? 'Comandante Geral' : 'Piloto Oficial',
-        motorcycle: p.motorcycle || 'Motocicleta Oficial',
-        city: p.city || 'Brasil',
-        state: p.state || 'BR',
-        totalPoints: pPoints,
-        totalKm: Math.round(pPoints * 0.8),
-        eventsCount: 0,
-        tripsCount: 0,
-        badgesCount: pPoints > 1000 ? 5 : (pPoints > 0 ? 1 : 0),
-        tierTitle: pTier,
-        tierIcon: pTier === 'Diamante' ? '💎' : pTier === 'Ouro' ? '🥇' : pTier === 'Prata' ? '🥈' : '🥉',
-        tierAccent: pTier === 'Diamante' ? '#38bdf8' : pTier === 'Ouro' ? '#eab308' : '#94a3b8',
-        isVerified: p.role === 'admin' || p.plan === 'pago' || p.plan === 'bonificado',
-        isPro: p.role === 'admin' || p.plan === 'pago' || p.plan === 'bonificado',
-        bio: p.bio || 'Piloto cadastrado no MotoLegado.',
-        joinedYear: p.created_at ? new Date(p.created_at).getFullYear() : 2026,
-        pointsTrend: 'same' as const,
-        rankChange: 0,
-      };
-    });
+    return dbPilots
+      .filter((p) => !isAdministratorPilot(p))
+      .map((p) => {
+        const pName = p.name || 'Piloto MotoLegado';
+        const pAvatar = (p.avatar_url && !p.avatar_url.includes('56ceb5ecca61'))
+          ? p.avatar_url
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=ea580c&color=ffffff&bold=true`;
+        const pTier = p.tier || 'Bronze';
+        const pPoints = typeof p.points === 'number' ? p.points : 0;
+        return {
+          id: String(p.id),
+          name: pName,
+          handle: p.email ? `@${p.email.split('@')[0]}` : `@piloto_${String(p.id).slice(-4)}`,
+          avatar: pAvatar,
+          motoClub: p.club_name || 'Independente',
+          clubRole: p.role === 'admin' ? 'Comandante Geral' : 'Piloto Oficial',
+          motorcycle: p.motorcycle || 'Motocicleta Oficial',
+          city: p.city || 'Brasil',
+          state: p.state || 'BR',
+          totalPoints: pPoints,
+          totalKm: Math.round(pPoints * 0.8),
+          eventsCount: 0,
+          tripsCount: 0,
+          badgesCount: pPoints > 1000 ? 5 : (pPoints > 0 ? 1 : 0),
+          tierTitle: pTier,
+          tierIcon: pTier === 'Diamante' ? '💎' : pTier === 'Ouro' ? '🥇' : pTier === 'Prata' ? '🥈' : '🥉',
+          tierAccent: pTier === 'Diamante' ? '#38bdf8' : pTier === 'Ouro' ? '#eab308' : '#94a3b8',
+          isVerified: p.plan === 'pago' || p.plan === 'bonificado',
+          isPro: p.plan === 'pago' || p.plan === 'bonificado',
+          bio: p.bio || 'Piloto cadastrado no MotoLegado.',
+          joinedYear: p.created_at ? new Date(p.created_at).getFullYear() : 2026,
+          pointsTrend: 'same' as const,
+          rankChange: 0,
+        };
+      });
   }, [dbPilots]);
 
   // Pilot details for the authenticated user
@@ -175,21 +177,27 @@ export function GlobalRanking() {
       tierAccent: rankInfo.currentTier.accentColor,
       isPro: profile?.plan_type === 'pago' || profile?.is_pro,
       bio: profile?.bio || 'Piloto na estrada acumulando quilômetros e histórias no asfalto.',
+      role: profile?.role,
     };
   }, [isAuthenticated, profile, user, pointsBreakdown, rankInfo, badges]);
 
-  // Build ranking
+  // Verifica se o usuário autenticado é o Administrador MotoLegado
+  const isCurrentAdmin = useMemo(() => {
+    return isAdministratorPilot(userPilotData) || profile?.role === 'admin';
+  }, [userPilotData, profile]);
+
+  // Build ranking (se for administrador, não participa da classificação)
   const { leaderboard, currentUserPosition, currentUserPilot, totalPilotsCount } = useMemo(() => {
     return buildGlobalRanking({
       realPilots: realCommunityPilots,
-      currentPilot: userPilotData || undefined,
+      currentPilot: isCurrentAdmin ? undefined : userPilotData || undefined,
       sortBy,
       period,
       stateFilter: selectedState,
       clubFilter: selectedClub,
       searchQuery,
     });
-  }, [realCommunityPilots, userPilotData, sortBy, period, selectedState, selectedClub, searchQuery]);
+  }, [realCommunityPilots, userPilotData, isCurrentAdmin, sortBy, period, selectedState, selectedClub, searchQuery]);
 
   // Top 3 Podium
   const top1 = leaderboard.length > 0 ? leaderboard[0] : null;
@@ -274,7 +282,40 @@ export function GlobalRanking() {
         </div>
       </div>
 
-      {/* 2. USER POSITION HIGHLIGHT CARD */}
+      {/* 2. USER POSITION HIGHLIGHT CARD OU BANNER ADMINISTRATIVO */}
+      {isCurrentAdmin && (
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl sm:rounded-3xl bg-slate-900/80 border border-amber-500/40 p-4 sm:p-6 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+              <Shield size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 flex items-center gap-1.5">
+                  <Sparkles size={12} /> MODO DE GESTÃO • ADMINISTRADOR MOTOLEGADO
+                </span>
+                <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[8px] font-black uppercase border border-amber-500/40">
+                  IMPARCIALIDADE
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                Conforme as regras do sistema, o <strong>Administrador MotoLegado</strong> não participa da classificação do Ranking nem é listado entre os pilotos ranqueados.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/command-center')}
+            className="btn-secondary py-2 px-3 text-xs font-bold uppercase self-start sm:self-auto shrink-0 border-amber-500/40 text-amber-400 hover:text-white"
+          >
+            Acessar Centro de Comando
+          </button>
+        </motion.div>
+      )}
+
       {currentUserPilot && (
         <motion.div 
           initial={{ opacity: 0, y: 15 }}

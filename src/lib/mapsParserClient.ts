@@ -113,22 +113,130 @@ export function guessStageType(name: string): 'fuel' | 'food' | 'scenic' | 'slee
   return 'scenic';
 }
 
+// Dicionário de coordenadas de cidades e regiões metropolitanas para cálculo offline/instantâneo de distâncias
+export const CLIENT_CITY_COORDS: Record<string, [number, number]> = {
+  // Rio Grande do Sul
+  'porto alegre': [-51.2177, -30.0346],
+  'porto alegre - rs': [-51.2177, -30.0346],
+  'independência, porto alegre': [-51.2120, -30.0290],
+  'av. independência, porto alegre': [-51.2120, -30.0290],
+  'independencia, porto alegre': [-51.2120, -30.0290],
+  'viamão': [-51.0242, -30.0811],
+  'viamão - rs': [-51.0242, -30.0811],
+  'viamao': [-51.0242, -30.0811],
+  'viamao - rs': [-51.0242, -30.0811],
+  'canoas': [-51.1837, -29.9179],
+  'canoas - rs': [-51.1837, -29.9179],
+  'gravataí': [-50.9922, -29.9439],
+  'gravatai': [-50.9922, -29.9439],
+  'alvorada': [-51.0825, -30.0028],
+  'novo hamburgo': [-51.1306, -29.6783],
+  'são leopoldo': [-51.1444, -29.7547],
+  'caxias do sul': [-51.1794, -29.1678],
+  'gramado': [-50.8736, -29.3789],
+  'canela': [-50.8128, -29.3639],
+  'bento gonçalves': [-51.5186, -29.1706],
+  'pelotas': [-52.3426, -31.7654],
+  'santa maria': [-53.8069, -29.6842],
+  'passo fundo': [-52.4067, -28.2628],
+  'torres': [-49.7269, -29.3361],
+  'capão da canoa': [-50.0344, -29.7456],
+
+  // Santa Catarina
+  'itajaí': [-48.6658, -26.9078],
+  'itajaí - sc': [-48.6658, -26.9078],
+  'itajai': [-48.6658, -26.9078],
+  'itajai - sc': [-48.6658, -26.9078],
+  'balneário camboriú': [-48.6353, -26.9926],
+  'balneario camboriu': [-48.6353, -26.9926],
+  'florianópolis': [-48.5496, -27.5954],
+  'florianopolis': [-48.5496, -27.5954],
+  'joinville': [-48.8464, -26.3045],
+  'blumenau': [-49.0661, -26.9194],
+  'pomerode': [-49.1764, -26.7408],
+  'brusque': [-48.9161, -27.0978],
+  'navegantes': [-48.6547, -26.8978],
+  'urubici': [-49.5919, -28.0150],
+  'bom jardim da serra': [-49.6278, -28.3386],
+  'são joaquim': [-49.9317, -28.2939],
+  'serra do rio do rastro': [-49.5500, -28.3833],
+
+  // Paraná
+  'curitiba': [-49.2731, -25.4284],
+  'curitiba - pr': [-49.2731, -25.4284],
+  'morretes': [-48.8339, -25.4744],
+  'antonina': [-48.7119, -25.4286],
+  'paranaguá': [-48.5225, -25.5205],
+  'ponta grossa': [-50.1619, -25.0994],
+  'foz do iguaçu': [-54.5854, -25.5163],
+  'londrina': [-51.1628, -23.3045],
+  'maringá': [-51.9331, -23.4205],
+
+  // São Paulo
+  'são paulo': [-46.6333, -23.5505],
+  'santos': [-46.3333, -23.9608],
+  'campos do jordão': [-45.5908, -22.7394],
+  'cunha': [-44.9583, -23.0767],
+  'ubatuba': [-45.0689, -23.4339],
+  'campinas': [-47.0608, -22.9099],
+  'ribeirão preto': [-47.8103, -21.1704],
+
+  // Rio de Janeiro
+  'rio de janeiro': [-43.1729, -22.9068],
+  'paraty': [-44.7136, -23.2178],
+  'petrópolis': [-43.1822, -22.5050],
+  'angra dos reis': [-44.3181, -23.0067],
+
+  // Minas Gerais
+  'belo horizonte': [-43.9378, -19.9208],
+  'ouro preto': [-43.5036, -20.3856],
+  'tiradentes': [-44.1758, -21.1108],
+
+  // Centro-Oeste / Nordeste
+  'brasília': [-47.9292, -15.7801],
+  'brasilia': [-47.9292, -15.7801],
+  'goiânia': [-49.2550, -16.6869],
+  'salvador': [-38.5108, -12.9714]
+};
+
+export function lookupCoords(text: string): [number, number] | null {
+  if (!text) return null;
+  const clean = text.toLowerCase().trim();
+  
+  // 1. Busca exata
+  if (CLIENT_CITY_COORDS[clean]) return CLIENT_CITY_COORDS[clean];
+
+  // 2. Busca por termo contido
+  for (const [key, coords] of Object.entries(CLIENT_CITY_COORDS)) {
+    if (clean.includes(key)) return coords;
+  }
+
+  // 3. Normalização de caracteres
+  const normalized = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  for (const [key, coords] of Object.entries(CLIENT_CITY_COORDS)) {
+    const keyNorm = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (normalized.includes(keyNorm)) return coords;
+  }
+
+  return null;
+}
+
 export function extractMetricsFromTextClient(text: string): { distanceKm: number | null; duration: string | null } {
   if (!text) return { distanceKm: null, duration: null };
   let distanceKm: number | null = null;
   let duration: string | null = null;
 
-  // 1. Extrai distância em KM (ex: "68,4 km", "68.4 km", "3,4 km", "185 km", "(68 km)")
+  // 1. Extrai distância em KM (ex: "22,8 km", "22.8 km", "3,4 km", "185 km", "(22,8 km)")
   const distMatch = text.match(/(?:^|[^\w])(\d+(?:[.,]\d+)?)\s*(?:km|kms|quilômetros|quilometros)\b/i);
   if (distMatch) {
     const rawVal = distMatch[1].replace(',', '.');
     const parsed = parseFloat(rawVal);
     if (!isNaN(parsed) && parsed > 0) {
-      distanceKm = parsed < 10 ? Math.round(parsed * 10) / 10 : Math.round(parsed);
+      distanceKm = Math.round(parsed * 10) / 10;
     }
   }
 
-  // 2. Extrai duração em Horas e Minutos
+  // 2. Extrai duração em Horas e Minutos (ex: "1 h 15 min", "1h 15min", "1h15m", "1 hora e 15 minutos")
   const hmMatch = text.match(/(\d+)\s*(?:h|hr|hrs|hora|horas)\s*(?:e\s*)?(\d+)?\s*(?:min|mins|minuto|minutos|m)?\b/i);
   if (hmMatch) {
     const hours = parseInt(hmMatch[1], 10);
@@ -139,6 +247,7 @@ export function extractMetricsFromTextClient(text: string): { distanceKm: number
         : `${mins}min`;
     }
   } else {
+    // Apenas minutos (ex: "35 min", "35min", "35 minutos")
     const mMatch = text.match(/(\d+)\s*(?:min|mins|minuto|minutos|m)\b/i);
     if (mMatch) {
       const mins = parseInt(mMatch[1], 10);
@@ -328,36 +437,34 @@ export function parseGoogleMapsRouteClient(urlOrText: string): ParsedRouteClient
         const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
         totalKm += 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       }
-      const roadKm = totalKm * 1.32;
-      result.estimatedDistanceKm = roadKm < 10 ? Math.round(roadKm * 10) / 10 : Math.round(roadKm);
+      const roadKm = totalKm * 1.25;
+      result.estimatedDistanceKm = Math.round(roadKm * 10) / 10;
     }
   }
 
-  // Se não foi extraída distância do texto ou coordenadas, calcula estimativa coerente
-  if (!result.estimatedDistanceKm) {
-    const normOrigin = (result.origin || '').toLowerCase();
-    const normDest = (result.destination || '').toLowerCase();
-    const isUrban = (normOrigin.includes('rio de janeiro') && normDest.includes('rio de janeiro')) ||
-      (normOrigin.includes('são paulo') && normDest.includes('são paulo')) ||
-      (normOrigin.includes('curitiba') && normDest.includes('curitiba')) ||
-      (normOrigin.includes('belo horizonte') && normDest.includes('belo horizonte'));
+  // Se não foi extraída distância do texto ou coordenadas da URL, busca cidades no dicionário offline
+  if (!result.estimatedDistanceKm && result.origin && result.destination) {
+    const cOrigin = lookupCoords(result.origin);
+    const cDest = lookupCoords(result.destination);
 
-    if (isUrban) {
-      result.estimatedDistanceKm = 5;
-      result.estimatedDuration = '15min';
-    } else {
-      const allPoints = [result.origin, ...result.waypoints, result.destination].filter(Boolean);
-      const legCount = Math.max(1, allPoints.length - 1);
-      result.estimatedDistanceKm = Math.round(legCount * 60);
+    if (cOrigin && cDest) {
+      const dLat = (cDest[1] - cOrigin[1]) * Math.PI / 180;
+      const dLon = (cDest[0] - cOrigin[0]) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(cOrigin[1] * Math.PI / 180) * Math.cos(cDest[1] * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      const totalKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const roadKm = Math.round(totalKm * 1.25 * 10) / 10;
+      result.estimatedDistanceKm = roadKm;
     }
   }
 
   if (!result.estimatedDuration && result.estimatedDistanceKm) {
-    const avgSpeed = result.estimatedDistanceKm < 20 ? 35 : 72;
+    const avgSpeed = result.estimatedDistanceKm < 35 ? 38 : 68;
     const totalMins = Math.round((result.estimatedDistanceKm / avgSpeed) * 60);
     const h = Math.floor(totalMins / 60);
     const m = totalMins % 60;
-    result.estimatedDuration = `${h}h ${m > 0 ? `${m}min` : '00min'}`.trim();
+    result.estimatedDuration = h > 0 
+      ? `${h}h ${m > 0 ? `${m}min` : '00min'}`.trim()
+      : `${totalMins}min`;
   }
 
   return result;

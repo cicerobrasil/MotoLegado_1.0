@@ -559,18 +559,32 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
             clearTimeout(timeoutId);
             targetUrl = response.url || targetUrl;
             responseHtml = await response.text();
+
+            if (responseHtml && (!targetUrl.includes('/dir/') && !targetUrl.includes('origin='))) {
+              const embeddedMatch = 
+                responseHtml.match(/<link\s+rel=["']canonical["']\s+href=["']([^"']+)["']/i)?.[1] ||
+                responseHtml.match(/<meta\s+property=["']og:url["']\s+content=["']([^"']+)["']/i)?.[1] ||
+                responseHtml.match(/<meta\s+property=["']al:web:url["']\s+content=["']([^"']+)["']/i)?.[1] ||
+                responseHtml.match(/content=["']\d+;\s*url=([^"']+)["']/i)?.[1] ||
+                responseHtml.match(/"(https:\/\/(?:www\.)?google\.[a-z.]+\/maps\/dir\/[^"]+)"/i)?.[1] ||
+                responseHtml.match(/"(https:\\\/\\\/www\.google\.com\\\/maps\\\/dir\\\/[^"]+)"/i)?.[1] ||
+                responseHtml.match(/href=["'](https:\/\/(?:www\.)?google\.[a-z.]+\/maps\/dir\/[^"']+)["']/i)?.[1];
+              if (embeddedMatch) {
+                targetUrl = embeddedMatch.replace(/\\\//g, '/');
+              }
+            }
           }
         } catch (fetchErr: any) {
           console.warn('[ParseMaps] Falha ao seguir redirecionamento automático:', fetchErr?.message || fetchErr);
         }
       }
 
-      // Se a URL final for de consentimento do Google (consent.google.com), extrai o parâmetro continue original
-      if (targetUrl && targetUrl.includes('consent.google.com') && targetUrl.includes('continue=')) {
+      // Se a URL final for de consentimento do Google ou redirecionamento intermediário
+      if (targetUrl && (targetUrl.includes('continue=') || targetUrl.includes('url=') || targetUrl.includes('q='))) {
         try {
           const consentUrl = new URL(targetUrl);
-          const cont = consentUrl.searchParams.get('continue');
-          if (cont) {
+          const cont = consentUrl.searchParams.get('continue') || consentUrl.searchParams.get('url') || consentUrl.searchParams.get('q');
+          if (cont && (cont.includes('maps') || cont.includes('/dir/'))) {
             targetUrl = decodeURIComponent(cont);
           }
         } catch {}
@@ -594,7 +608,7 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
         }
       }
 
-      if (!parsed.origin && !parsed.destination && parsed.waypoints.length === 0) {
+      if (!parsed.origin && !parsed.destination && parsed.waypoints.length === 0 && !parsed.estimatedDistanceKm && !parsed.estimatedDuration) {
         return res.status(422).json({
           success: false,
           error: 'Não foi possível identificar os pontos da rota. Certifique-se de colar um link de rota (direções/itinerário) do Google Maps ou descrever as paradas separadas por "->" (ex: Curitiba -> Morretes -> Antonina).',

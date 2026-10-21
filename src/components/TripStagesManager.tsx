@@ -164,7 +164,8 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
               ? res.data.estimatedDistanceKm 
               : parseFloat(String(res.data.estimatedDistanceKm).replace(',', '.'));
             if (!isNaN(num) && num > 0) {
-              const kmFormatted = num < 10 ? String(Math.round(num * 10) / 10).replace('.', ',') : String(Math.round(num));
+              const rounded = Math.round(num * 10) / 10;
+              const kmFormatted = rounded % 1 === 0 ? String(Math.round(rounded)) : String(rounded).replace('.', ',');
               setMapsDistance(kmFormatted);
             }
           }
@@ -386,7 +387,8 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
       if (!finalKmStr && rawKm !== undefined && rawKm !== null) {
         const num = typeof rawKm === 'number' ? rawKm : parseFloat(String(rawKm).replace(',', '.'));
         if (!isNaN(num) && num > 0) {
-          finalKmStr = num < 10 ? String(Math.round(num * 10) / 10).replace('.', ',') : String(Math.round(num));
+          const rounded = Math.round(num * 10) / 10;
+          finalKmStr = rounded % 1 === 0 ? String(Math.round(rounded)) : String(rounded).replace('.', ',');
         }
       }
 
@@ -736,7 +738,7 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
                   type="text"
                   value={mapsDistance}
                   onChange={(e) => setMapsDistance(e.target.value)}
-                  placeholder={isResolvingMetrics ? "Calculando..." : "Ex: 3,4 ou 85"}
+                  placeholder={isResolvingMetrics ? "Calculando..." : "Ex: 22,8"}
                   className={`w-full bg-slate-900 border rounded-lg px-3 py-2 text-xs font-mono outline-none transition-colors ${
                     mapsDistance 
                       ? 'border-emerald-500/50 bg-emerald-950/20 text-emerald-300 font-bold' 
@@ -765,7 +767,7 @@ export const TripStagesManager: React.FC<TripStagesManagerProps> = ({
                 type="text"
                 value={mapsDuration}
                 onChange={(e) => setMapsDuration(e.target.value)}
-                placeholder={isResolvingMetrics ? "Calculando..." : "Ex: 12 min ou 1h 29min"}
+                placeholder={isResolvingMetrics ? "Calculando..." : "Ex: 35 min ou 1h 15min"}
                 className={`w-full bg-slate-900 border rounded-lg px-3 py-2 text-xs font-mono outline-none transition-colors ${
                   mapsDuration 
                     ? 'border-emerald-500/50 bg-emerald-950/20 text-emerald-300 font-bold' 

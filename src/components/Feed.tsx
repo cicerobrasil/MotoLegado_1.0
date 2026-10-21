@@ -775,15 +775,19 @@ export function Feed() {
                       <span className="text-xs font-black uppercase tracking-wider">{post.likes}</span>
                     </button>
 
-                    {/* Comments Toggle */}
+                    {/* Comments Toggle Button */}
                     <button 
                       onClick={() => handleToggleComments(post.id)}
-                      className="flex items-center gap-2 text-slate-400 hover:text-amber-400 transition-colors group/btn"
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border group/btn",
+                        isCommentsExpanded
+                          ? "bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-sm shadow-amber-500/10"
+                          : "bg-slate-900/60 text-slate-400 border-slate-800 hover:text-amber-400 hover:border-amber-500/30"
+                      )}
+                      title={isCommentsExpanded ? "Ocultar comentários" : "Visualizar comentários e interagir"}
                     >
-                      <MessageSquare size={18} className="group-hover/btn:scale-110 transition-transform" />
-                      <span className="text-xs font-black uppercase tracking-wider">
-                        {post.comments} {post.comments === 1 ? 'Comentário' : 'Comentários'}
-                      </span>
+                      <MessageSquare size={16} className={cn("transition-transform group-hover/btn:scale-110", isCommentsExpanded ? "text-amber-400" : "text-slate-400")} />
+                      <span>COMENTÁRIO{post.comments > 0 ? ` (${post.comments})` : ''}</span>
                     </button>
                   </div>
 
@@ -791,7 +795,7 @@ export function Feed() {
                     {/* Share Button */}
                     <button 
                       onClick={() => handleSharePost(post)}
-                      className="p-2 text-slate-400 hover:text-white transition-colors"
+                      className="p-2 text-slate-400 hover:text-white transition-colors cursor-pointer"
                       title="Compartilhar"
                     >
                       <Share2 size={16} />
@@ -800,7 +804,7 @@ export function Feed() {
                     {/* Report Button */}
                     <button 
                       onClick={() => setReportingPost(post)}
-                      className="p-2 text-slate-500 hover:text-rose-400 transition-colors"
+                      className="p-2 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
                       title="Denunciar Publicação à Moderação"
                     >
                       <ShieldAlert size={16} />
@@ -808,7 +812,7 @@ export function Feed() {
                   </div>
                 </div>
 
-                {/* EXPANDED COMMENTS SECTION */}
+                {/* EXPANDED COMMENTS SECTION (Aparece estritamente quando o botão COMENTÁRIO é clicado) */}
                 <AnimatePresence>
                   {isCommentsExpanded && (
                     <motion.div 
@@ -817,9 +821,19 @@ export function Feed() {
                       exit={{ opacity: 0, height: 0 }}
                       className="bg-slate-950 border-t border-slate-800 p-6 space-y-4"
                     >
-                      <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        COMENTÁRIOS E INTERAÇÕES
-                      </h5>
+                      <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                        <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                          <MessageSquare size={14} className="text-amber-500" />
+                          COMENTÁRIOS E INTERAÇÕES {post.comments > 0 ? `(${post.comments})` : ''}
+                        </h5>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleComments(post.id)}
+                          className="text-[10px] font-bold text-slate-500 hover:text-white uppercase transition-colors cursor-pointer"
+                        >
+                          ✕ Fechar
+                        </button>
+                      </div>
 
                       {/* Comments List */}
                       <div className="space-y-3">

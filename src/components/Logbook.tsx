@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, ChangeEvent } from 'react';
 import { Send, Plus, Map, X, Compass, Calendar, Bike, MapPin, Clock, Cloud, CloudRain, Sun, Zap, Moon, Star, Sparkles, ArrowLeft, Camera, Loader2, Trash2, ClipboardCheck, BookOpen, FileDown, Navigation, ExternalLink, ShieldCheck, Layers, CheckCircle2, Filter, RotateCcw, TrendingUp, Pencil, Check, Wrench, Users, Tag, ChevronDown, CloudFog, Wind, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { uploadImageToStorage } from '../lib/storage';
@@ -303,8 +303,8 @@ export function sanitizeDistanceKm(val: string | number | undefined | null): str
   const match = s.match(/\d+(?:\.\d+)?/);
   if (!match) return '';
   const num = parseFloat(match[0]);
-  if (isNaN(num) || num <= 0) return '';
-  return num < 10 ? String(Math.round(num * 10) / 10).replace('.', ',') : String(Math.round(num));
+  const rounded = Math.round(num * 10) / 10;
+  return rounded % 1 === 0 ? String(Math.round(rounded)) : String(rounded).replace('.', ',');
 }
 
 /**
@@ -421,9 +421,18 @@ export function getDefaultStartPoint(profile?: any): string {
 
 export function Logbook() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'trips' | 'checklist'>('trips');
   const [isFormOpen, setIsFormOpen] = useState(false);
+
+  // Abre automaticamente a tela de novo registro quando acionado a partir dos botões do Dashboard
+  useEffect(() => {
+    if (location.state && (location.state as any).openNew) {
+      setIsFormOpen(true);
+      setEditingLogId(null);
+    }
+  }, [location.state]);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<UpgradeFeatureTrigger>('diario_ilimitado');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -1687,8 +1696,28 @@ export function Logbook() {
             </button>
           </div>
 
-          <div className="p-5 sm:p-8 md:p-10 space-y-6 sm:space-y-10">
-            {/* Route Selector (Auto-populates Title, Destination, Distance & Duration) */}
+          <div className="p-5 sm:p-8 md:p-10 space-y-6 sm:space-y-10 max-w-full overflow-x-hidden">
+            {/* 1. ETAPAS & PARADAS DO ROTEIRO (Importação do Google Maps e Linha do Tempo) */}
+            <div className="p-5 sm:p-7 rounded-2xl sm:rounded-3xl bg-slate-950/60 border border-slate-800/80 shadow-inner">
+              <TripStagesManager
+                origin={origin}
+                setOrigin={setOrigin}
+                destination={destination}
+                setDestination={setDestination}
+                stages={stages}
+                setStages={setStages}
+                setTitle={setTitle}
+                currentTitle={title}
+                onMapsUrlGenerated={(url) => setMapsUrl(url)}
+                setDistance={setDistance}
+                setDuration={setDuration}
+                currentDistance={distance}
+                currentDuration={duration}
+                currentMapsUrl={mapsUrl}
+              />
+            </div>
+
+            {/* 2. DADOS DO ROTEIRO (Recebe os dados da importação do Maps ou preenchimento manual) */}
             {availableRoutes.length > 0 && (
               <div className="space-y-2.5 p-4 sm:p-5 bg-gradient-to-r from-orange-500/10 via-slate-900/40 to-slate-900/60 border border-orange-500/30 rounded-2xl shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
@@ -1817,8 +1846,8 @@ export function Logbook() {
               </div>
             </div>
 
-            {/* Technical Data Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Technical Data Grid: Partida, Data, Moto Utilizada */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">LOCAL DE PARTIDA</label>
@@ -1876,7 +1905,10 @@ export function Logbook() {
                   />
                 </div>
               </div>
+            </div>
 
+            {/* Technical Data Grid: Destino Final, Distância Total (KM), Duração da Viagem */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">DESTINO FINAL</label>
                 <div className="relative">
@@ -1923,26 +1955,6 @@ export function Logbook() {
                   />
                 </div>
               </div>
-            </div>
-
-            {/* Gerenciador de Etapas e Paradas da Rota (com importação do Google Maps) */}
-            <div className="p-5 sm:p-7 rounded-2xl sm:rounded-3xl bg-slate-950/60 border border-slate-800/80 shadow-inner">
-              <TripStagesManager
-                origin={origin}
-                setOrigin={setOrigin}
-                destination={destination}
-                setDestination={setDestination}
-                stages={stages}
-                setStages={setStages}
-                setTitle={setTitle}
-                currentTitle={title}
-                onMapsUrlGenerated={(url) => setMapsUrl(url)}
-                setDistance={setDistance}
-                setDuration={setDuration}
-                currentDistance={distance}
-                currentDuration={duration}
-                currentMapsUrl={mapsUrl}
-              />
             </div>
 
             {/* Bloco de Condições: Período do Roteiro e Clima (Múltipla Seleção) */}

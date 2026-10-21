@@ -392,7 +392,7 @@ export function Dashboard() {
               )}
               <button
                 data-tour="dashboard-logbook"
-                onClick={() => navigate('/logbook')}
+                onClick={() => navigate('/logbook', { state: { openNew: true } })}
                 className="btn-primary w-full sm:w-auto self-start sm:self-center"
               >
                 <Plus size={15} />
@@ -621,8 +621,8 @@ export function Dashboard() {
           </div>
 
           <button
-            onClick={() => navigate('/logbook')}
-            className="mt-6 w-full py-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+            onClick={() => navigate('/logbook', { state: { openNew: true } })}
+            className="mt-6 w-full py-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             <Plus size={14} className="text-orange-500" />
             <span>Cadastrar Nova Aventura</span>
@@ -632,7 +632,7 @@ export function Dashboard() {
         {/* Painel Interativo de Métricas Recharts: Total de Quilometragem & Tempo Acumulado */}
         <RouteMetricsPanel 
           logs={logs} 
-          onNewTripClick={() => navigate('/logbook')} 
+          onNewTripClick={() => navigate('/logbook', { state: { openNew: true } })} 
         />
 
         {/* Checked In Events Section */}

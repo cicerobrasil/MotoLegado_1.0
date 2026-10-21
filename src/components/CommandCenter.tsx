@@ -77,7 +77,9 @@ interface MotoEvent {
   title: string;
   desc: string;
   time: string;
+  endTime?: string;
   date: string;
+  endDate?: string;
   location: string;
   distance?: number;
   category: string;
@@ -159,6 +161,7 @@ export function CommandCenter() {
   const [events, setEvents] = useState<MotoEvent[]>([]);
   const [eventFilter, setEventFilter] = useState<'pendente' | 'aprovado' | 'rejeitado' | 'todos'>('pendente');
   const [eventSearch, setEventSearch] = useState('');
+  const [eventDateFilter, setEventDateFilter] = useState('');
   const [editingEvent, setEditingEvent] = useState<MotoEvent | null>(null);
   const editEventFileInputRef = useRef<HTMLInputElement | null>(null);
   const addEventFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1343,7 +1346,11 @@ export function CommandCenter() {
       evt.location.toLowerCase().includes(eventSearch.toLowerCase()) ||
       (evt.createdBy || '').toLowerCase().includes(eventSearch.toLowerCase());
 
-    return matchesFilter && matchesSearch;
+    const matchesDate = !eventDateFilter.trim() || 
+      evt.date.toLowerCase().includes(eventDateFilter.trim().toLowerCase()) ||
+      (evt.endDate && evt.endDate.toLowerCase().includes(eventDateFilter.trim().toLowerCase()));
+
+    return matchesFilter && matchesSearch && matchesDate;
   });
 
   if (loading) {
@@ -1690,16 +1697,47 @@ export function CommandCenter() {
             </div>
 
             {/* Controls Bar */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <div className="relative flex-1 max-w-md">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  type="text"
-                  placeholder="Buscar evento por título, local ou autor..."
-                  value={eventSearch}
-                  onChange={(e) => setEventSearch(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-[#ff751f] transition-all placeholder:text-slate-400"
-                />
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 max-w-xl">
+                <div className="relative flex-1">
+                  <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    placeholder="Buscar evento por título, local ou autor..."
+                    value={eventSearch}
+                    onChange={(e) => setEventSearch(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-10 pr-8 text-xs font-bold text-white outline-none focus:border-[#ff751f] transition-all placeholder:text-slate-400"
+                  />
+                  {eventSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setEventSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filtro de Data */}
+                <div className="relative min-w-[170px] sm:w-48">
+                  <DateInput
+                    value={eventDateFilter}
+                    onChange={(newDate) => setEventDateFilter(newDate)}
+                    placeholder="Filtrar por data..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 pl-3 pr-8 text-xs font-bold text-white outline-none focus:border-[#ff751f] transition-all placeholder:text-slate-400 font-mono"
+                  />
+                  {eventDateFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setEventDateFilter('')}
+                      title="Limpar data"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-400 cursor-pointer"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -4258,15 +4296,40 @@ export function CommandCenter() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Categoria</label>
-                    <input
-                      type="text"
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Categoria do Evento (Sugestões Pré-Definidas)
+                    </label>
+                    <select
                       value={editingEvent.category}
                       onChange={(e) => setEditingEvent({ ...editingEvent, category: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none cursor-pointer"
                       required
-                    />
+                    >
+                      <option value="Geral">Geral (Confraternizações & Passeios em Geral)</option>
+                      <option value="Festas & Encontros">Festas & Encontros (Shows, Churrascos, Feiras & Aniversários)</option>
+                      <option value="On-Road">On-Road (Asfalto, Rodovias e Serras Pavimentadas)</option>
+                      <option value="Off-Road">Off-Road (Terra, Trilha e Rali)</option>
+                      <option value="Misto">Misto (Asfalto + Terra / Terrenos Variados)</option>
+                    </select>
+                    {/* Botões Rápidos com as Categorias Pré-Sugeridas */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {['Geral', 'Festas & Encontros', 'On-Road', 'Off-Road', 'Misto'].map(cat => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setEditingEvent({ ...editingEvent, category: cat })}
+                          className={cn(
+                            "px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer border",
+                            editingEvent.category === cat 
+                              ? "bg-amber-500 text-slate-950 border-amber-400 font-black shadow-sm" 
+                              : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
+                          )}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="space-y-1">
@@ -4283,27 +4346,15 @@ export function CommandCenter() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Localização</label>
-                    <input
-                      type="text"
-                      value={editingEvent.location}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Distância Percurso (KM)</label>
-                    <input
-                      type="number"
-                      value={editingEvent.distance}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, distance: Number(e.target.value) })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Localização do Evento</label>
+                  <input
+                    type="text"
+                    value={editingEvent.location}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
+                    required
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -4401,24 +4452,40 @@ export function CommandCenter() {
                     </div>
                   ) : (
                     /* Caso não haja imagem cadastrada, mostre o campo de upload de arquivo */
-                    <div 
-                      onClick={() => editEventFileInputRef.current?.click()}
-                      className="border-2 border-dashed border-slate-700 hover:border-amber-500/60 rounded-2xl p-6 text-center bg-slate-900/40 hover:bg-amber-500/5 transition-all cursor-pointer group flex flex-col items-center justify-center space-y-2.5"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-slate-800 group-hover:bg-amber-500/20 border border-slate-700 group-hover:border-amber-500/40 flex items-center justify-center transition-all shadow-md">
-                        <Upload size={20} className="text-slate-400 group-hover:text-amber-400" />
+                    <div className="space-y-3">
+                      <div 
+                        onClick={() => editEventFileInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-700 hover:border-amber-500/60 rounded-2xl p-6 text-center bg-slate-900/40 hover:bg-amber-500/5 transition-all cursor-pointer group flex flex-col items-center justify-center space-y-2.5"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-slate-800 group-hover:bg-amber-500/20 border border-slate-700 group-hover:border-amber-500/40 flex items-center justify-center transition-all shadow-md">
+                          <Upload size={20} className="text-slate-400 group-hover:text-amber-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-wider text-slate-200 group-hover:text-amber-300">
+                            Fazer Upload de Imagem do Dispositivo
+                          </p>
+                          <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                            Clique aqui para escolher um arquivo JPG, PNG ou WebP até 10MB
+                          </p>
+                        </div>
+                        <span className="text-[9px] font-black text-amber-400 bg-amber-950/80 border border-amber-500/40 px-3.5 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
+                          Escolher Arquivo do Computador/Celular
+                        </span>
                       </div>
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-wider text-slate-200 group-hover:text-amber-300">
-                          Nenhuma Imagem Cadastrada
-                        </p>
-                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">
-                          Clique para fazer upload do arquivo de imagem do seu computador ou celular
-                        </p>
+
+                      {/* Ou informar URL direta */}
+                      <div className="space-y-1.5 pt-1">
+                        <label className="text-[9px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                          <LinkIcon size={12} className="text-amber-400" /> Ou informe a URL da Imagem de Capa:
+                        </label>
+                        <input
+                          type="url"
+                          placeholder="https://exemplo.com/imagem-do-evento.jpg"
+                          value={editingEvent.image || ''}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, image: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-amber-500 placeholder:text-slate-500"
+                        />
                       </div>
-                      <span className="text-[9px] font-black text-amber-400 bg-amber-950/80 border border-amber-500/40 px-3.5 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
-                        Escolher Arquivo de Imagem
-                      </span>
                     </div>
                   )}
 
@@ -4446,20 +4513,45 @@ export function CommandCenter() {
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-800">
                   <button
                     type="button"
                     onClick={() => setEditingEvent(null)}
-                    className="px-5 py-3 rounded-xl bg-slate-800 text-slate-300 text-xs font-black uppercase hover:bg-slate-700"
+                    className="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-800 text-slate-300 text-xs font-black uppercase hover:bg-slate-700 cursor-pointer"
                   >
                     Cancelar
                   </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black uppercase shadow-lg shadow-amber-600/20"
-                  >
-                    Salvar Alterações
-                  </button>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+                    <button
+                      type="submit"
+                      className="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-black uppercase transition-colors cursor-pointer border border-slate-700"
+                    >
+                      Salvar Alterações
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!editingEvent) return;
+                        const approved: MotoEvent = { 
+                          ...editingEvent, 
+                          status: 'aprovado',
+                          distance: 0
+                        };
+                        const updated = events.map(evt => evt.id === approved.id ? approved : evt);
+                        saveEvents(updated);
+                        clientDbService.events.save(approved).catch(() => {});
+                        clientDbService.events.updateStatus(approved.id, 'aprovado').catch(() => {});
+                        addAuditLog(`Evento "${approved.title}" EDITADO & APROVADO pelo Administrador`);
+                        showToast("Evento atualizado e APROVADO com sucesso no sistema!", "success");
+                        setEditingEvent(null);
+                      }}
+                      className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer active:scale-95"
+                    >
+                      <ShieldCheck size={16} /> Salvar & Aprovar Evento
+                    </button>
+                  </div>
                 </div>
               </form>
             </motion.div>
@@ -5281,6 +5373,20 @@ export function CommandCenter() {
                     <label className="text-[10px] font-black uppercase text-slate-400">Horário:</label>
                     <input type="text" value={newEventData.time || '14:00'} onChange={e => setNewEventData({ ...newEventData, time: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-bold" />
                   </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400">Categoria do Evento:</label>
+                  <select 
+                    value={newEventData.category || 'Geral'} 
+                    onChange={e => setNewEventData({ ...newEventData, category: e.target.value as any })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-bold cursor-pointer"
+                  >
+                    <option value="Geral">Geral (Confraternizações & Passeios em Geral)</option>
+                    <option value="Festas & Encontros">Festas & Encontros (Shows, Churrascos, Feiras & Aniversários)</option>
+                    <option value="On-Road">On-Road (Asfalto, Rodovias e Serras Pavimentadas)</option>
+                    <option value="Off-Road">Off-Road (Terra, Trilha e Rali)</option>
+                    <option value="Misto">Misto (Asfalto + Terra / Terrenos Variados)</option>
+                  </select>
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase text-slate-400">Localização / Cidade:</label>

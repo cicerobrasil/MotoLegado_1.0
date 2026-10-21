@@ -25,7 +25,8 @@ import {
   Star,
   ShieldCheck,
   Globe,
-  Lock
+  Lock,
+  Camera
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -65,7 +66,8 @@ export interface Partner {
   location: string;
   discount: string; // e.g., "15% de desconto em customizações de escapamento"
   news: string; // Latest update/news
-  image: string; // Beautiful unsplash presentation banner or uploaded logo/photo
+  image: string; // Logomarca enviada pelo parceiro
+  photos?: string[]; // Até 4 fotos do estabelecimento apresentadas 2 por linha
   corporateContact?: string; // Nome do Contato/Setor Corporativo
   phone: string; // Telefone Corporativo
   whatsapp?: string; // WhatsApp Corporativo
@@ -77,15 +79,6 @@ export interface Partner {
   posts?: PartnerPost[];
   status?: 'aprovado' | 'pendente' | 'rejeitado';
 }
-
-const PRESETS_IMAGE = [
-  "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&q=80&w=600",
-  "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&q=80&w=600",
-  "https://images.unsplash.com/photo-1542718610-a1d656d1884c?auto=format&fit=crop&q=80&w=600",
-  "https://images.unsplash.com/photo-1521485950395-bcfb8fc9bc06?auto=format&fit=crop&q=80&w=600",
-  "https://images.unsplash.com/photo-1527018601619-a508a2be00cd?auto=format&fit=crop&q=80&w=600",
-  "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&q=80&w=600"
-];
 
 const CATEGORIES: Partner['category'][] = [
   "Bar e Point",
@@ -104,6 +97,7 @@ export function Partners() {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photosInputRef = useRef<HTMLInputElement>(null);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [activeTab, setActiveTab] = useState<'browse' | 'register'>('browse');
   const [selectedCategory, setSelectedCategory] = useState<Partner['category'] | 'Todos'>('Todos');
@@ -122,7 +116,8 @@ export function Partners() {
   const [formPhone, setFormPhone] = useState('');
   const [formWhatsapp, setFormWhatsapp] = useState('');
   const [formWebsite, setFormWebsite] = useState('');
-  const [formImage, setFormImage] = useState(PRESETS_IMAGE[0]);
+  const [formImage, setFormImage] = useState<string>(''); // Imagem da Logomarca
+  const [formPhotos, setFormPhotos] = useState<string[]>([]); // Até 4 fotos do estabelecimento
   const [formManagerName, setFormManagerName] = useState('');
   const [formManagerPhone, setFormManagerPhone] = useState('');
 
@@ -196,11 +191,52 @@ export function Partners() {
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {
           setFormImage(reader.result);
-          triggerToast("Foto/Logomarca carregada com sucesso!", "success");
+          triggerToast("Logomarca carregada com sucesso!", "success");
         }
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  // Upload de até 4 fotos do estabelecimento
+  const handlePhotosUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remainingSlots = 4 - formPhotos.length;
+    if (remainingSlots <= 0) {
+      triggerToast("Limite atingido: você já adicionou 4 fotos do estabelecimento.", "info");
+      return;
+    }
+
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    const newPhotos: string[] = [];
+
+    let processedCount = 0;
+    filesToProcess.forEach(file => {
+      if (file.size > 5 * 1024 * 1024) {
+        triggerToast(`Foto "${file.name}" ultrapassou 5MB e foi ignorada.`, "info");
+        processedCount++;
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          newPhotos.push(reader.result);
+        }
+        processedCount++;
+        if (processedCount === filesToProcess.length) {
+          setFormPhotos(prev => [...prev, ...newPhotos].slice(0, 4));
+          triggerToast(`${newPhotos.length} foto(s) do estabelecimento adicionada(s)!`, "success");
+          if (photosInputRef.current) photosInputRef.current.value = '';
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setFormPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleRegisterPartner = (e: FormEvent) => {
@@ -210,6 +246,11 @@ export function Partners() {
       return;
     }
 
+    const fallbackLogo = formPhotos.length > 0 
+      ? formPhotos[0] 
+      : 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&q=80&w=600';
+    const finalLogo = formImage.trim() || fallbackLogo;
+
     const managerName = formManagerName.trim() || "Piloto Responsável";
     const managerPhone = formManagerPhone.trim() || formWhatsapp || formPhone || "(41) 98877-6655";
 
@@ -218,7 +259,7 @@ export function Partners() {
         id: "post_init_" + Date.now(),
         author: {
           name: managerName,
-          photo: formImage,
+          photo: finalLogo,
           role: "Responsável",
           isOwner: true
         },
@@ -237,7 +278,8 @@ export function Partners() {
       mapUrl: formMapUrl.trim() || undefined,
       discount: formDiscount,
       news: formNews || "Nenhuma novidade no momento. Faça-nos uma visita de moto!",
-      image: formImage,
+      image: finalLogo,
+      photos: formPhotos,
       corporateContact: formCorporateContact.trim() || undefined,
       phone: formPhone || "(41) 3333-0000",
       whatsapp: formWhatsapp || formPhone || "(41) 99999-9999",
@@ -247,7 +289,7 @@ export function Partners() {
       status: 'pendente', // Requires moderation authorization in CommandCenter
       responsible: {
         name: managerName,
-        avatar: formImage,
+        avatar: finalLogo,
         phone: managerPhone,
         whatsapp: managerPhone
       },
@@ -270,7 +312,8 @@ export function Partners() {
     setFormWebsite('');
     setFormManagerName('');
     setFormManagerPhone('');
-    setFormImage(PRESETS_IMAGE[Math.floor(Math.random() * PRESETS_IMAGE.length)]);
+    setFormImage('');
+    setFormPhotos([]);
     
     // Switch back to view list
     setActiveTab('browse');
@@ -404,12 +447,25 @@ export function Partners() {
             className="space-y-6"
           >
             {/* Search and Category filters */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-slate-900/10 p-3 sm:p-4 border border-slate-800/40 rounded-2xl sm:rounded-3xl backdrop-blur-sm">
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full md:w-auto">
+            <div className="space-y-4 bg-slate-900/40 p-4 sm:p-5 border border-slate-800/60 rounded-2xl sm:rounded-3xl backdrop-blur-sm shadow-inner">
+              {/* Linha 1: Campo de Busca com largura total */}
+              <div className="relative group w-full">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar descontos, cidades ou nomes de estabelecimentos..." 
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3.5 pl-12 pr-6 text-xs sm:text-sm font-bold focus:border-orange-500 focus:bg-slate-900/60 outline-none transition-all w-full text-white placeholder:text-slate-400 shadow-inner"
+                />
+              </div>
+
+              {/* Linha 2: Botões de Tipos de Parceiros */}
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full pt-1">
                 <button
                   onClick={() => setSelectedCategory('Todos')}
                   className={cn(
-                    "text-[11px] sm:text-xs py-1.5 sm:py-2 px-3 sm:px-4 shrink-0",
+                    "text-[11px] sm:text-xs py-2 px-3.5 sm:px-4.5 rounded-xl font-black uppercase tracking-wider transition-all cursor-pointer shrink-0 border",
                     selectedCategory === 'Todos' ? "btn-filter-active" : "btn-filter-inactive"
                   )}
                 >
@@ -420,24 +476,13 @@ export function Partners() {
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
                     className={cn(
-                      "text-[11px] sm:text-xs py-1.5 sm:py-2 px-3 sm:px-4 shrink-0",
+                      "text-[11px] sm:text-xs py-2 px-3.5 sm:px-4.5 rounded-xl font-black uppercase tracking-wider transition-all cursor-pointer shrink-0 border",
                       selectedCategory === cat ? "btn-filter-active" : "btn-filter-inactive"
                     )}
                   >
                     {cat}
                   </button>
                 ))}
-              </div>
-
-              <div className="relative group w-full md:w-80 shrink-0">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" size={16} />
-                <input 
-                  type="text" 
-                  placeholder="Buscar descontos, cidades ou nomes..." 
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-12 pr-6 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400"
-                />
               </div>
             </div>
 
@@ -462,11 +507,17 @@ export function Partners() {
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/200 to-transparent" />
                     
                     {/* Category Overlay tag */}
-                    <div className="absolute top-4 left-4 flex gap-2">
+                    <div className="absolute top-4 left-4 flex flex-wrap gap-2">
                       <span className="text-[8px] font-black text-white px-3 py-1 bg-slate-950/80 backdrop-blur-md rounded-full uppercase tracking-[0.2em] border border-slate-800 flex items-center gap-1.5">
                         {getCategoryIcon(pt.category)}
                         {pt.category.toUpperCase()}
                       </span>
+                      {pt.photos && pt.photos.length > 0 && (
+                        <span className="text-[8px] font-black text-slate-200 px-2.5 py-1 bg-slate-950/80 backdrop-blur-md rounded-full uppercase tracking-wider border border-slate-800 flex items-center gap-1">
+                          <Camera size={10} className="text-orange-500" />
+                          {pt.photos.length} {pt.photos.length === 1 ? 'FOTO' : 'FOTOS'}
+                        </span>
+                      )}
                     </div>
 
                     {/* Highly Recommended Badge or Rating */}
@@ -817,81 +868,164 @@ export function Partners() {
               </button>
             </form>
 
-            {/* Side column for Uploading Logo / Photo & Preset Selection */}
-            <div className="lg:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-[2.5rem] p-8 md:p-10 flex flex-col justify-between space-y-6">
+            {/* Side column for Uploading Logo & Establishment Photos */}
+            <div className="lg:col-span-4 bg-slate-900/40 border border-slate-800/60 rounded-[2.5rem] p-6 sm:p-8 md:p-10 flex flex-col justify-between space-y-6">
               <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <ImageIcon size={18} className="text-orange-500" />
-                  <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">Logomarca / Foto</h3>
+                
+                {/* 1. SEÇÃO LOGOMARCA */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <ImageIcon size={18} className="text-orange-500" />
+                    <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">Logomarca do Parceiro</h3>
+                  </div>
+
+                  {/* Upload File Input Button */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                      Upload da Logomarca Oficial:
+                    </label>
+                    
+                    <input 
+                      type="file" 
+                      ref={fileInputRef}
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full p-4 bg-slate-950 border-2 border-dashed border-orange-500/40 hover:border-orange-500 rounded-2xl flex flex-col items-center justify-center gap-2 group transition-all cursor-pointer text-center"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Upload size={20} />
+                      </div>
+                      <span className="text-xs font-black uppercase text-orange-400 tracking-wider">
+                        {formImage ? "Substituir Logomarca" : "Enviar Logomarca"}
+                      </span>
+                      <span className="text-[9px] text-slate-500 font-bold">
+                        Formatos: PNG, JPG, WEBP (Até 5MB)
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Pré-visualização da Logomarca */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
+                      Pré-visualização do Parceiro:
+                    </label>
+                    {formImage ? (
+                      <div className="aspect-video rounded-2xl overflow-hidden border-2 border-orange-500 shadow-xl relative bg-slate-950 flex items-center justify-center p-2 group">
+                        <img 
+                          src={formImage} 
+                          className="w-full h-full object-contain" 
+                          alt="Logomarca do Parceiro" 
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent flex items-end justify-between p-3 opacity-90 group-hover:opacity-100 transition-opacity">
+                          <span className="text-[9px] font-black uppercase text-orange-400 tracking-widest flex items-center gap-1.5 bg-slate-950/80 px-2.5 py-1 rounded-lg border border-orange-500/30">
+                            <Check size={12} className="text-emerald-400" /> Logomarca Ativa
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setFormImage('')}
+                            className="px-2 py-1 bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-200 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 transition-all"
+                            title="Remover Logomarca"
+                          >
+                            <X size={10} /> Remover
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="aspect-video rounded-2xl border-2 border-dashed border-slate-800 bg-slate-950/60 flex flex-col items-center justify-center p-4 text-center space-y-2">
+                        <Store size={28} className="text-slate-700" />
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                            Nenhuma Logomarca Enviada
+                          </p>
+                          <p className="text-[8px] text-slate-600 font-bold uppercase tracking-wider mt-0.5">
+                            Faça o upload para exibir sua marca no perfil
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Upload File Input Button / Area */}
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
-                    Upload de Foto / Logomarca do Parceiro:
-                  </label>
-                  
+                {/* 2. SEÇÃO FOTOS DO ESTABELECIMENTO (ATÉ 4 FOTOS - 2 POR LINHA) */}
+                <div className="space-y-4 pt-4 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Camera size={16} className="text-orange-500" />
+                      <h4 className="text-sm font-black uppercase italic tracking-wider text-white">
+                        Fotos do Estabelecimento
+                      </h4>
+                    </div>
+                    <span className="text-[9px] font-mono font-black uppercase text-orange-400 bg-orange-950/50 px-2 py-0.5 rounded-md border border-orange-500/20">
+                      {formPhotos.length}/4 fotos
+                    </span>
+                  </div>
+
+                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                    Envie até 4 fotos do local (apresentadas 2 por linha):
+                  </p>
+
                   <input 
                     type="file" 
-                    ref={fileInputRef}
+                    ref={photosInputRef}
+                    multiple
                     accept="image/*"
-                    onChange={handleFileUpload}
+                    onChange={handlePhotosUpload}
                     className="hidden"
                   />
 
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full p-5 bg-slate-950 border-2 border-dashed border-orange-500/40 hover:border-orange-500 rounded-2xl flex flex-col items-center justify-center gap-2 group transition-all cursor-pointer text-center"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Upload size={20} />
-                    </div>
-                    <span className="text-xs font-black uppercase text-orange-400 tracking-wider">
-                      Enviar Logomarca ou Foto
-                    </span>
-                    <span className="text-[9px] text-slate-500 font-bold">
-                      Formatos: PNG, JPG, WEBP (Até 5MB)
-                    </span>
-                  </button>
-                </div>
-
-                {/* Selected Image Preview */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">
-                    Pré-visualização do Parceiro:
-                  </label>
-                  <div className="aspect-video rounded-2xl overflow-hidden border-2 border-orange-500 shadow-xl relative bg-slate-950">
-                    <img src={formImage} className="w-full h-full object-cover" alt="Preview da Logomarca" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-3">
-                      <span className="text-[9px] font-black uppercase text-orange-400 tracking-widest flex items-center gap-1.5">
-                        <Check size={12} /> Logomarca Ativa
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Preset Options as alternative */}
-                <div className="space-y-3">
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider leading-relaxed">
-                    Ou selecione um preset de imagem:
-                  </p>
-
-                  <div className="grid grid-cols-3 gap-3">
-                    {PRESETS_IMAGE.map((url, i) => (
+                  {/* Grid de Fotos: 2 por linha */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {formPhotos.map((photo, idx) => (
                       <div 
-                        key={i}
-                        onClick={() => setFormImage(url)}
-                        className={cn(
-                          "aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all relative group",
-                          formImage === url ? "border-orange-500 scale-105 shadow-xl shadow-orange-600/10" : "border-transparent opacity-60 hover:opacity-100"
-                        )}
+                        key={idx}
+                        className="aspect-video rounded-xl overflow-hidden border border-slate-700 bg-slate-950 relative group shadow-lg"
                       >
-                        <img src={url} className="w-full h-full object-cover" alt={`Preset ${i+1}`} />
+                        <img 
+                          src={photo} 
+                          className="w-full h-full object-cover" 
+                          alt={`Foto do Estabelecimento ${idx + 1}`} 
+                        />
+                        <div className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-slate-950/80 backdrop-blur-xs rounded-md text-[8px] font-black uppercase text-white border border-slate-800">
+                          Foto {idx + 1}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePhoto(idx)}
+                          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-600/90 hover:bg-red-500 text-white flex items-center justify-center shadow-lg transition-transform hover:scale-110 cursor-pointer"
+                          title="Remover Foto"
+                        >
+                          <X size={12} />
+                        </button>
                       </div>
                     ))}
+
+                    {/* Botão de Adicionar Foto (se menos de 4) */}
+                    {formPhotos.length < 4 && (
+                      <button
+                        type="button"
+                        onClick={() => photosInputRef.current?.click()}
+                        className="aspect-video rounded-xl border-2 border-dashed border-orange-500/40 hover:border-orange-500 bg-slate-950/60 hover:bg-slate-900/80 flex flex-col items-center justify-center gap-1.5 p-3 group transition-all cursor-pointer text-center"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Plus size={16} />
+                        </div>
+                        <span className="text-[10px] font-black uppercase text-orange-400 tracking-wider">
+                          Adicionar Foto
+                        </span>
+                        <span className="text-[8px] text-slate-500 font-bold uppercase">
+                          ({4 - formPhotos.length} restante{4 - formPhotos.length > 1 ? 's' : ''})
+                        </span>
+                      </button>
+                    )}
                   </div>
                 </div>
+
               </div>
 
               <div className="bg-slate-950 border border-slate-800/80 p-5 rounded-2xl text-slate-500 mt-6 lg:mt-0">
@@ -1133,6 +1267,42 @@ export function Partners() {
                       <p className="text-xs text-slate-300 italic font-medium leading-relaxed bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800">
                         "{selectedPartner.news}"
                       </p>
+                    </div>
+                  )}
+
+                  {/* FOTOS DO ESTABELECIMENTO (2 POR LINHA) */}
+                  {selectedPartner.photos && selectedPartner.photos.length > 0 && (
+                    <div className="space-y-3 pt-3 border-t border-slate-800/80">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Camera size={16} className="text-orange-500" />
+                          <h4 className="text-xs sm:text-sm font-black italic uppercase text-white tracking-wider">
+                            FOTOS DO ESTABELECIMENTO
+                          </h4>
+                        </div>
+                        <span className="text-[9px] font-mono font-black uppercase text-orange-400 bg-orange-950/50 px-2 py-0.5 rounded-md border border-orange-500/20">
+                          {selectedPartner.photos.length} {selectedPartner.photos.length === 1 ? 'Foto' : 'Fotos'} (2 por linha)
+                        </span>
+                      </div>
+                      
+                      {/* Grid de Fotos: exatamente 2 por linha */}
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedPartner.photos.map((photoUrl, pIdx) => (
+                          <div 
+                            key={pIdx} 
+                            className="aspect-video rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 relative group shadow-lg"
+                          >
+                            <img 
+                              src={photoUrl} 
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                              alt={`${selectedPartner.name} - Foto ${pIdx + 1}`} 
+                            />
+                            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-slate-950/85 backdrop-blur-xs text-[8px] font-black uppercase text-slate-300 tracking-wider border border-slate-800">
+                              Foto {pIdx + 1}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

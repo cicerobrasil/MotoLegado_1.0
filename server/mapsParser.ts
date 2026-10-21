@@ -35,7 +35,7 @@ export function extractMetricsFromText(text: string): { distanceKm: number | nul
     const rawVal = distMatch[1].replace(',', '.');
     const parsed = parseFloat(rawVal);
     if (!isNaN(parsed) && parsed > 0) {
-      distanceKm = parsed < 10 ? Math.round(parsed * 10) / 10 : Math.round(parsed);
+      distanceKm = Math.round(parsed * 10) / 10;
     }
   }
 
@@ -371,11 +371,11 @@ export async function calculateRouteDistanceAndDuration(
   destination: string,
   waypoints: string[] = [],
   precomputedCoords?: Array<[number, number]>
-): Promise<{ distanceKm: number; duration: string }> {
+): Promise<{ distanceKm: number; duration: string } | null> {
   const allLocations = [origin, ...waypoints, destination].map(s => s.trim()).filter(Boolean);
   
   if (allLocations.length < 2 && (!precomputedCoords || precomputedCoords.length < 2)) {
-    return { distanceKm: 120, duration: '2h 00min' };
+    return null;
   }
 
   try {
@@ -469,7 +469,7 @@ export async function calculateRouteDistanceAndDuration(
           const seconds = routeData.routes[0].duration;
 
           const distanceRaw = meters / 1000;
-          const distanceKm = distanceRaw < 10 ? Math.round(distanceRaw * 10) / 10 : Math.round(distanceRaw);
+          const distanceKm = Math.round(distanceRaw * 10) / 10;
           const totalMinutes = Math.max(1, Math.round(seconds / 60));
           const hours = Math.floor(totalMinutes / 60);
           const minutes = totalMinutes % 60;
@@ -488,10 +488,10 @@ export async function calculateRouteDistanceAndDuration(
         totalHaversine += haversineDistanceKm(validCoords[i], validCoords[i + 1]);
       }
       if (totalHaversine > 0) {
-        const roadRaw = totalHaversine * 1.28;
-        const roadKm = roadRaw < 10 ? Math.round(roadRaw * 10) / 10 : Math.round(roadRaw);
-        // Velocidade média em motocicleta de turismo com paradas (~72 km/h ou ~35 km/h se urbano)
-        const avgSpeed = roadKm < 20 ? 35 : 72;
+        const roadRaw = totalHaversine * 1.25;
+        const roadKm = Math.round(roadRaw * 10) / 10;
+        // Velocidade média em motocicleta de turismo com paradas (~68 km/h ou ~38 km/h se urbano)
+        const avgSpeed = roadKm < 35 ? 38 : 68;
         const totalMin = Math.round((roadKm / avgSpeed) * 60);
         const h = Math.floor(totalMin / 60);
         const m = totalMin % 60;
@@ -505,33 +505,8 @@ export async function calculateRouteDistanceAndDuration(
     console.warn('[RouteCalculator] Erro no cálculo OSRM:', err);
   }
 
-  // Verifica se é deslocamento urbano/metropolitano (mesma cidade ou bairro)
-  const normOrigin = (origin || '').toLowerCase();
-  const normDest = (destination || '').toLowerCase();
-  const isUrbanTrip = (normOrigin.includes('rio de janeiro') && normDest.includes('rio de janeiro')) ||
-    (normOrigin.includes('são paulo') && normDest.includes('são paulo')) ||
-    (normOrigin.includes('curitiba') && normDest.includes('curitiba')) ||
-    (normOrigin.includes('belo horizonte') && normDest.includes('belo horizonte')) ||
-    (normOrigin.includes('porto alegre') && normDest.includes('porto alegre'));
-
-  if (isUrbanTrip) {
-    return {
-      distanceKm: 5,
-      duration: '15min'
-    };
-  }
-
-  // Fallback baseado em estimativa coerente para viagens intermunicipais
-  const legCount = Math.max(1, allLocations.length - 1);
-  const fallbackKm = Math.round(legCount * 60);
-  const fallbackTotalMin = Math.round((fallbackKm / 70) * 60);
-  const h = Math.floor(fallbackTotalMin / 60);
-  const m = fallbackTotalMin % 60;
-
-  return {
-    distanceKm: fallbackKm,
-    duration: `${h}h ${m > 0 ? `${m}min` : '15min'}`.trim()
-  };
+  // Se não foi possível geocodificar com precisão, retorna null para não injetar valores falsos
+  return null;
 }
 
 export function parseGoogleMapsRoute(urlOrText: string, originalInput?: string): ParsedRouteResult {

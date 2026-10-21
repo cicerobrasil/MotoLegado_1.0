@@ -189,7 +189,7 @@ export const generateCategorySvgCover = (category: string) => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
-const DEFAULT_FALLBACK_IMAGE = generateCategorySvgCover("Geral");
+const DEFAULT_FALLBACK_IMAGE = "https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&q=80&w=800";
 
 const CATEGORY_TAGS = ["Todos", "Geral", "Festas & Encontros", "On-Road", "Off-Road", "Misto"];
 
@@ -449,6 +449,11 @@ export function Events() {
       return;
     }
 
+    if (!formData.image.trim()) {
+      triggerToast("Por favor, adicione uma Imagem de Capa para o evento através de Upload ou URL da Imagem!", "info");
+      return;
+    }
+
     if (isSubmitting) return;
     setIsSubmitting(true);
 
@@ -472,9 +477,9 @@ export function Events() {
         time: formattedTime,
         endTime: formData.endTime.trim() || undefined,
         location: formData.location.trim(),
-        distance: formData.distance === '' ? 0 : Number(formData.distance),
+        distance: 0,
         category: formData.category,
-        image: formData.image.trim() || DEFAULT_FALLBACK_IMAGE,
+        image: formData.image.trim(),
         checkedIn: true, // Auto check-in upon event creation
         memberCount: 1,
         status: 'pendente',
@@ -688,27 +693,15 @@ export function Events() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Localização</label>
-                    <input
-                      type="text"
-                      value={editingEvent.location}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Distância Percurso (KM)</label>
-                    <input
-                      type="number"
-                      value={editingEvent.distance}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, distance: Number(e.target.value) })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Localização</label>
+                  <input
+                    type="text"
+                    value={editingEvent.location}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:border-amber-500 outline-none"
+                    required
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -992,15 +985,67 @@ export function Events() {
       {/* FILTER AND SEARCH CONTROLS */}
       {activeTab !== 'criar' && (
         <div className="space-y-3">
-          <div className="flex flex-col lg:flex-row gap-3.5 justify-between items-stretch lg:items-center bg-slate-900/30 p-3.5 sm:p-4 border border-slate-800/60 rounded-2xl sm:rounded-3xl backdrop-blur-sm shadow-inner">
-            {/* Categories Selector */}
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <div className="space-y-3.5 bg-slate-900/30 p-3.5 sm:p-5 border border-slate-800/60 rounded-2xl sm:rounded-3xl backdrop-blur-sm shadow-inner">
+            
+            {/* Linha 1: Campo de Busca e Filtro por Data */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+              
+              {/* Campo de Busca */}
+              <div className="relative group md:col-span-7 lg:col-span-8">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar eventos por título, local ou detalhes..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-12 pr-9 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400 shadow-inner"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Filtro por Data */}
+              <div className="relative md:col-span-5 lg:col-span-4">
+                <div className="relative">
+                  <DateInput 
+                    value={selectedDateFilter}
+                    onChange={(newDate) => setSelectedDateFilter(newDate)}
+                    placeholder="Filtrar por data (DD/MM/AAAA)..."
+                    className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-4 pr-12 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400 font-mono shadow-inner"
+                  />
+                  {selectedDateFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDateFilter('')}
+                      title="Limpar filtro de data"
+                      className="absolute right-10 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Linha 2: Botões de Tipos e Categorias de Eventos */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pt-2 border-t border-slate-800/60">
+              <span className="text-[10px] font-black uppercase text-slate-500 mr-1 hidden sm:inline">
+                Categorias:
+              </span>
               {CATEGORY_TAGS.map((tag) => (
                 <button
                   key={tag}
                   onClick={() => setSelectedCategory(tag)}
                   className={cn(
-                    "text-[11px] sm:text-xs py-1.5 sm:py-2 px-3 sm:px-4 shrink-0 transition-all rounded-xl font-bold",
+                    "text-[11px] sm:text-xs py-1.5 sm:py-2 px-3 sm:px-4 shrink-0 transition-all rounded-xl font-bold cursor-pointer border",
                     selectedCategory === tag ? "btn-filter-active" : "btn-filter-inactive"
                   )}
                 >
@@ -1009,49 +1054,6 @@ export function Events() {
               ))}
             </div>
 
-            {/* Inputs: Date Filter & Search Box */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
-              {/* Date Filter */}
-              <div className="relative min-w-[190px] sm:w-52">
-                <DateInput 
-                  value={selectedDateFilter}
-                  onChange={(newDate) => setSelectedDateFilter(newDate)}
-                  placeholder="Filtrar por data..."
-                  className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-4 pr-12 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400 font-mono"
-                />
-                {selectedDateFilter && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDateFilter('')}
-                    title="Limpar filtro de data"
-                    className="absolute right-10 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-
-              {/* Search Box */}
-              <div className="relative group w-full sm:w-64 md:w-72">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" size={16} />
-                <input 
-                  type="text" 
-                  placeholder="Buscar título, local..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-12 pr-9 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400"
-                />
-                {searchTerm && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Active Filter Chips */}
@@ -1572,21 +1574,7 @@ export function Events() {
                 </div>
               </div>
 
-              {/* 8. DISTÂNCIA ESTIMADA (KM) */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">
-                  Distância Estimada (KM) <span className="text-slate-600 font-normal">(0 para festas e encontros estáticos no local)</span>
-                </label>
-                <input 
-                  type="number" 
-                  placeholder="Ex: 0 (evento estático) ou 140 (passeio/comboio)"
-                  value={formData.distance}
-                  onChange={(e) => setFormData({...formData, distance: e.target.value})}
-                  className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 text-white" 
-                />
-              </div>
-
-              {/* 9. PROGRAMAÇÃO / DETALHES / ATRAÇÕES */}
+              {/* PROGRAMAÇÃO / DETALHES / ATRAÇÕES */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">
                   Programação / Detalhes / Atrações
@@ -1630,35 +1618,46 @@ export function Events() {
                   )}
                 </div>
 
-                {/* CURRENT COVER PREVIEW */}
-                <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 aspect-video group shadow-inner">
-                  <img 
-                    src={formData.image || DEFAULT_FALLBACK_IMAGE} 
-                    alt="Pré-visualização da Capa" 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = DEFAULT_FALLBACK_IMAGE;
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
-                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-300 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-700/50">
-                      {formData.image ? (coverSource === 'upload' ? "Imagem por Upload" : "Imagem por URL") : "Capa Padrão (Sem foto custom)"}
-                    </span>
-                    {formData.image && (
+                {/* CURRENT COVER PREVIEW - SEM SUGESTÃO GERAL, APENAS UPLOAD OU URL */}
+                {formData.image ? (
+                  <div className="relative rounded-2xl overflow-hidden border-2 border-orange-500/70 bg-slate-950 aspect-video group shadow-inner">
+                    <img 
+                      src={formData.image} 
+                      alt="Pré-visualização da Capa" 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
+                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-orange-400 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-lg border border-orange-500/30 flex items-center gap-1.5 shadow-md">
+                        <Check size={11} className="text-emerald-400" />
+                        {coverSource === 'upload' ? "Capa por Upload" : "Capa por URL"}
+                      </span>
                       <button 
                         type="button"
                         onClick={handleResetCover}
                         title="Remover imagem personalizada"
-                        className="p-1.5 bg-slate-900/90 hover:bg-rose-600 text-slate-300 hover:text-white rounded-lg transition-colors border border-slate-700/50 cursor-pointer"
+                        className="p-1.5 bg-slate-900/90 hover:bg-rose-600 text-slate-300 hover:text-white rounded-lg transition-colors border border-slate-700/50 cursor-pointer shadow-md"
                       >
                         <X size={12} />
                       </button>
-                    )}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="relative rounded-2xl border-2 border-dashed border-slate-800 bg-slate-950/60 aspect-video flex flex-col items-center justify-center p-5 text-center space-y-2">
+                    <div className="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
+                      <Camera size={22} className="text-orange-500/80" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-black uppercase text-slate-300 tracking-wider">
+                        Nenhuma Capa Definida
+                      </p>
+                      <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
+                        Carregue por Upload ou informe a URL da Imagem abaixo
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* TAB SWITCHER: UPLOAD vs URL */}
                 <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
