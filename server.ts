@@ -29,6 +29,7 @@ import {
   storeApprovePaymentRequest
 } from './server/store';
 import { parseGoogleMapsRoute, calculateRouteDistanceAndDuration, extractMetricsFromText } from './server/mapsParser';
+import { sanitizeInputsMiddleware } from './server/sanitizer';
 
 async function startServer() {
   const app = express();
@@ -40,6 +41,8 @@ async function startServer() {
 
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+  // Camada global de sanitização contra injeção de scripts maliciosos (XSS)
+  app.use(sanitizeInputsMiddleware);
 
   // Armazenamento local de uploads no próprio servidor Hostinger / VPS
   const uploadsDir = path.join(process.cwd(), 'uploads');

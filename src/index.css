@@ -864,3 +864,24 @@ input:-webkit-autofill:active {
   -webkit-text-fill-color: #e2e8f0 !important;
   transition: background-color 5000s ease-in-out 0s;
 }
+
+/* Indicador visual de clique para expansão em lightbox para fotos do sistema */
+.bento-card img,
+.partner-card img,
+article img,
+[data-card-title] img,
+img[data-zoomable="true"],
+.zoomable-image,
+.logbook-photo,
+.partner-photo,
+.event-photo {
+  cursor: zoom-in !important;
+  transition: transform 0.3s ease, filter 0.2s ease;
+}
+
+.bento-card img:hover,
+.partner-card img:hover,
+img[data-zoomable="true"]:hover {
+  filter: brightness(1.05);
+}
+

@@ -36,7 +36,21 @@ export function sanitizePilot(pilot: any) {
 // 1. Endpoint de Cadastro Real com Suporte Híbrido Resiliente (MySQL Hostinger + Armazenamento Local)
 export async function handleRegister(req: Request, res: Response) {
   try {
-    const { email, password, name, motorcycle, phone } = req.body;
+    const { 
+      email, 
+      password, 
+      name, 
+      motorcycle, 
+      phone,
+      blood_type,
+      bloodType,
+      emergency_contact,
+      emergencyContact,
+      emergency_phone,
+      emergencyPhone,
+      health_notes,
+      healthNotes
+    } = req.body;
 
     if (!email || !password || !name) {
       return res.status(400).json({ 
@@ -54,6 +68,10 @@ export async function handleRegister(req: Request, res: Response) {
 
     const cleanEmail = email.toLowerCase().trim();
     const cleanName = name.trim();
+    const cleanBloodType = (blood_type || bloodType || '').trim();
+    const cleanEmergencyContact = (emergency_contact || emergencyContact || '').trim();
+    const cleanEmergencyPhone = (emergency_phone || emergencyPhone || '').trim();
+    const cleanHealthNotes = (health_notes || healthNotes || '').trim();
 
     // 1. Verificar se o e-mail já existe no armazenamento local ou MySQL
     const localExisting = storeGetPilotByEmail(cleanEmail);
@@ -63,13 +81,28 @@ export async function handleRegister(req: Request, res: Response) {
       localExisting.password_hash = newHash;
       if (cleanName) localExisting.name = cleanName;
       if (motorcycle) localExisting.motorcycle = motorcycle;
+      if (phone) localExisting.phone = phone;
+      if (cleanBloodType) localExisting.blood_type = cleanBloodType;
+      if (cleanEmergencyContact) localExisting.emergency_contact = cleanEmergencyContact;
+      if (cleanEmergencyPhone) localExisting.emergency_phone = cleanEmergencyPhone;
+      if (cleanHealthNotes) localExisting.health_notes = cleanHealthNotes;
       localExisting.updated_at = new Date().toISOString();
 
       const updated = storeSavePilot(localExisting);
 
       safeMySqlQuery(
-        'UPDATE pilots SET password_hash = ?, name = ?, motorcycle = ? WHERE LOWER(email) = ?',
-        [newHash, cleanName, motorcycle || null, cleanEmail]
+        'UPDATE pilots SET password_hash = ?, name = ?, motorcycle = ?, phone = ?, blood_type = ?, emergency_contact = ?, emergency_phone = ?, health_notes = ? WHERE LOWER(email) = ?',
+        [
+          newHash, 
+          cleanName, 
+          motorcycle || null, 
+          phone || null, 
+          cleanBloodType || null, 
+          cleanEmergencyContact || null, 
+          cleanEmergencyPhone || null, 
+          cleanHealthNotes || null, 
+          cleanEmail
+        ]
       ).catch(() => {});
 
       return res.status(200).json({
@@ -98,6 +131,10 @@ export async function handleRegister(req: Request, res: Response) {
       name: cleanName,
       motorcycle: motorcycle || '',
       phone: phone || '',
+      blood_type: cleanBloodType || undefined,
+      emergency_contact: cleanEmergencyContact || undefined,
+      emergency_phone: cleanEmergencyPhone || undefined,
+      health_notes: cleanHealthNotes || undefined,
       role,
       plan,
       tier,
@@ -108,12 +145,16 @@ export async function handleRegister(req: Request, res: Response) {
     // 3. Tentar persistência no MySQL se disponível (sem travar se estiver offline ou em container)
     safeMySqlQuery(`
       INSERT INTO pilots (
-        id, email, password_hash, name, motorcycle, phone, role, plan, tier, points, avatar_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, email, password_hash, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone, health_notes, role, plan, tier, points, avatar_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         name = VALUES(name),
         motorcycle = VALUES(motorcycle),
         phone = VALUES(phone),
+        blood_type = VALUES(blood_type),
+        emergency_contact = VALUES(emergency_contact),
+        emergency_phone = VALUES(emergency_phone),
+        health_notes = VALUES(health_notes),
         password_hash = VALUES(password_hash)
     `, [
       id, 
@@ -122,6 +163,10 @@ export async function handleRegister(req: Request, res: Response) {
       cleanName, 
       motorcycle || null, 
       phone || null, 
+      cleanBloodType || null,
+      cleanEmergencyContact || null,
+      cleanEmergencyPhone || null,
+      cleanHealthNotes || null,
       role, 
       plan, 
       tier, 

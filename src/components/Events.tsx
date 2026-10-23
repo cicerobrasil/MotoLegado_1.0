@@ -32,6 +32,7 @@ import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
 import { DateInput } from './DateInput';
 import { clientDbService } from '../lib/dbService';
+import { eventSchema, validateWithZod } from '../lib/validationSchemas';
 
 // Helper to format date cleanly
 function formatDisplayDate(dateStr?: string) {
@@ -57,31 +58,37 @@ function normalizeDateStr(d?: string): string {
   return trimmed;
 }
 
-function matchesEventDate(evtDate?: string, evtEndDate?: string, filterDate?: string): boolean {
-  if (!filterDate || !filterDate.trim()) return true;
+function matchesEventDateRange(evtDate?: string, evtEndDate?: string, filterStart?: string, filterEnd?: string): boolean {
+  if (!filterStart?.trim() && !filterEnd?.trim()) return true;
   if (!evtDate) return false;
 
-  const target = normalizeDateStr(filterDate);
-  const start = normalizeDateStr(evtDate);
-  const end = normalizeDateStr(evtEndDate);
+  const fStart = normalizeDateStr(filterStart);
+  const fEnd = normalizeDateStr(filterEnd);
+  const eStart = normalizeDateStr(evtDate);
+  const eEnd = normalizeDateStr(evtEndDate) || eStart;
 
-  if (!target) return true;
-
-  // Match exato na data inicial
-  if (start === target) return true;
-
-  // Evento com intervalo de datas [start, end]
-  if (start && end && target >= start && target <= end) {
-    return true;
+  // Se ambas as datas do período foram preenchidas
+  if (fStart && fEnd) {
+    const minF = fStart <= fEnd ? fStart : fEnd;
+    const maxF = fStart <= fEnd ? fEnd : fStart;
+    return eStart <= maxF && eEnd >= minF;
   }
 
-  // Fallback para correspondência textual
-  const normFilter = filterDate.trim().toLowerCase();
-  if (evtDate.toLowerCase().includes(normFilter) || (evtEndDate && evtEndDate.toLowerCase().includes(normFilter))) {
-    return true;
+  // Apenas data de início: eventos que terminam ou ocorrem a partir desta data
+  if (fStart) {
+    return eEnd >= fStart;
   }
 
-  return false;
+  // Apenas data de fim: eventos que iniciam até esta data
+  if (fEnd) {
+    return eStart <= fEnd;
+  }
+
+  return true;
+}
+
+function matchesEventDate(evtDate?: string, evtEndDate?: string, filterDate?: string): boolean {
+  return matchesEventDateRange(evtDate, evtEndDate, filterDate, filterDate);
 }
 
 // Core Event Interface
@@ -211,7 +218,8 @@ export function Events() {
   };
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
-  const [selectedDateFilter, setSelectedDateFilter] = useState('');
+  const [selectedStartDateFilter, setSelectedStartDateFilter] = useState('');
+  const [selectedEndDateFilter, setSelectedEndDateFilter] = useState('');
   const [showToast, setShowToast] = useState<{message: string, type: 'success' | 'info'} | null>(null);
   const [selectedEventDetails, setSelectedEventDetails] = useState<MotoEvent | null>(null);
 
@@ -487,6 +495,14 @@ export function Events() {
         createdAt: new Date().toISOString().split('T')[0]
       };
 
+      // Validação rigorosa com Zod no cliente
+      const validation = validateWithZod(eventSchema, newEvent);
+      if (!validation.success) {
+        triggerToast(validation.error, "info");
+        setIsSubmitting(false);
+        return;
+      }
+
       // 1. Atualização atômica funcional de estado para gravação imediata
       setEvents(prevEvents => {
         const next = [newEvent, ...prevEvents.filter(ev => ev.id !== newEvent.id)];
@@ -549,7 +565,7 @@ export function Events() {
       evt.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
       evt.desc.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'Todos' || evt.category === selectedCategory;
-    const matchesDate = matchesEventDate(evt.date, evt.endDate, selectedDateFilter);
+    const matchesDate = matchesEventDateRange(evt.date, evt.endDate, selectedStartDateFilter, selectedEndDateFilter);
     return matchesSearch && matchesCategory && matchesDate;
   });
 
@@ -560,7 +576,7 @@ export function Events() {
       evt.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
       evt.desc.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'Todos' || evt.category === selectedCategory;
-    const matchesDate = matchesEventDate(evt.date, evt.endDate, selectedDateFilter);
+    const matchesDate = matchesEventDateRange(evt.date, evt.endDate, selectedStartDateFilter, selectedEndDateFilter);
     return matchesSearch && matchesCategory && matchesDate;
   });
 
@@ -987,11 +1003,11 @@ export function Events() {
         <div className="space-y-3">
           <div className="space-y-3.5 bg-slate-900/30 p-3.5 sm:p-5 border border-slate-800/60 rounded-2xl sm:rounded-3xl backdrop-blur-sm shadow-inner">
             
-            {/* Linha 1: Campo de Busca e Filtro por Data */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+            {/* Linha 1: Campo de Busca e Filtro por Período (Data Início e Data Fim) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
               
               {/* Campo de Busca */}
-              <div className="relative group md:col-span-7 lg:col-span-8">
+              <div className="relative group lg:col-span-5">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-orange-500 transition-colors" size={16} />
                 <input 
                   type="text" 
@@ -1011,23 +1027,44 @@ export function Events() {
                 )}
               </div>
 
-              {/* Filtro por Data */}
-              <div className="relative md:col-span-5 lg:col-span-4">
+              {/* Filtro por Período: Data Início e Data Fim */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 lg:col-span-7">
+                {/* Data Início */}
                 <div className="relative">
                   <DateInput 
-                    value={selectedDateFilter}
-                    onChange={(newDate) => setSelectedDateFilter(newDate)}
-                    placeholder="Filtrar por data (DD/MM/AAAA)..."
-                    className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-4 pr-12 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400 font-mono shadow-inner"
+                    value={selectedStartDateFilter}
+                    onChange={(newDate) => setSelectedStartDateFilter(newDate)}
+                    placeholder="Data Início (DD/MM/AAAA)..."
+                    className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-4 pr-11 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400 font-mono shadow-inner"
                   />
-                  {selectedDateFilter && (
+                  {selectedStartDateFilter && (
                     <button
                       type="button"
-                      onClick={() => setSelectedDateFilter('')}
-                      title="Limpar filtro de data"
-                      className="absolute right-10 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+                      onClick={() => setSelectedStartDateFilter('')}
+                      title="Limpar data início"
+                      className="absolute right-9 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
                     >
-                      <X size={14} />
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Data Fim */}
+                <div className="relative">
+                  <DateInput 
+                    value={selectedEndDateFilter}
+                    onChange={(newDate) => setSelectedEndDateFilter(newDate)}
+                    placeholder="Data Fim (DD/MM/AAAA)..."
+                    className="bg-slate-950 border border-slate-800/80 rounded-2xl py-3 pl-4 pr-11 text-xs font-bold focus:border-orange-500 focus:bg-slate-900/40 outline-none transition-all w-full text-white placeholder:text-slate-400 font-mono shadow-inner"
+                  />
+                  {selectedEndDateFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEndDateFilter('')}
+                      title="Limpar data fim"
+                      className="absolute right-9 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-rose-400 hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <X size={13} />
                     </button>
                   )}
                 </div>
@@ -1057,20 +1094,27 @@ export function Events() {
           </div>
 
           {/* Active Filter Chips */}
-          {(selectedDateFilter || selectedCategory !== 'Todos' || searchTerm) && (
+          {(selectedStartDateFilter || selectedEndDateFilter || selectedCategory !== 'Todos' || searchTerm) && (
             <div className="flex flex-wrap items-center gap-2 px-1">
               <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1">
                 Filtros ativos:
               </span>
-              {selectedDateFilter && (
+              {(selectedStartDateFilter || selectedEndDateFilter) && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[11px] font-bold font-mono">
                   <Calendar size={12} className="text-orange-500" />
-                  Data: {formatDisplayDate(selectedDateFilter)}
+                  {selectedStartDateFilter && selectedEndDateFilter
+                    ? `Período: ${formatDisplayDate(selectedStartDateFilter)} até ${formatDisplayDate(selectedEndDateFilter)}`
+                    : selectedStartDateFilter
+                      ? `A partir de: ${formatDisplayDate(selectedStartDateFilter)}`
+                      : `Até: ${formatDisplayDate(selectedEndDateFilter)}`}
                   <button 
                     type="button" 
-                    onClick={() => setSelectedDateFilter('')} 
+                    onClick={() => {
+                      setSelectedStartDateFilter('');
+                      setSelectedEndDateFilter('');
+                    }} 
                     className="hover:text-white ml-0.5 text-orange-400 hover:bg-orange-500/20 rounded-full p-0.5 cursor-pointer"
-                    title="Remover filtro de data"
+                    title="Remover filtro de período"
                   >
                     <X size={12} />
                   </button>
@@ -1103,7 +1147,8 @@ export function Events() {
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedDateFilter('');
+                  setSelectedStartDateFilter('');
+                  setSelectedEndDateFilter('');
                   setSelectedCategory('Todos');
                   setSearchTerm('');
                 }}

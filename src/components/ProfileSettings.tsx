@@ -25,13 +25,17 @@ import {
   Sparkles,
   KeyRound,
   Eye,
-  EyeOff
+  EyeOff,
+  HeartPulse,
+  Droplet,
+  PhoneCall
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { uploadImageToStorage } from '../lib/storage';
+import { pilotProfileSchema, changePasswordSchema, validateWithZod } from '../lib/validationSchemas';
 
 export function ProfileSettings() {
   const navigate = useNavigate();
@@ -56,6 +60,10 @@ export function ProfileSettings() {
   const [name, setName] = useState(profile?.name || '');
   const [email, setEmail] = useState(profile?.email || '');
   const [phone, setPhone] = useState(profile?.phone || '');
+  const [bloodType, setBloodType] = useState(profile?.blood_type || profile?.bloodType || '');
+  const [emergencyContact, setEmergencyContact] = useState(profile?.emergency_contact || profile?.emergencyContact || '');
+  const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergency_phone || profile?.emergencyPhone || '');
+  const [healthNotes, setHealthNotes] = useState(profile?.health_notes || profile?.healthNotes || '');
   const [bio, setBio] = useState(profile?.bio || '');
   const [city, setCity] = useState(profile?.city || '');
   const [state, setState] = useState(profile?.state || '');
@@ -126,6 +134,10 @@ export function ProfileSettings() {
       setName(profile.name || '');
       setEmail(profile.email || '');
       setPhone(profile.phone || '');
+      setBloodType(profile.blood_type || profile.bloodType || '');
+      setEmergencyContact(profile.emergency_contact || profile.emergencyContact || '');
+      setEmergencyPhone(profile.emergency_phone || profile.emergencyPhone || '');
+      setHealthNotes(profile.health_notes || profile.healthNotes || '');
       setBio(profile.bio || '');
       setCity(profile.city || '');
       setState(profile.state || '');
@@ -434,6 +446,26 @@ export function ProfileSettings() {
   };
 
   const handleSave = async () => {
+    // Validação rigorosa com Zod no cliente
+    const validation = validateWithZod(pilotProfileSchema, {
+      name,
+      email,
+      phone,
+      bio,
+      city,
+      state,
+      motorcycle,
+      avatar_url: profilePhoto,
+      bloodType,
+      emergencyContact,
+      emergencyPhone,
+      healthNotes,
+    });
+    if (!validation.success) {
+      showToast(validation.error, 'error');
+      return;
+    }
+
     setIsSaving(true);
     setSaveSuccess(false);
 
@@ -443,6 +475,14 @@ export function ProfileSettings() {
         email,
         phone,
         bio,
+        blood_type: bloodType,
+        bloodType: bloodType,
+        emergency_contact: emergencyContact,
+        emergencyContact: emergencyContact,
+        emergency_phone: emergencyPhone,
+        emergencyPhone: emergencyPhone,
+        health_notes: healthNotes,
+        healthNotes: healthNotes,
         city,
         state,
         cep,
@@ -512,6 +552,16 @@ export function ProfileSettings() {
     }
     if (newPassword !== confirmNewPassword) {
       setPasswordChangeError('As novas senhas não coincidem.');
+      return;
+    }
+
+    const validation = validateWithZod(changePasswordSchema, {
+      pilot_id: profile?.id || user?.id || 'pilot',
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    if (!validation.success) {
+      setPasswordChangeError(validation.error);
       return;
     }
 
@@ -751,6 +801,108 @@ export function ProfileSettings() {
                     placeholder="Escreva um resumo sobre suas viagens e sua paixão por duas rodas..."
                     className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-5 text-sm font-bold focus:border-orange-500 outline-none transition-all placeholder:text-slate-400 backdrop-blur-sm text-white resize-none"
                   />
+                </div>
+              </div>
+
+              {/* DADOS VITAIS & CONTATOS DE EMERGÊNCIA (CARD ID / SOCORRO EM ACIDENTE) */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400">
+                      <HeartPulse size={16} />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black uppercase italic tracking-wider text-white flex items-center gap-2">
+                        <span>Dados Vitais & Contatos de Emergência</span>
+                        <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400">
+                          Card ID Oficial
+                        </span>
+                      </h3>
+                      <p className="text-[10px] text-slate-400">
+                        Informações médicas essenciais e contato para socorro imediato por equipes de resgate (SAMU / Rodovias).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Tipo Sanguíneo */}
+                  <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-2 group">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1 flex items-center gap-1.5 group-hover:text-red-400 transition-colors">
+                      <Droplet size={12} className="text-red-400" />
+                      Tipo Sanguíneo
+                    </label>
+                    <select
+                      value={bloodType}
+                      onChange={(e) => setBloodType(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 text-sm font-bold focus:border-red-500 outline-none transition-all text-white cursor-pointer"
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="A+">A+ (Positivo)</option>
+                      <option value="A-">A- (Negativo)</option>
+                      <option value="B+">B+ (Positivo)</option>
+                      <option value="B-">B- (Negativo)</option>
+                      <option value="AB+">AB+ (Positivo)</option>
+                      <option value="AB-">AB- (Negativo)</option>
+                      <option value="O+">O+ (Positivo)</option>
+                      <option value="O-">O- (Negativo)</option>
+                      <option value="Não informado">Não informado</option>
+                    </select>
+                  </div>
+
+                  {/* Nome do Contato de Emergência */}
+                  <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-2 group">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1 flex items-center gap-1.5 group-hover:text-amber-400 transition-colors">
+                      <User size={12} className="text-amber-400" />
+                      Contato de Emergência
+                    </label>
+                    <input 
+                      type="text"
+                      placeholder="Ex: Mariana (Esposa)"
+                      value={emergencyContact}
+                      onChange={(e) => setEmergencyContact(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 text-sm font-bold focus:border-amber-500 outline-none transition-all text-white placeholder:text-slate-600"
+                    />
+                  </div>
+
+                  {/* Telefone de Emergência */}
+                  <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-2 group">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1 flex items-center gap-1.5 group-hover:text-amber-400 transition-colors">
+                      <PhoneCall size={12} className="text-amber-400" />
+                      Telefone de Emergência
+                    </label>
+                    <input 
+                      type="text"
+                      placeholder="(00) 00000-0000"
+                      value={emergencyPhone}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/\D/g, '');
+                        let formatted = raw;
+                        if (raw.length > 2) formatted = `(${raw.substring(0, 2)}) ${raw.substring(2)}`;
+                        if (raw.length > 7) formatted = `(${raw.substring(0, 2)}) ${raw.substring(2, 7)}-${raw.substring(7, 11)}`;
+                        setEmergencyPhone(formatted.substring(0, 15));
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 text-sm font-bold focus:border-amber-500 outline-none transition-all text-white placeholder:text-slate-600"
+                    />
+                  </div>
+
+                  {/* Condições de Saúde / Ficha Médica em Acidente */}
+                  <div className="bento-card border-slate-800/60 bg-slate-900/40 space-y-2 group md:col-span-3">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1 flex items-center gap-1.5 group-hover:text-red-400 transition-colors">
+                      <HeartPulse size={12} className="text-red-400" />
+                      Condições de Saúde / Observações Relevantes em Caso de Acidente
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={healthNotes}
+                      onChange={(e) => setHealthNotes(e.target.value)}
+                      placeholder="Ex: Alérgico a penicilina e dipirona; Hipertenso; Placa metálica com parafusos no rádio esquerdo; Medicamento de uso diário: Losartana 50mg."
+                      className="w-full bg-slate-950 border border-slate-800/50 rounded-2xl p-4 text-sm font-bold focus:border-red-500 outline-none transition-all text-white placeholder:text-slate-600 resize-none"
+                    />
+                    <p className="text-[9px] text-slate-500 ml-1">
+                      🚑 Este texto é salvo no seu registro oficial e fica visível no Card ID digital para socorristas em caso de acidente.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1023,8 +1175,23 @@ export function ProfileSettings() {
               ? (profile.id.startsWith('PIL-') ? profile.id : `PIL-${profile.id.replace(/[^0-9]/g, '').slice(-6) || '77892'}`)
               : 'PIL-77892';
 
+            const displayBloodType = bloodType || profile?.blood_type || profile?.bloodType;
+            const displayEmergencyContact = emergencyContact || profile?.emergency_contact || profile?.emergencyContact;
+            const displayEmergencyPhone = emergencyPhone || profile?.emergency_phone || profile?.emergencyPhone;
+            const displayHealthNotes = healthNotes || profile?.health_notes || profile?.healthNotes;
+
             const handleShare = () => {
-              const shareText = `Passaporte Oficial MotoLegado\nPiloto: ${displayName}\nID: ${cleanPilotId}\nMoto: ${displayBike}\nBase: ${displayLocation}\nPatente: ${displayTier}`;
+              const shareText = 
+                `Passaporte Oficial MotoLegado\n` +
+                `Piloto: ${displayName}\n` +
+                `ID: ${cleanPilotId}\n` +
+                `Moto: ${displayBike}\n` +
+                `Base: ${displayLocation}\n` +
+                `Patente: ${displayTier}\n` +
+                (displayBloodType ? `Tipo Sanguíneo: ${displayBloodType}\n` : '') +
+                (displayEmergencyContact || displayEmergencyPhone ? `Emergência: ${displayEmergencyContact || ''}${displayEmergencyPhone ? ` (${displayEmergencyPhone})` : ''}\n` : '') +
+                (displayHealthNotes ? `Ficha Médica: ${displayHealthNotes}\n` : '');
+
               if (navigator.clipboard) {
                 navigator.clipboard.writeText(shareText);
                 showToast('Credencial copiada para a área de transferência!', 'success');
@@ -1115,6 +1282,66 @@ export function ProfileSettings() {
                         </div>
                       </div>
                     </div>
+
+                    {/* DADOS VITAIS & CONTATOS DE EMERGÊNCIA NO OFFICIAL MEMBER CARD */}
+                    {(displayBloodType || displayEmergencyContact || displayEmergencyPhone || displayHealthNotes) && (
+                      <div className="pt-2 border-t border-slate-800/80 space-y-2 text-left">
+                        <div className="flex items-center justify-between px-0.5">
+                          <span className="text-[8px] font-black uppercase tracking-[0.2em] text-red-400 flex items-center gap-1.5">
+                            <HeartPulse size={11} className="text-red-400 animate-pulse" />
+                            Dados Vitais & Socorro em Caso de Acidente
+                          </span>
+                          <span className="text-[7px] font-black uppercase text-slate-400 tracking-wider bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800">
+                            Resgate SAMU / Rodovias
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {/* Tipo Sanguíneo */}
+                          <div className="bg-slate-900/70 border border-red-500/30 rounded-xl px-3 py-2 flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 shrink-0">
+                              <Droplet size={13} className="fill-red-500/30" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[7px] font-black uppercase tracking-wider text-slate-400">TIPO SANGUÍNEO</p>
+                              <p className="text-xs font-black text-red-400 font-mono">
+                                {displayBloodType || 'Não informado'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Contato de Emergência */}
+                          <div className="bg-slate-900/70 border border-amber-500/30 rounded-xl px-3 py-2 flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                              <PhoneCall size={12} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[7px] font-black uppercase tracking-wider text-slate-400">CONTATO DE EMERGÊNCIA</p>
+                              <p className="text-[10px] font-black text-slate-200 truncate" title={displayEmergencyContact || ''}>
+                                {displayEmergencyContact || 'Não informado'}
+                              </p>
+                              {displayEmergencyPhone && (
+                                <p className="text-[9px] font-mono text-amber-400 truncate">
+                                  {displayEmergencyPhone}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Ficha Médica / Condições em Acidente */}
+                        {displayHealthNotes && (
+                          <div className="bg-red-950/20 border border-red-900/40 rounded-xl p-2.5 space-y-0.5">
+                            <p className="text-[7px] font-black uppercase tracking-wider text-red-400">
+                              CONDIÇÕES DE SAÚDE / FICHA MÉDICA EM ACIDENTE
+                            </p>
+                            <p className="text-[10px] text-slate-300 leading-snug line-clamp-3">
+                              {displayHealthNotes}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Card Footer */}
                     <div className="flex justify-between items-end pt-2 border-t border-slate-800/80">

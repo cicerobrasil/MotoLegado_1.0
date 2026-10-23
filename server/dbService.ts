@@ -32,6 +32,7 @@ export interface DbPilot {
   blood_type?: string;
   emergency_contact?: string;
   emergency_phone?: string;
+  health_notes?: string;
   motorcycle?: string;
   motorcycle_year?: string;
   motorcycle_plate?: string;
@@ -277,12 +278,12 @@ export class HostingerDbService {
     try {
       await safeMySqlQuery(`
         INSERT INTO pilots (
-          id, email, password_hash, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone,
+          id, email, password_hash, name, motorcycle, phone, blood_type, emergency_contact, emergency_phone, health_notes,
           role, plan, motorcycle_nickname, motorcycle_photos, motorcycle_year, motorcycle_plate,
           bio, avatar_url, personal_logo_url, city, state, cep, street, street_number, neighborhood,
           default_start_point, club_name, points, tier
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           name = VALUES(name),
           motorcycle = VALUES(motorcycle),
@@ -290,6 +291,7 @@ export class HostingerDbService {
           blood_type = VALUES(blood_type),
           emergency_contact = VALUES(emergency_contact),
           emergency_phone = VALUES(emergency_phone),
+          health_notes = VALUES(health_notes),
           role = VALUES(role),
           plan = VALUES(plan),
           motorcycle_nickname = VALUES(motorcycle_nickname),
@@ -319,6 +321,7 @@ export class HostingerDbService {
         saved.blood_type || null,
         saved.emergency_contact || null,
         saved.emergency_phone || null,
+        saved.health_notes || null,
         saved.role || 'pilot',
         saved.plan || 'gratuito',
         saved.motorcycle_nickname || null,

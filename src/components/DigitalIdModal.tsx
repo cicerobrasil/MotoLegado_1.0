@@ -8,7 +8,10 @@ import {
   Download, 
   ShieldCheck, 
   Bike, 
-  CheckCircle2
+  CheckCircle2,
+  HeartPulse,
+  Droplet,
+  PhoneCall
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import QRCode from 'qrcode';
@@ -27,6 +30,10 @@ interface DigitalIdModalProps {
   };
   pilotAvatar?: string;
   pilotLogo?: string;
+  pilotBloodType?: string;
+  pilotEmergencyContact?: string;
+  pilotEmergencyPhone?: string;
+  pilotHealthNotes?: string;
 }
 
 export function DigitalIdModal({
@@ -39,6 +46,10 @@ export function DigitalIdModal({
   pilotTier,
   pilotAvatar,
   pilotLogo,
+  pilotBloodType,
+  pilotEmergencyContact,
+  pilotEmergencyPhone,
+  pilotHealthNotes,
 }: DigitalIdModalProps) {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [copiedLink, setCopiedLink] = useState(false);
@@ -135,6 +146,9 @@ export function DigitalIdModal({
       `🛡️ *Moto Clube:* ${pilotClub}\n` +
       `⚡ *Patente:* ${pilotTier.icon} ${pilotTier.title}\n` +
       `🏍️ *Máquina:* ${pilotMotorcycle}\n` +
+      (pilotBloodType ? `🩸 *Tipo Sanguíneo:* ${pilotBloodType}\n` : '') +
+      (pilotEmergencyContact || pilotEmergencyPhone ? `🚨 *Contato de Emergência:* ${pilotEmergencyContact || ''}${pilotEmergencyPhone ? ` (${pilotEmergencyPhone})` : ''}\n` : '') +
+      (pilotHealthNotes ? `🏥 *Ficha Médica / Acidente:* ${pilotHealthNotes}\n` : '') +
       `🆔 *Código:* ${pilotId}\n\n` +
       `🔗 *Acesse e verifique meu passaporte:* \n${passportUrl}`;
 
@@ -276,6 +290,66 @@ export function DigitalIdModal({
                   </span>
                 </div>
               </div>
+
+              {/* DADOS VITAIS & CONTATOS DE EMERGÊNCIA NO CARD ID */}
+              {(pilotBloodType || pilotEmergencyContact || pilotEmergencyPhone || pilotHealthNotes) && (
+                <div className="pt-2 border-t border-slate-800/90 space-y-2 text-left">
+                  <div className="flex items-center justify-between px-0.5">
+                    <span className="text-[8px] font-black uppercase tracking-[0.2em] text-red-400 flex items-center gap-1">
+                      <HeartPulse size={11} className="text-red-400 animate-pulse" />
+                      Dados Vitais & Socorro
+                    </span>
+                    <span className="text-[7px] font-black uppercase text-slate-400 tracking-wider bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800">
+                      Resgate SAMU / Rodovias
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Tipo Sanguíneo */}
+                    <div className="p-2 rounded-xl bg-slate-950/80 border border-red-500/30 flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 shrink-0">
+                        <Droplet size={13} className="fill-red-500/30" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[7px] font-black uppercase tracking-wider text-slate-400 block">Tipo Sangue</span>
+                        <span className="text-xs font-black text-red-400 font-mono">
+                          {pilotBloodType || 'Não inf.'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Contato de Emergência */}
+                    <div className="p-2 rounded-xl bg-slate-950/80 border border-amber-500/30 flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                        <PhoneCall size={12} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[7px] font-black uppercase tracking-wider text-slate-400 block">Emergência</span>
+                        <p className="text-[10px] font-bold text-slate-200 truncate" title={pilotEmergencyContact || ''}>
+                          {pilotEmergencyContact || 'Não informado'}
+                        </p>
+                        {pilotEmergencyPhone && (
+                          <p className="text-[9px] font-mono text-amber-400 truncate">
+                            {pilotEmergencyPhone}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ficha Médica / Observações Relevantes em Acidente */}
+                  {pilotHealthNotes && (
+                    <div className="p-2 rounded-xl bg-red-950/25 border border-red-900/40 space-y-0.5">
+                      <span className="text-[7px] font-black uppercase tracking-wider text-red-400 block">
+                        Ficha Médica / Condições em Acidente
+                      </span>
+                      <p className="text-[10px] text-slate-300 leading-snug line-clamp-3">
+                        {pilotHealthNotes}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Link Box */}
               <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-400 break-all text-center flex items-center justify-between gap-2">

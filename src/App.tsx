@@ -27,6 +27,8 @@ import { OnboardingTour } from "./components/OnboardingTour";
 import { PilotGuideModal } from "./components/PilotGuideModal";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { FirstAccessSetupModal } from "./components/FirstAccessSetupModal";
+import { ImageLightboxProvider } from "./context/ImageLightboxContext";
+import { GlobalImageLightbox } from "./components/GlobalImageLightbox";
 import { cn } from "./lib/utils";
 import "./utils/systemReset";
 
@@ -92,6 +94,9 @@ function AppLayout() {
 
       {/* Offline Connectivity Indicator */}
       <OfflineIndicator />
+
+      {/* Global Image Lightbox Modal for All Photos, Cards, Logs, Logos & Events */}
+      <GlobalImageLightbox />
     </div>
   );
 }
@@ -102,7 +107,9 @@ export default function App() {
       <AuthProvider>
         <AccessibilityProvider>
           <TourProvider>
-            <AppLayout />
+            <ImageLightboxProvider>
+              <AppLayout />
+            </ImageLightboxProvider>
           </TourProvider>
         </AccessibilityProvider>
       </AuthProvider>

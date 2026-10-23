@@ -24,6 +24,14 @@ export interface PilotProfile {
   city?: string;
   state?: string;
   phone?: string;
+  blood_type?: string;
+  bloodType?: string;
+  emergency_contact?: string;
+  emergencyContact?: string;
+  emergency_phone?: string;
+  emergencyPhone?: string;
+  health_notes?: string;
+  healthNotes?: string;
   bio?: string;
   cep?: string;
   street?: string;
@@ -49,7 +57,23 @@ interface AuthContextType {
   loading: boolean;
   isSupabaseConfigured: boolean;
   signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUpWithEmail: (email: string, password: string, metadata: { name: string; motorcycle?: string }) => Promise<{ error: Error | null }>;
+  signUpWithEmail: (
+    email: string, 
+    password: string, 
+    metadata: { 
+      name: string; 
+      motorcycle?: string;
+      phone?: string;
+      bloodType?: string;
+      blood_type?: string;
+      emergencyContact?: string;
+      emergency_contact?: string;
+      emergencyPhone?: string;
+      emergency_phone?: string;
+      healthNotes?: string;
+      health_notes?: string;
+    }
+  ) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null; isSetupNeeded?: boolean }>;
   signInWithGoogleCredential: (credential: string) => Promise<{ error: Error | null }>;
   signInWithGoogleQuick: (email?: string, name?: string, avatarUrl?: string) => Promise<{ error: Error | null }>;
@@ -250,6 +274,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   name: p.name || parsed.name,
                   email: p.email || parsed.email,
                   phone: p.phone || parsed.phone || '',
+                  blood_type: p.blood_type || p.bloodType || parsed.blood_type || parsed.bloodType || '',
+                  bloodType: p.blood_type || p.bloodType || parsed.blood_type || parsed.bloodType || '',
+                  emergency_contact: p.emergency_contact || p.emergencyContact || parsed.emergency_contact || parsed.emergencyContact || '',
+                  emergencyContact: p.emergency_contact || p.emergencyContact || parsed.emergency_contact || parsed.emergencyContact || '',
+                  emergency_phone: p.emergency_phone || p.emergencyPhone || parsed.emergency_phone || parsed.emergencyPhone || '',
+                  emergencyPhone: p.emergency_phone || p.emergencyPhone || parsed.emergency_phone || parsed.emergencyPhone || '',
+                  health_notes: p.health_notes || p.healthNotes || parsed.health_notes || parsed.healthNotes || '',
+                  healthNotes: p.health_notes || p.healthNotes || parsed.health_notes || parsed.healthNotes || '',
                   bio: p.bio || parsed.bio || '',
                   motorcycle: p.motorcycle || parsed.motorcycle || '',
                   motorcycle_nickname: p.motorcycle_nickname || parsed.motorcycle_nickname || '',
@@ -473,9 +505,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUpWithEmail = async (
     email: string,
     password: string,
-    metadata: { name: string; motorcycle?: string }
+    metadata: { 
+      name: string; 
+      motorcycle?: string;
+      phone?: string;
+      bloodType?: string;
+      blood_type?: string;
+      emergencyContact?: string;
+      emergency_contact?: string;
+      emergencyPhone?: string;
+      emergency_phone?: string;
+      healthNotes?: string;
+      health_notes?: string;
+    }
   ) => {
     const cleanEmail = email.toLowerCase().trim();
+    const finalBloodType = metadata.bloodType || metadata.blood_type || '';
+    const finalEmergencyContact = metadata.emergencyContact || metadata.emergency_contact || '';
+    const finalEmergencyPhone = metadata.emergencyPhone || metadata.emergency_phone || '';
+    const finalHealthNotes = metadata.healthNotes || metadata.health_notes || '';
 
     // 1. Cadastro Direto no Backend do MotoLegado
     const res = await apiRegister({
@@ -483,6 +531,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       name: metadata.name,
       motorcycle: metadata.motorcycle,
+      phone: metadata.phone,
+      bloodType: finalBloodType,
+      emergencyContact: finalEmergencyContact,
+      emergencyPhone: finalEmergencyPhone,
+      healthNotes: finalHealthNotes,
     });
 
     if (res.data?.success && res.data.pilot) {
@@ -490,13 +543,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const normalizedProfile: PilotProfile = {
         ...pilot,
         motorcycle: pilot.motorcycle || metadata.motorcycle || '',
+        phone: pilot.phone || metadata.phone || '',
+        blood_type: pilot.blood_type || finalBloodType,
+        bloodType: pilot.blood_type || finalBloodType,
+        emergency_contact: pilot.emergency_contact || finalEmergencyContact,
+        emergencyContact: pilot.emergency_contact || finalEmergencyContact,
+        emergency_phone: pilot.emergency_phone || finalEmergencyPhone,
+        emergencyPhone: pilot.emergency_phone || finalEmergencyPhone,
+        health_notes: pilot.health_notes || finalHealthNotes,
+        healthNotes: pilot.health_notes || finalHealthNotes,
         motorcycle_nickname: '',
         motorcycle_year: '',
         motorcycle_plate: '',
         motorcycle_photos: [],
         city: '',
         state: '',
-        phone: '',
         bio: '',
         cep: '',
         street: '',

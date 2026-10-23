@@ -1148,6 +1148,10 @@ export function ProfileDashboard() {
         pilotTier={currentTier}
         pilotAvatar={pilotAvatar}
         pilotLogo={profile?.personal_logo_url}
+        pilotBloodType={profile?.blood_type || profile?.bloodType}
+        pilotEmergencyContact={profile?.emergency_contact || profile?.emergencyContact}
+        pilotEmergencyPhone={profile?.emergency_phone || profile?.emergencyPhone}
+        pilotHealthNotes={profile?.health_notes || profile?.healthNotes}
       />
     </div>
   );

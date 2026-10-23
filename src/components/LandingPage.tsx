@@ -33,7 +33,10 @@ import {
   Check,
   Menu,
   KeyRound,
-  ArrowLeft
+  ArrowLeft,
+  HeartPulse,
+  Droplet,
+  PhoneCall
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -164,6 +167,11 @@ export function LandingPage() {
   const [pilotPassword, setPilotPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [bikeModel, setBikeModel] = useState('');
+  const [pilotPhone, setPilotPhone] = useState('');
+  const [pilotBloodType, setPilotBloodType] = useState('');
+  const [pilotEmergencyContact, setPilotEmergencyContact] = useState('');
+  const [pilotEmergencyPhone, setPilotEmergencyPhone] = useState('');
+  const [pilotHealthNotes, setPilotHealthNotes] = useState('');
 
   // Moto Club Packages State
   const [selectedClubPackage, setSelectedClubPackage] = useState<ClubPackageOption | null>(null);
@@ -242,6 +250,11 @@ export function LandingPage() {
         const { error } = await signUpWithEmail(pilotEmail, pilotPassword, {
           name: pilotName || pilotEmail.split('@')[0],
           motorcycle: bikeModel,
+          phone: pilotPhone,
+          bloodType: pilotBloodType,
+          emergencyContact: pilotEmergencyContact,
+          emergencyPhone: pilotEmergencyPhone,
+          healthNotes: pilotHealthNotes,
         });
         if (error) {
           const rawMsg = error.message || '';
@@ -275,6 +288,11 @@ export function LandingPage() {
     setPilotEmail('');
     setPilotPassword('');
     setBikeModel('');
+    setPilotPhone('');
+    setPilotBloodType('');
+    setPilotEmergencyContact('');
+    setPilotEmergencyPhone('');
+    setPilotHealthNotes('');
     setShowPassword(false);
     setAuthError(null);
     setAuthSuccess(null);
@@ -288,6 +306,11 @@ export function LandingPage() {
     setPilotName('');
     setPilotPassword('');
     setBikeModel('');
+    setPilotPhone('');
+    setPilotBloodType('');
+    setPilotEmergencyContact('');
+    setPilotEmergencyPhone('');
+    setPilotHealthNotes('');
     setAuthError(null);
     setIsCredentialError(false);
     setIsAlreadyRegisteredError(false);
@@ -1422,7 +1445,10 @@ export function LandingPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-8 space-y-4 sm:space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+              className={cn(
+                "w-full bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-8 space-y-4 sm:space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto transition-all",
+                loginTab === 'register' ? "max-w-lg" : "max-w-md"
+              )}
             >
               <button
                 onClick={() => setShowLoginModal(false)}
@@ -1761,17 +1787,120 @@ export function LandingPage() {
                     </div>
 
                     {loginTab === 'register' && (
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Modelo da Motocicleta Principal</label>
-                        <input
-                          type="text"
-                          value={bikeModel}
-                          onChange={(e) => setBikeModel(e.target.value)}
-                          placeholder=""
-                          autoComplete="off"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors"
-                        />
-                      </div>
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Modelo da Motocicleta</label>
+                            <input
+                              type="text"
+                              value={bikeModel}
+                              onChange={(e) => setBikeModel(e.target.value)}
+                              placeholder="Ex: BMW R 1250 GS"
+                              autoComplete="off"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors placeholder:text-slate-600"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Telefone / WhatsApp</label>
+                            <input
+                              type="tel"
+                              value={pilotPhone}
+                              onChange={(e) => setPilotPhone(e.target.value)}
+                              placeholder="(11) 98765-4321"
+                              autoComplete="off"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors placeholder:text-slate-600"
+                            />
+                          </div>
+                        </div>
+
+                        {/* DADOS VITAIS & CONTATOS DE EMERGÊNCIA (CARD ID / SOCORRO) */}
+                        <div className="pt-3 pb-1 border-t border-slate-800/90 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-5 h-5 rounded-md bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400">
+                                <HeartPulse size={12} />
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-wider text-white">
+                                Dados Vitais & Socorro em Caso de Acidente
+                              </span>
+                            </div>
+                            <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 tracking-wider">
+                              Card ID
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Dados vitais e contato para acionamento imediato por socorristas (SAMU / Rodovias) visíveis no seu Card ID.
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                                <Droplet size={11} className="text-red-400" />
+                                Tipo Sanguíneo
+                              </label>
+                              <select
+                                value={pilotBloodType}
+                                onChange={(e) => setPilotBloodType(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors cursor-pointer"
+                              >
+                                <option value="">Selecione...</option>
+                                <option value="A+">A+ (Positivo)</option>
+                                <option value="A-">A- (Negativo)</option>
+                                <option value="B+">B+ (Positivo)</option>
+                                <option value="B-">B- (Negativo)</option>
+                                <option value="AB+">AB+ (Positivo)</option>
+                                <option value="AB-">AB- (Negativo)</option>
+                                <option value="O+">O+ (Positivo)</option>
+                                <option value="O-">O- (Negativo)</option>
+                                <option value="Não informado">Não informado</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                                <PhoneCall size={11} className="text-amber-400" />
+                                Telefone de Emergência
+                              </label>
+                              <input
+                                type="tel"
+                                value={pilotEmergencyPhone}
+                                onChange={(e) => setPilotEmergencyPhone(e.target.value)}
+                                placeholder="(11) 99999-8888"
+                                autoComplete="off"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors placeholder:text-slate-600"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                              Nome do Contato de Emergência & Parentesco
+                            </label>
+                            <input
+                              type="text"
+                              value={pilotEmergencyContact}
+                              onChange={(e) => setPilotEmergencyContact(e.target.value)}
+                              placeholder="Ex: Mariana (Esposa) ou Carlos (Irmão)"
+                              autoComplete="off"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors placeholder:text-slate-600"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                              Condições de Saúde / Observações Relevantes em Acidente
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={pilotHealthNotes}
+                              onChange={(e) => setPilotHealthNotes(e.target.value)}
+                              placeholder="Ex: Alérgico a penicilina; Hipertenso; Placa metálica no braço esquerdo; Uso contínuo de anticoagulante."
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-colors resize-none placeholder:text-slate-600"
+                            />
+                          </div>
+                        </div>
+                      </>
                     )}
 
                     <button

@@ -10,6 +10,7 @@ export interface StoredPilot {
   blood_type?: string;
   emergency_contact?: string;
   emergency_phone?: string;
+  health_notes?: string;
   motorcycle?: string;
   motorcycle_nickname?: string;
   motorcycle_year?: string;

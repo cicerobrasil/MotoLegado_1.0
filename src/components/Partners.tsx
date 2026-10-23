@@ -34,6 +34,7 @@ import { useAuth } from '../context/AuthContext';
 import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
 import { clientDbService } from '../lib/dbService';
+import { partnerSchema, validateWithZod } from '../lib/validationSchemas';
 
 export interface PartnerManager {
   name: string;
@@ -295,6 +296,13 @@ export function Partners() {
       },
       posts: initialPosts
     };
+
+    // Validação rigorosa com Zod no cliente
+    const validation = validateWithZod(partnerSchema, newPartner);
+    if (!validation.success) {
+      triggerToast(validation.error, "info");
+      return;
+    }
 
     const updated = [newPartner, ...partners];
     savePartners(updated, newPartner);

@@ -70,6 +70,7 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
         blood_type VARCHAR(10) NULL,
         emergency_contact VARCHAR(150) NULL,
         emergency_phone VARCHAR(30) NULL,
+        health_notes TEXT NULL,
         motorcycle VARCHAR(150) NULL,
         motorcycle_year VARCHAR(10) NULL,
         motorcycle_plate VARCHAR(20) NULL,
@@ -109,7 +110,8 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
       "ALTER TABLE pilots ADD COLUMN club_name VARCHAR(150) NULL",
       "ALTER TABLE pilots ADD COLUMN blood_type VARCHAR(10) NULL",
       "ALTER TABLE pilots ADD COLUMN emergency_contact VARCHAR(150) NULL",
-      "ALTER TABLE pilots ADD COLUMN emergency_phone VARCHAR(30) NULL"
+      "ALTER TABLE pilots ADD COLUMN emergency_phone VARCHAR(30) NULL",
+      "ALTER TABLE pilots ADD COLUMN health_notes TEXT NULL"
     ];
     for (const sql of columnsToEnsure) {
       try {

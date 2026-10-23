@@ -15,6 +15,7 @@ import { RouteShareModal } from './RouteShareModal';
 import { GpsExportModal } from './GpsExportModal';
 import { uploadImageToStorage } from '../lib/storage';
 import { clientDbService } from '../lib/dbService';
+import { routeSchema, validateWithZod } from '../lib/validationSchemas';
 
 export const DEFAULT_ROUTE_FALLBACK = "https://images.unsplash.com/photo-1502472091351-875c941d9c98?auto=format&fit=crop&q=80&w=1200";
 
@@ -507,6 +508,13 @@ export function Routes() {
       isFavorite: false,
       status: 'pendente' // NOVO ROTEIRO VEM PENDENTE DE MODERAÇÃO
     };
+
+    // Validação rigorosa com Zod no cliente
+    const validation = validateWithZod(routeSchema, newRouteItem);
+    if (!validation.success) {
+      showToast(validation.error, "error");
+      return;
+    }
 
     const updated = [newRouteItem, ...routes];
     saveRoutes(updated, newRouteItem);

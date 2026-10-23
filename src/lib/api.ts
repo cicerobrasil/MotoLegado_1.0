@@ -1,13 +1,63 @@
 // Utilitário de conexão direta com a API do MotoLegado rodando na Hostinger
+import { sanitizeData, sanitizeString } from './sanitizer';
+import {
+  loginSchema,
+  registerSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
+  pilotProfileSchema,
+  tripSchema,
+  routeSchema,
+  eventSchema,
+  partnerSchema,
+  communityPostSchema,
+  clubSchema,
+  validateWithZod,
+} from './validationSchemas';
+
+export { 
+  sanitizeData, 
+  sanitizeString,
+  loginSchema,
+  registerSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
+  pilotProfileSchema,
+  tripSchema,
+  routeSchema,
+  eventSchema,
+  partnerSchema,
+  communityPostSchema,
+  clubSchema,
+  validateWithZod,
+};
 
 export async function fetchFromApi<T = any>(endpoint: string, options: RequestInit = {}): Promise<{ data: T | null; error: string | null }> {
   try {
+    const finalOptions: RequestInit = { ...options };
+
+    // Camada de sanitização via DOMPurify para prevenir injeção de scripts maliciosos (XSS) antes de enviar para o banco de dados
+    if (finalOptions.body && typeof finalOptions.body === 'string') {
+      try {
+        const parsed = JSON.parse(finalOptions.body);
+        const clean = sanitizeData(parsed);
+        finalOptions.body = JSON.stringify(clean);
+      } catch {
+        // Se for string pura (não-JSON) e não for imagem base64
+        if (!finalOptions.body.startsWith('data:image/')) {
+          finalOptions.body = sanitizeData(finalOptions.body);
+        }
+      }
+    }
+
     const res = await fetch(endpoint, {
       headers: {
         'Content-Type': 'application/json',
-        ...(options.headers || {})
+        ...(finalOptions.headers || {})
       },
-      ...options
+      ...finalOptions
     });
     const json = await res.json().catch(() => null);
     if (!res.ok) {
@@ -23,18 +73,42 @@ export async function fetchFromApi<T = any>(endpoint: string, options: RequestIn
   }
 }
 
-// Autenticação Real no MySQL da Hostinger
+// Autenticação Real no MySQL da Hostinger com validação Zod no cliente
 export async function apiLogin(email: string, password: string) {
+  const validation = validateWithZod(loginSchema, { email, password });
+  if (!validation.success) {
+    return { data: null, error: validation.error };
+  }
+
   return fetchFromApi<{ success: boolean; pilot: any; message?: string }>('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify(validation.data)
   });
 }
 
-export async function apiRegister(payload: { email: string; password: string; name: string; motorcycle?: string; phone?: string }) {
+export async function apiRegister(payload: { 
+  email: string; 
+  password: string; 
+  name: string; 
+  motorcycle?: string; 
+  phone?: string;
+  bloodType?: string;
+  blood_type?: string;
+  emergencyContact?: string;
+  emergency_contact?: string;
+  emergencyPhone?: string;
+  emergency_phone?: string;
+  healthNotes?: string;
+  health_notes?: string;
+}) {
+  const validation = validateWithZod(registerSchema, payload);
+  if (!validation.success) {
+    return { data: null, error: validation.error };
+  }
+
   return fetchFromApi<{ success: boolean; pilot: any; message?: string }>('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(validation.data)
   });
 }
 
@@ -42,8 +116,13 @@ export async function apiGetMe(pilotId: string) {
   return fetchFromApi<{ success: boolean; pilot: any }>(`/api/auth/me/${encodeURIComponent(pilotId)}`);
 }
 
-// Recuperação e Redefinição de Senha
+// Recuperação e Redefinição de Senha com validação Zod
 export async function apiForgotPassword(email: string) {
+  const validation = validateWithZod(forgotPasswordSchema, { email });
+  if (!validation.success) {
+    return { data: null, error: validation.error };
+  }
+
   return fetchFromApi<{ 
     success: boolean; 
     message?: string; 
@@ -53,7 +132,7 @@ export async function apiForgotPassword(email: string) {
     pilotName?: string;
   }>('/api/auth/forgot-password', {
     method: 'POST',
-    body: JSON.stringify({ email })
+    body: JSON.stringify(validation.data)
   });
 }
 
@@ -63,9 +142,14 @@ export async function apiResetPassword(payload: {
   new_password: string; 
   security_answer?: string; 
 }) {
+  const validation = validateWithZod(resetPasswordSchema, payload);
+  if (!validation.success) {
+    return { data: null, error: validation.error };
+  }
+
   return fetchFromApi<{ success: boolean; message?: string; error?: string; pilot?: any }>('/api/auth/reset-password', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(validation.data)
   });
 }
 
@@ -74,26 +158,43 @@ export async function apiChangePassword(payload: {
   current_password: string; 
   new_password: string; 
 }) {
+  const validation = validateWithZod(changePasswordSchema, payload);
+  if (!validation.success) {
+    return { data: null, error: validation.error };
+  }
+
   return fetchFromApi<{ success: boolean; message?: string; error?: string }>('/api/auth/change-password', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(validation.data)
   });
 }
 
-// Sincronizar dados do piloto com o MySQL da Hostinger
+// Sincronizar dados do piloto com o MySQL da Hostinger com validação Zod
 export async function syncPilotToHostinger(pilotData: any) {
+  const validation = validateWithZod(pilotProfileSchema, pilotData);
+  if (!validation.success) {
+    console.warn('[Zod Validation] Perfil de piloto inválido:', validation.error);
+    return { success: false, error: validation.error };
+  }
+
   const result = await fetchFromApi('/api/pilots', {
     method: 'POST',
-    body: JSON.stringify(pilotData)
+    body: JSON.stringify(validation.data)
   });
   return result.data;
 }
 
-// Sincronizar viagem com o MySQL da Hostinger
+// Sincronizar viagem com o MySQL da Hostinger com validação Zod
 export async function syncTripToHostinger(tripData: any) {
+  const validation = validateWithZod(tripSchema, tripData);
+  if (!validation.success) {
+    console.warn('[Zod Validation] Diário de bordo inválido:', validation.error);
+    return { success: false, error: validation.error };
+  }
+
   const result = await fetchFromApi('/api/trips', {
     method: 'POST',
-    body: JSON.stringify(tripData)
+    body: JSON.stringify(validation.data)
   });
   return result.data;
 }
@@ -206,9 +307,15 @@ export async function getRouteByIdFromHostinger(id: string) {
 }
 
 export async function saveRouteToHostinger(routeData: any) {
+  const validation = validateWithZod(routeSchema, routeData);
+  if (!validation.success) {
+    console.warn('[Zod Validation] Roteiro inválido antes do envio:', validation.error);
+    return routeData;
+  }
+
   const res = await fetchFromApi<{ success: boolean; route: any; message?: string }>('/api/routes', {
     method: 'POST',
-    body: JSON.stringify(routeData)
+    body: JSON.stringify(validation.data)
   });
   return res.data?.route || routeData;
 }
@@ -238,9 +345,15 @@ export async function getEventsFromHostinger(status?: string) {
 }
 
 export async function saveEventToHostinger(eventData: any) {
+  const validation = validateWithZod(eventSchema, eventData);
+  if (!validation.success) {
+    console.warn('[Zod Validation] Evento inválido antes do envio:', validation.error);
+    return eventData;
+  }
+
   const res = await fetchFromApi<{ success: boolean; event: any; message?: string }>('/api/events', {
     method: 'POST',
-    body: JSON.stringify(eventData)
+    body: JSON.stringify(validation.data)
   });
   return res.data?.event || eventData;
 }
@@ -270,9 +383,15 @@ export async function getPartnersFromHostinger(status?: string) {
 }
 
 export async function savePartnerToHostinger(partnerData: any) {
+  const validation = validateWithZod(partnerSchema, partnerData);
+  if (!validation.success) {
+    console.warn('[Zod Validation] Parceiro inválido antes do envio:', validation.error);
+    return partnerData;
+  }
+
   const res = await fetchFromApi<{ success: boolean; partner: any; message?: string }>('/api/partners', {
     method: 'POST',
-    body: JSON.stringify(partnerData)
+    body: JSON.stringify(validation.data)
   });
   return res.data?.partner || partnerData;
 }
@@ -302,9 +421,15 @@ export async function getCommunityPostsFromHostinger(status?: string) {
 }
 
 export async function saveCommunityPostToHostinger(postData: any) {
+  const validation = validateWithZod(communityPostSchema, postData);
+  if (!validation.success) {
+    console.warn('[Zod Validation] Postagem inválida antes do envio:', validation.error);
+    return postData;
+  }
+
   const res = await fetchFromApi<{ success: boolean; post: any; message?: string }>('/api/community/posts', {
     method: 'POST',
-    body: JSON.stringify(postData)
+    body: JSON.stringify(validation.data)
   });
   return res.data?.post || postData;
 }
@@ -340,9 +465,15 @@ export async function getClubsFromHostinger() {
 }
 
 export async function saveClubToHostinger(clubData: any) {
+  const validation = validateWithZod(clubSchema, clubData);
+  if (!validation.success) {
+    console.warn('[Zod Validation] Motoclube inválido antes do envio:', validation.error);
+    return clubData;
+  }
+
   const res = await fetchFromApi<{ success: boolean; club: any; message?: string }>('/api/clubs', {
     method: 'POST',
-    body: JSON.stringify(clubData)
+    body: JSON.stringify(validation.data)
   });
   return res.data?.club || clubData;
 }
