@@ -12,8 +12,6 @@ interface TopNavbarProps {
 const ROUTE_NAMES: Record<string, string> = {
   '/dashboard': 'Central do Piloto',
   '/routes': 'Roteiros Estradeiros',
-  '/motoclub': 'Moto Clubes & Irmandades',
-  '/motoclubes': 'Moto Clubes & Irmandades',
   '/events': 'Calendário de Encontros',
   '/partners': 'Parceiros Oficiais',
   '/feed': 'Mural da Comunidade',

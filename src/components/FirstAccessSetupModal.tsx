@@ -101,7 +101,7 @@ export function FirstAccessSetupModal() {
               </h2>
 
               <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-                Olá, <strong className="text-white">{profile?.name || 'Piloto'}</strong>! Para liberar seu <strong>Passaporte Digital</strong>, telemetria de viagens e acesso aos Moto Clubes, vamos começar completando o seu perfil.
+                Olá, <strong className="text-white">{profile?.name || 'Piloto'}</strong>! Para liberar seu <strong>Passaporte Digital</strong>, telemetria de viagens e rede de parceiros credenciados, vamos começar completando o seu perfil.
               </p>
             </div>
 

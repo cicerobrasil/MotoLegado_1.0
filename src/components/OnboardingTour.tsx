@@ -231,19 +231,6 @@ export function OnboardingTour() {
             </span>
           </div>
         );
-      case 'motoclubes':
-        return (
-          <div className="rounded-2xl bg-slate-950/90 border border-slate-800 p-3.5 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-orange-600/20 border border-orange-500/30 flex items-center justify-center shrink-0 text-orange-400">
-              <Shield size={22} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="text-[10px] font-black uppercase text-orange-400 tracking-wider block">Irmandades Oficiais</span>
-              <p className="text-xs font-bold text-white truncate">Sedes, Colete Virtual e Mural Interno</p>
-              <span className="text-[10px] text-slate-400 block mt-0.5">Validação de novos integrantes e eventos exclusivos</span>
-            </div>
-          </div>
-        );
       case 'partners':
         return (
           <div className="rounded-2xl bg-slate-950/90 border border-purple-500/30 p-3.5 flex items-center gap-3">

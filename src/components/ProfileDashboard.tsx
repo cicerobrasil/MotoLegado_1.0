@@ -376,7 +376,7 @@ export function ProfileDashboard() {
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-1 max-w-2xl">
-                Seu acesso completo ao <strong>Plano Pro</strong> foi bonificado pela Diretoria MotoLegado. Você desfruta de todos os recursos pagos (Diário ilimitado, gestão de Moto Clubes, telemetria e descontos) sem nenhuma cobrança.
+                Seu acesso completo ao <strong>Plano Pro</strong> foi bonificado pela Diretoria MotoLegado. Você desfruta de todos os recursos pagos (Diário ilimitado, telemetria avançada, rotas VIP e rede de parceiros) sem nenhuma cobrança.
               </p>
             </div>
           </div>
@@ -726,7 +726,7 @@ export function ProfileDashboard() {
               PASSAPORTE DE PILOTO MOTOLEGADO
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed mb-6">
-              Seu ID Digital é utilizado para credenciamento em encontros oficiais, validação de passaporte em sedes de Moto Clubes e descontos em parceiros.
+              Seu ID Digital é utilizado para credenciamento em encontros oficiais, validação de passaporte em pontos de parada credenciados e descontos em parceiros.
             </p>
           </div>
 

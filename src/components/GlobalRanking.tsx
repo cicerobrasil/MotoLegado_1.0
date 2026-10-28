@@ -467,8 +467,8 @@ export function GlobalRanking() {
                 <p className="text-[10px] text-slate-400 font-mono">{top2.handle}</p>
 
                 <div className="mt-2 text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Shield size={12} className="text-slate-400" />
-                  <span>{top2.motoClub || 'Independente'}</span>
+                  <MapPin size={12} className="text-slate-400" />
+                  <span>{top2.city ? `${top2.city}/${top2.state}` : 'Piloto Cadastrado'}</span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">{top2.motorcycle}</p>
               </div>
@@ -521,8 +521,8 @@ export function GlobalRanking() {
                 <p className="text-[10px] text-slate-400 font-mono">{top1.handle}</p>
 
                 <div className="mt-2 text-xs font-bold text-white flex items-center gap-1.5">
-                  <Shield size={12} className="text-amber-400" />
-                  <span>{top1.motoClub || 'Independente'}</span>
+                  <MapPin size={12} className="text-amber-400" />
+                  <span>{top1.city ? `${top1.city}/${top1.state}` : 'Piloto Cadastrado'}</span>
                 </div>
                 <p className="text-[11px] text-slate-300 mt-0.5">{top1.motorcycle}</p>
               </div>
@@ -570,8 +570,8 @@ export function GlobalRanking() {
                 <p className="text-[10px] text-slate-400 font-mono">{top3.handle}</p>
 
                 <div className="mt-2 text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Shield size={12} className="text-amber-600" />
-                  <span>{top3.motoClub || 'Independente'}</span>
+                  <MapPin size={12} className="text-amber-600" />
+                  <span>{top3.city ? `${top3.city}/${top3.state}` : 'Piloto Cadastrado'}</span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">{top3.motorcycle}</p>
               </div>
@@ -742,50 +742,23 @@ export function GlobalRanking() {
             </div>
           </div>
 
-          {/* State & Club Filter Dropdowns */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800/60">
-            {/* State Filter */}
-            <div>
-              <label htmlFor="state-filter-select" className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                Filtrar por Estado (UF):
-              </label>
-              <select
-                id="state-filter-select"
-                value={selectedState}
-                onChange={(e) => setSelectedState(e.target.value)}
-                aria-label="Filtrar pilotos por estado"
-                className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-orange-500 uppercase font-bold"
-              >
-                <option value="todos">Brasil Todo (Todos os Estados)</option>
-                {availableStates.filter(s => s !== 'todos').map(uf => (
-                  <option key={uf} value={uf}>Estado: {uf}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Club Filter */}
-            <div>
-              <label htmlFor="club-filter-select" className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                Filtrar por Moto Clube:
-              </label>
-              <select
-                id="club-filter-select"
-                value={selectedClub}
-                onChange={(e) => setSelectedClub(e.target.value)}
-                aria-label="Filtrar pilotos por filiação ou moto clube"
-                className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-orange-500 uppercase font-bold"
-              >
-                <option value="todos">Todos os Pilotos e Clubes</option>
-                <option value="independente">Apenas Motociclistas Independentes</option>
-                <option value="Abutres">Abutres MC</option>
-                <option value="Bodes">Bodes do Asfalto</option>
-                <option value="Insanos">Insanos MC</option>
-                <option value="Asfalto Livre">Asfalto Livre MC</option>
-                <option value="Rota 101">Rota 101 MC</option>
-                <option value="Mulheres do Asfalto">Mulheres do Asfalto</option>
-                <option value="Caveiras">Caveiras do Asfalto</option>
-              </select>
-            </div>
+          {/* State Filter Dropdown */}
+          <div className="pt-2 border-t border-slate-800/60 max-w-sm">
+            <label htmlFor="state-filter-select" className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
+              Filtrar por Estado (UF):
+            </label>
+            <select
+              id="state-filter-select"
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              aria-label="Filtrar pilotos por estado"
+              className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-orange-500 uppercase font-bold"
+            >
+              <option value="todos">Brasil Todo (Todos os Estados)</option>
+              {availableStates.filter(s => s !== 'todos').map(uf => (
+                <option key={uf} value={uf}>Estado: {uf}</option>
+              ))}
+            </select>
           </div>
         </div>
       </section>
@@ -803,7 +776,7 @@ export function GlobalRanking() {
           {/* Header Row (Desktop) */}
           <div className="hidden md:grid md:grid-cols-12 gap-4 px-6 py-3.5 bg-slate-950/80 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-800">
             <div className="col-span-1 text-center">POS</div>
-            <div className="col-span-4">PILOTO & CLUBE</div>
+            <div className="col-span-4">PILOTO & LOCALIZAÇÃO</div>
             <div className="col-span-2">PATENTE</div>
             <div className="col-span-2 text-right">DISTÂNCIA (KM)</div>
             <div className="col-span-1 text-center">EVENTOS</div>
@@ -896,7 +869,7 @@ export function GlobalRanking() {
                     </div>
 
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-400 truncate mt-0.5">
-                      <span className="text-slate-300 font-medium truncate">{pilot.motoClub || 'Independente'}</span>
+                      <span className="text-slate-300 font-medium truncate">{pilot.city ? `${pilot.city}/${pilot.state}` : 'Brasil'}</span>
                       <span aria-hidden="true">·</span>
                       <span className="text-slate-500 truncate">{pilot.motorcycle}</span>
                     </div>
@@ -946,7 +919,7 @@ export function GlobalRanking() {
               <Trophy size={40} className="mx-auto text-slate-700" />
               <h3 className="text-base font-black uppercase text-white">Nenhum piloto encontrado</h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Tente ajustar os filtros de estado, moto clube ou limpar o campo de busca.
+                Tente ajustar o filtro de estado ou limpar o campo de busca.
               </p>
               <button
                 onClick={() => {
@@ -956,7 +929,7 @@ export function GlobalRanking() {
                 }}
                 className="btn-secondary text-xs"
               >
-                Limpar Todos os Filtros
+                Limpar Filtros
               </button>
             </div>
           )}
@@ -1067,10 +1040,10 @@ export function GlobalRanking() {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500 font-bold uppercase text-[10px]">Moto Clube:</span>
+                  <span className="text-slate-500 font-bold uppercase text-[10px]">Localização:</span>
                   <span className="font-bold text-amber-400 flex items-center gap-1.5">
-                    <Shield size={14} />
-                    {selectedPilot.motoClub || 'Independente'} {selectedPilot.clubRole && `(${selectedPilot.clubRole})`}
+                    <MapPin size={14} />
+                    {selectedPilot.city || 'Brasil'} / {selectedPilot.state || 'BR'}
                   </span>
                 </div>
 
@@ -1177,7 +1150,7 @@ export function GlobalRanking() {
                   <div>
                     <h4 className="text-xs font-black uppercase text-white">+150 Pontos por Check-in de Encontro</h4>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Confirme presença nos eventos motociclísticos e encontros de moto clubes oficiais através da aba <strong>Eventos</strong>.
+                      Confirme presença nos eventos motociclísticos e encontros oficiais através da aba <strong>Eventos</strong>.
                     </p>
                   </div>
                 </div>

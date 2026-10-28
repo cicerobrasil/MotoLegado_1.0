@@ -1014,26 +1014,6 @@ export function ProfileSettings() {
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Fundar Moto Clube Call to Action */}
-                  <div 
-                    onClick={() => navigate('/motoclub')}
-                    className="bento-card border-slate-800/60 bg-slate-900/40 rounded-3xl flex flex-col items-center justify-center p-6 sm:p-8 text-center relative group min-h-[160px] overflow-hidden cursor-pointer hover:border-orange-500/50 transition-all hover:scale-[1.02] active:scale-95 shadow-lg active:shadow-inner"
-                  >
-                    <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-100 transition-opacity">
-                       <Plus size={20} className="text-orange-500" />
-                    </div>
-                    <div className="relative">
-                      <Shield size={40} className="text-orange-600/40 group-hover:text-orange-500 transition-colors drop-shadow-[0_0_15px_rgba(255,85,0,0.2)]" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Plus size={18} className="text-white bg-orange-600 rounded-full p-1" />
-                      </div>
-                    </div>
-                    <div className="mt-3">
-                      <p className="text-[12px] font-black italic uppercase tracking-tighter text-white">Fundar Novo Clube</p>
-                      <p className="text-[8px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">Crie sua própria lenda</p>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Alterar Senha de Acesso */}

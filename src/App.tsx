@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { AccessibilityProvider } from "./context/AccessibilityContext";
 import { TourProvider } from "./context/TourContext";
@@ -12,10 +12,7 @@ import { Routes as RoutesList } from "./components/Routes";
 import { ProfileDashboard } from "./components/ProfileDashboard";
 import { ProfileSettings } from "./components/ProfileSettings";
 import { Logbook } from "./components/Logbook";
-import { MotoClubsList } from "./components/MotoClubsList";
-import { MotoClubDetail } from "./components/MotoClubDetail";
-import { MotoClubMural } from "./components/MotoClubMural";
-import { MotoClubApplication } from "./components/MotoClubApplication";
+
 import { Events } from "./components/Events";
 import { Partners } from "./components/Partners";
 import { CommandCenter } from "./components/CommandCenter";
@@ -63,11 +60,11 @@ function AppLayout() {
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/ranking" element={<GlobalRanking />} />
           <Route path="/leaderboard" element={<GlobalRanking />} />
-          <Route path="/motoclub" element={<MotoClubsList />} />
-          <Route path="/motoclubes" element={<MotoClubsList />} />
-          <Route path="/motoclub/:id" element={<MotoClubDetail />} />
-          <Route path="/motoclub/:id/mural" element={<MotoClubMural />} />
-          <Route path="/motoclub/:id/apply" element={<MotoClubApplication />} />
+          <Route path="/motoclub" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/motoclubes" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/motoclub/:id" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/motoclub/:id/mural" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/motoclub/:id/apply" element={<Navigate to="/dashboard" replace />} />
           <Route path="/command-center" element={<CommandCenter />} />
           <Route path="/admin" element={<CommandCenter />} />
           <Route path="/profile" element={<ProfileDashboard />} />

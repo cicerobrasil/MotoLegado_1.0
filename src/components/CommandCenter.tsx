@@ -235,7 +235,7 @@ export function CommandCenter() {
   const navigate = useNavigate();
   const isAdmin = profile?.role === 'admin';
 
-  const [activeTab, setActiveTab] = useState<'eventos' | 'clubes' | 'roteiros' | 'comunidade' | 'parceiros' | 'telemetria' | 'bonificados'>('eventos');
+  const [activeTab, setActiveTab] = useState<'eventos' | 'roteiros' | 'comunidade' | 'parceiros' | 'telemetria' | 'bonificados'>('eventos');
   
   // Routes Moderation State
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -1452,7 +1452,7 @@ export function CommandCenter() {
   const gratuitosCount = pilotsList.filter(p => p.plan_type === 'gratuito' || (!p.plan_type && !p.is_pro)).length;
   const proCount = pilotsList.filter(p => p.plan_type === 'pago' || (p.is_pro && p.plan_type !== 'bonificado' && p.role !== 'admin')).length;
 
-  const totalPendingAll = pendingEventsCount + pendingClubsCount + pendingRoutesCount + pendingReportsCount + pendingPostsCount + pendingPartnersCount;
+  const totalPendingAll = pendingEventsCount + pendingRoutesCount + pendingReportsCount + pendingPostsCount + pendingPartnersCount;
 
   // Growth & Activity Line Chart Data
   const [chartDaysRange, setChartDaysRange] = useState<7 | 14 | 30>(14);
@@ -1580,23 +1580,6 @@ export function CommandCenter() {
         onClick: () => {
           setActiveTab('eventos');
           setViewingEvent(e);
-          setShowNotificationsPopover(false);
-        }
-      });
-    });
-
-    // Moto Clubes
-    clubRequests.filter(c => c.status === 'pendente').forEach(c => {
-      list.push({
-        id: 'club_' + c.id,
-        type: 'clubes',
-        typeLabel: 'Moto Clube',
-        title: c.clubName,
-        subtitle: `Pres: ${c.president} • ${c.cityState}`,
-        time: c.requestedAt ? formatDisplayDate(c.requestedAt) : 'Aguardando',
-        onClick: () => {
-          setActiveTab('clubes');
-          setViewingClub(c);
           setShowNotificationsPopover(false);
         }
       });
@@ -1769,7 +1752,7 @@ export function CommandCenter() {
           </h1>
 
           <p className="text-slate-400 text-xs sm:text-sm font-medium leading-relaxed max-w-xl mx-auto mb-8">
-            Este módulo de moderação, homologação de Moto Clubes, auditoria de rotas e telemetria é de uso exclusivo para <strong className="text-white">Administradores do Sistema</strong>.
+            Este módulo de moderação, homologação de parceiros e eventos, auditoria de rotas e telemetria é de uso exclusivo para <strong className="text-white">Administradores do Sistema</strong>.
           </p>
 
           <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-6 max-w-md mx-auto text-left space-y-3 mb-8">
@@ -1827,7 +1810,7 @@ export function CommandCenter() {
             </h1>
 
             <p className="text-xs md:text-sm text-slate-300 max-w-3xl font-medium leading-relaxed">
-              Painel administrativo unificado para moderação geral do portal MotoLegado. Valide e aprove eventos solicitados, credencie Moto Clubes e empresas parceiras, modere conteúdos denunciados e acompanhe a telemetria do sistema em tempo real.
+              Painel administrativo unificado para moderação geral do portal MotoLegado. Valide e aprove eventos solicitados, credencie empresas e estabelecimentos parceiros, modere conteúdos denunciados e acompanhe a telemetria do sistema em tempo real.
             </p>
           </div>
 
@@ -1950,7 +1933,6 @@ export function CommandCenter() {
                     {[
                       { id: 'all', label: 'Todos', count: pendingNotificationsList.length },
                       { id: 'eventos', label: 'Eventos', count: pendingEventsCount },
-                      { id: 'clubes', label: 'Clubes', count: pendingClubsCount },
                       { id: 'roteiros', label: 'Roteiros', count: pendingRoutesCount },
                       { id: 'comunidade', label: 'Feed', count: pendingReportsCount + pendingPostsCount },
                       { id: 'parceiros', label: 'Parceiros', count: pendingPartnersCount }
@@ -2099,7 +2081,7 @@ export function CommandCenter() {
       </AnimatePresence>
 
       {/* STATS OVERVIEW CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
         <button 
           onClick={() => setActiveTab('eventos')}
           className={cn(
@@ -2116,25 +2098,6 @@ export function CommandCenter() {
           </div>
           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1">
             <CheckCircle size={10} className="text-emerald-500" /> {approvedEventsCount} aprovados e no mapa
-          </div>
-        </button>
-
-        <button 
-          onClick={() => setActiveTab('clubes')}
-          className={cn(
-            "bento-card p-5 text-left transition-all border group relative overflow-hidden",
-            activeTab === 'clubes' ? "border-amber-500 bg-amber-950/20 shadow-lg shadow-amber-950/30" : "border-slate-800/80 hover:border-slate-700 bg-slate-900/40"
-          )}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">MOTO CLUBES</span>
-            <Building2 size={18} className="text-amber-400" />
-          </div>
-          <div className="text-3xl font-black italic text-white mb-1">
-            {pendingClubsCount} <span className="text-xs font-normal text-slate-400 uppercase italic">Aprovação</span>
-          </div>
-          <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-            {clubRequests.length} solicitações registradas
           </div>
         </button>
 
@@ -2401,11 +2364,10 @@ export function CommandCenter() {
 
       {/* CORE NAVIGATION TABS - Organizado em 2 linhas sem scroll bar */}
       <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-2 sm:p-2.5 shadow-lg space-y-2">
-        {/* Linha 1: 4 opções */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {/* Linha 1: 3 opções */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {[
             { id: 'eventos', label: 'Moderação de Eventos', icon: Calendar, badge: pendingEventsCount },
-            { id: 'clubes', label: 'Moto Clubes & Sedes', icon: Building2, badge: pendingClubsCount },
             { id: 'roteiros', label: 'Moderação Roteiros', icon: Navigation, badge: pendingRoutesCount },
             { id: 'comunidade', label: 'Comunidade & Feed', icon: MessageSquare, badge: pendingReportsCount },
           ].map((tab) => (
@@ -2700,8 +2662,8 @@ export function CommandCenter() {
       </motion.div>
     )}
 
-      {/* TAB CONTENT 2: MOTO CLUBES & SEDES */}
-      {activeTab === 'clubes' && (
+      {/* TAB CONTENT 2: MOTO CLUBES & SEDES (DESABILITADO ESTRATEGICAMENTE) */}
+      {false && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
           <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
             
@@ -3833,7 +3795,7 @@ export function CommandCenter() {
                       PAINEL DE GESTÃO DE PLANOS & MODO BONIFICADO
                     </h2>
                     <p className="text-xs text-slate-400 mt-1">
-                      Conceda acesso Pro integral (telemetria, Moto Clubes, rotas ilimitadas e benefícios) sem cobrança para pilotos parceiros ou lideranças.
+                      Conceda acesso Pro integral (telemetria, rotas ilimitadas, eventos e benefícios) sem cobrança para pilotos parceiros ou lideranças.
                     </p>
                   </div>
                 </div>

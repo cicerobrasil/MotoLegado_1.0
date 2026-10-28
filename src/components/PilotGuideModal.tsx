@@ -21,7 +21,7 @@ import {
 import { useTour } from '../context/TourContext';
 import { cn } from '../lib/utils';
 
-type CategoryFilter = 'all' | 'telemetry' | 'logbook' | 'gamification' | 'routes' | 'motoclub' | 'partners' | 'safety';
+type CategoryFilter = 'all' | 'telemetry' | 'logbook' | 'gamification' | 'routes' | 'partners' | 'safety';
 
 interface GuideTopic {
   id: string;
@@ -213,35 +213,6 @@ export function PilotGuideModal() {
             <li><strong>Curvas e Paisagens:</strong> Graus de dificuldade de curvas (serra, serpiginosas) e mirantes para fotos.</li>
             <li><strong>Traçado GPX:</strong> Baixe arquivos para carregar diretamente no seu GPS Garmin ou celular.</li>
           </ul>
-        </div>
-      )
-    },
-    {
-      id: 'motoclub',
-      category: 'motoclub',
-      categoryLabel: 'Clubes & Irmandades',
-      title: 'Moto Clubes Oficiais & Coletes',
-      summary: 'Conheça irmandades registradas, acompanhe murais internos e exiba seu brasão.',
-      icon: Shield,
-      badgeColor: 'text-blue-400',
-      badgeBg: 'bg-blue-500/15 border-blue-500/30',
-      routePath: '/motoclub',
-      routeLabel: 'Conhecer Moto Clubes',
-      content: (
-        <div className="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
-          <p>
-            O MotoLegado integra a cultura dos Moto Clubes, Motogrupos e Irmandades de todo o Brasil:
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-            <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
-              <strong className="text-white text-xs block">Brasão no Perfil</strong>
-              <p className="text-slate-400 text-xs mt-0.5">Integrantes aprovados exibem o escudo do seu clube no perfil público e rankings.</p>
-            </div>
-            <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
-              <strong className="text-white text-xs block">Mural de Avisos</strong>
-              <p className="text-slate-400 text-xs mt-0.5">Comunicação direta com o comando do clube sobre passeios, aniversários e encontros.</p>
-            </div>
-          </div>
         </div>
       )
     },
@@ -459,7 +430,6 @@ export function PilotGuideModal() {
                 { id: 'logbook', label: 'Diário de Bordo' },
                 { id: 'gamification', label: 'Patentes & Ranking' },
                 { id: 'routes', label: 'Rotas & GPS' },
-                { id: 'motoclub', label: 'Moto Clubes' },
                 { id: 'partners', label: 'Parceiros' },
                 { id: 'safety', label: 'Checklist & Segurança' }
               ].map(cat => (

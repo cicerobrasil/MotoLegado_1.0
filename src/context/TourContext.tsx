@@ -48,15 +48,6 @@ export const TOUR_STEPS: TourStep[] = [
     path: '/dashboard'
   },
   {
-    id: 'motoclubes',
-    title: 'Moto Clubes & Irmandades',
-    category: 'Comunidade',
-    description: 'Conheça clubes oficiais, acompanhe o mural de avisos da irmandade e solicite seu ingresso no colete da sua escolha.',
-    targetSelector: '[data-tour="nav-motoclubes"]',
-    iconName: 'Shield',
-    path: '/motoclub'
-  },
-  {
     id: 'partners',
     title: 'Rede de Parceiros Estradeiros',
     category: 'Benefícios',

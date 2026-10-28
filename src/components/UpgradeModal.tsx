@@ -58,12 +58,12 @@ const FEATURE_MESSAGES: Record<UpgradeFeatureTrigger, { title: string; desc: str
     desc: 'A emissão de relatórios oficiais em PDF, planilhas CSV e dossiês de quilometragem é um recurso exclusivo para assinantes MotoLegado Pro ou Bonificados.'
   },
   criar_clube: {
-    title: 'Fundação e Gestão Completa de Moto Clube',
-    desc: 'A criação e presidência de Moto Clubes é um recurso exclusivo para pilotos MotoLegado Pro ou com Modo Bonificado liberado.'
+    title: 'Recurso Avançado Exclusivo VIP Pro',
+    desc: 'Este recurso é exclusivo para pilotos MotoLegado Pro ou com Modo Bonificado liberado.'
   },
   membro_clube: {
-    title: 'Ingresso em Moto Clube Oficial (Exclusivo Pro)',
-    desc: 'Para preservar o padrão e os benefícios da irmandade, todos os integrantes e candidatos a Moto Clubes Oficiais precisam ser assinantes Pro ou Bonificados.'
+    title: 'Passaporte Digital Avançado (Exclusivo Pro)',
+    desc: 'Acesso completo ao passaporte digital, selos de estrada e benefícios exclusivos da rede para assinantes Pro ou Bonificados.'
   },
   criar_evento: {
     title: 'Criação e Agendamento de Eventos Coletivos',
@@ -413,11 +413,11 @@ export function UpgradeModal({ isOpen, onClose, feature = 'geral', onSuccess }: 
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={13} className="text-orange-500 shrink-0" />
-                        <span><strong>Fundar & Gerenciar Moto Clube</strong></span>
+                        <span><strong>Passaporte & Selos Digitais de Estrada</strong></span>
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={13} className="text-orange-500 shrink-0" />
-                        <span><strong>Candidatura & Ingresso em MCs</strong></span>
+                        <span><strong>Telemetria e Histórico Avançado</strong></span>
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 size={13} className="text-orange-500 shrink-0" />

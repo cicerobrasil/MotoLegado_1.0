@@ -42,7 +42,6 @@ const MENU_ITEMS: MenuItem[] = [
   { icon: MapIcon, label: "Roteiros", path: "/routes" },
   { icon: Trophy, label: "Conquistas", path: "/achievements" },
   { icon: Crown, label: "Ranking Global", path: "/ranking" },
-  { icon: Shield, label: "Moto Clubes", path: "/motoclubes" },
   { icon: ShieldCheck, label: "CENTRO DE COMANDO", path: "/command-center", adminOnly: true },
 ];
 
@@ -173,8 +172,6 @@ export function Sidebar({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }
             const isActive = location.pathname === item.path;
             const tourAttr = item.path === '/routes' 
               ? 'nav-routes' 
-              : item.path === '/motoclubes' 
-              ? 'nav-motoclubes' 
               : item.path === '/partners' 
               ? 'nav-partners' 
               : item.path === '/ranking' 
