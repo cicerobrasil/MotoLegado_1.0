@@ -739,7 +739,7 @@ export function LandingPage() {
           <div className="text-center space-y-2 sm:space-y-3">
             <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] text-[#ff751f]">MÓDULOS DE ALTA PERFORMANCE</h2>
             <h3 className="text-2xl sm:text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-white">
-              TUDO O QUE SEU GRUPO PRECISA NA <span className="text-[#ff751f]">ESTRADA</span>
+              FEITO POR MOTOCICLISTA PARA <span className="text-[#ff751f]">MOTOCICLISTAS</span>
             </h3>
             <p className="text-slate-400 text-xs sm:text-sm max-w-2xl mx-auto">
               Desenvolvido com foco na rotina real do motociclista, desde a preparação do roteiro até o diário de memórias.
