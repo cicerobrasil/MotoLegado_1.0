@@ -820,6 +820,27 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
     }
   });
 
+  app.delete('/api/pilots/:id', async (req, res) => {
+    try {
+      const pilotId = req.params.id;
+      if (!pilotId) {
+        return res.status(400).json({ success: false, error: 'ID do piloto é obrigatório' });
+      }
+      const clean = pilotId.toLowerCase().trim();
+      if (clean === 'admin_ciceroranieri' || clean === 'ciceroranieri@gmail.com') {
+        return res.status(403).json({ success: false, error: 'O administrador master não pode ser excluído.' });
+      }
+      const success = await dbService.deletePilot(pilotId);
+      return res.json({ 
+        success, 
+        message: 'Piloto e todos os seus registros foram excluídos permanentemente com sucesso!' 
+      });
+    } catch (err: any) {
+      console.error('[API DELETE PILOT ERROR]:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Trips API (Diário de Bordo) - Centralizado via dbService
   app.get('/api/trips', async (req, res) => {
     try {
@@ -1068,6 +1089,15 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
         message: 'Motoclube registrado com sucesso no banco MySQL!', 
         club: savedClub 
       });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/clubs/:id', async (req, res) => {
+    try {
+      const success = await dbService.deleteClub(req.params.id);
+      return res.json({ success, message: 'Motoclube excluído com sucesso!' });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }

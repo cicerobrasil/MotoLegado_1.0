@@ -382,3 +382,59 @@ export function storeApprovePaymentRequest(identifier: string, approverName = 'C
   saveStore(store);
   return { success: !!req };
 }
+
+// Excluir / Banir piloto e todos os seus dados associados (viagens, diário de bordo, etc)
+export function storeDeletePilot(pilotIdOrEmail: string): boolean {
+  if (!pilotIdOrEmail) return false;
+  const clean = pilotIdOrEmail.toLowerCase().trim();
+
+  // Proteção do administrador mestre
+  if (clean === 'admin_ciceroranieri' || clean === 'ciceroranieri@gmail.com') {
+    console.warn('[STORE] Bloqueio: Não é permitido excluir o administrador master ciceroranieri@gmail.com.');
+    return false;
+  }
+
+  const store = loadStore();
+  const pilot = storeGetPilotById(pilotIdOrEmail) || storeGetPilotByEmail(clean);
+  const idsToRemove = new Set<string>([clean]);
+  if (pilot) {
+    if (pilot.id) idsToRemove.add(pilot.id.toLowerCase());
+    if (pilot.email) idsToRemove.add(pilot.email.toLowerCase());
+  }
+
+  let deleted = false;
+
+  // 1. Remover de pilots
+  for (const [key, p] of Object.entries(store.pilots)) {
+    if (idsToRemove.has(key.toLowerCase()) || (p.id && idsToRemove.has(p.id.toLowerCase())) || (p.email && idsToRemove.has(p.email.toLowerCase()))) {
+      delete store.pilots[key];
+      deleted = true;
+    }
+  }
+
+  // 2. Remover viagens (diário de bordo) associadas ao piloto
+  if (store.trips && store.trips.length > 0) {
+    const beforeCount = store.trips.length;
+    store.trips = store.trips.filter(t => {
+      if (!t.pilot_id) return true;
+      return !idsToRemove.has(t.pilot_id.toLowerCase());
+    });
+    if (store.trips.length !== beforeCount) {
+      deleted = true;
+    }
+  }
+
+  // 3. Remover solicitações de pagamento pendentes
+  if (store.pending_payments && store.pending_payments.length > 0) {
+    store.pending_payments = store.pending_payments.filter(p => {
+      return !idsToRemove.has(p.id.toLowerCase()) && 
+             !idsToRemove.has((p.pilot_id || '').toLowerCase()) && 
+             !idsToRemove.has((p.email || '').toLowerCase());
+    });
+  }
+
+  if (deleted) {
+    saveStore(store);
+  }
+  return deleted;
+}

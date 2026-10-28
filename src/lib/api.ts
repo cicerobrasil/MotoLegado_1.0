@@ -478,4 +478,19 @@ export async function saveClubToHostinger(clubData: any) {
   return res.data?.club || clubData;
 }
 
+export async function deleteClubFromHostinger(id: string) {
+  const res = await fetchFromApi<{ success: boolean; message?: string }>(`/api/clubs/${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  });
+  return res.data?.success || false;
+}
+
+// Excluir e banir piloto e todos os seus registros do MySQL da Hostinger
+export async function deletePilotFromHostinger(pilotId: string) {
+  const res = await fetchFromApi<{ success: boolean; message?: string }>(`/api/pilots/${encodeURIComponent(pilotId)}`, {
+    method: 'DELETE'
+  });
+  return res.data?.success || false;
+}
+
 

@@ -8,6 +8,7 @@ import {
   storeGetTrips, 
   storeSaveTrip,
   storeDeleteTrip,
+  storeDeletePilot,
   storeGetPaymentRequests,
   storeSavePaymentRequest,
   storeApprovePaymentRequest
@@ -375,6 +376,30 @@ export class HostingerDbService {
     } catch {
       return false;
     }
+  }
+
+  async deletePilot(pilotId: string): Promise<boolean> {
+    if (!pilotId) return false;
+    const clean = pilotId.toLowerCase().trim();
+    if (clean === 'admin_ciceroranieri' || clean === 'ciceroranieri@gmail.com') {
+      console.warn('[HostingerDbService] Bloqueio: Não é permitido excluir o administrador master.');
+      return false;
+    }
+
+    try {
+      // 1. Remover registros de viagens (diário de bordo) do piloto no MySQL
+      await safeMySqlQuery('DELETE FROM trips WHERE pilot_id = ? OR pilot_id = ?', [pilotId, clean]);
+      // 2. Remover solicitações de pagamento pendentes/aprovadas
+      await safeMySqlQuery('DELETE FROM payment_requests WHERE pilot_id = ? OR LOWER(email) = ?', [pilotId, clean]);
+      // 3. Remover o cadastro do piloto no MySQL
+      await safeMySqlQuery('DELETE FROM pilots WHERE id = ? OR LOWER(email) = ?', [pilotId, clean]);
+    } catch (err) {
+      console.warn('[HostingerDbService] deletePilot MySQL warning:', err);
+    }
+
+    // 4. Remover do armazenamento resiliente local
+    storeDeletePilot(pilotId);
+    return true;
   }
 
   private normalizePilotRow(row: any): DbPilot {
@@ -1165,6 +1190,16 @@ export class HostingerDbService {
       description: row.description || '',
       category: row.category || 'Tradicional'
     };
+  }
+
+  async deleteClub(id: string): Promise<boolean> {
+    try {
+      await safeMySqlQuery('DELETE FROM clubs WHERE id = ? OR name = ?', [id, id]);
+      return true;
+    } catch (err) {
+      console.warn('[HostingerDbService] deleteClub MySQL warning:', err);
+      return false;
+    }
   }
 
   // ==========================================================================

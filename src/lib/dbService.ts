@@ -18,8 +18,10 @@ import {
   deleteCommunityPostFromHostinger,
   getClubsFromHostinger,
   saveClubToHostinger,
+  deleteClubFromHostinger,
   syncPilotToHostinger,
   getPilotsFromHostinger,
+  deletePilotFromHostinger,
   syncTripToHostinger,
   getTripsFromHostinger,
   deleteTripFromHostinger,
@@ -51,6 +53,7 @@ export const clientDbService = {
   pilots: {
     getAll: getPilotsFromHostinger,
     save: syncPilotToHostinger,
+    delete: deletePilotFromHostinger,
   },
 
   // Diário de Bordo (Viagens)
@@ -121,6 +124,7 @@ export const clientDbService = {
   clubs: {
     getAll: getClubsFromHostinger,
     save: saveClubToHostinger,
+    delete: deleteClubFromHostinger,
   }
 };
 
