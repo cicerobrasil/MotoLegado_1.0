@@ -160,7 +160,7 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
         duration VARCHAR(50) NULL,
         difficulty VARCHAR(50) DEFAULT 'Médio',
         road_type VARCHAR(100) NULL,
-        cover_image TEXT NULL,
+        cover_image LONGTEXT NULL,
         waypoints JSON NULL,
         rating DECIMAL(3,2) DEFAULT 5.0,
         total_ratings_count INT DEFAULT 1,
@@ -171,6 +171,19 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    // Migrações e compatibilidade de colunas de rotas
+    const routeColumnsToEnsure = [
+      "ALTER TABLE routes MODIFY COLUMN cover_image LONGTEXT NULL",
+      "ALTER TABLE routes ADD COLUMN cover_image LONGTEXT NULL",
+      "ALTER TABLE routes MODIFY COLUMN description LONGTEXT NULL",
+      "ALTER TABLE routes MODIFY COLUMN rider_tips LONGTEXT NULL"
+    ];
+    for (const sql of routeColumnsToEnsure) {
+      try {
+        await connection.query(sql);
+      } catch {}
+    }
 
     // 4. Tabela de Eventos
     await connection.query(`
@@ -277,6 +290,28 @@ export async function initDatabaseTables(): Promise<{ success: boolean; message:
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         approved_at TIMESTAMP NULL,
         approved_by VARCHAR(150) NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 9. Tabela de Notificações Push & Roteiros Compartilhados
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id VARCHAR(64) PRIMARY KEY,
+        type VARCHAR(50) DEFAULT 'route_shared',
+        sender_id VARCHAR(64) NULL,
+        sender_name VARCHAR(150) NULL,
+        sender_avatar TEXT NULL,
+        recipient_id VARCHAR(64) DEFAULT 'all',
+        route_id VARCHAR(64) NULL,
+        route_name VARCHAR(200) NULL,
+        route_destination VARCHAR(200) NULL,
+        route_distance DECIMAL(10,2) DEFAULT 0,
+        route_duration VARCHAR(50) NULL,
+        route_image TEXT NULL,
+        title VARCHAR(255) NULL,
+        message TEXT NULL,
+        is_read TINYINT(1) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 

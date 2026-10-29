@@ -4,7 +4,8 @@ import {
   MapPin, Star, Clock, ArrowRight, Plus, Search, Sparkles, Navigation, 
   ExternalLink, RefreshCw, Check, Fuel, Info, X, Heart, Award,
   ShieldAlert, CheckCircle, XCircle, Lock, Camera, Upload, Image as ImageIcon,
-  AlertCircle, Trash2, Loader2, BookOpen, Share2, Download, FileText, Printer
+  AlertCircle, Trash2, Loader2, BookOpen, Share2, Download, FileText, Printer,
+  ShieldCheck, AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Route, RouteDifficulty, RouteRatingMetrics, RouteReview } from '../types';
@@ -204,6 +205,21 @@ export function Routes() {
   const [rejectingRouteId, setRejectingRouteId] = useState<string | null>(null);
   const [rejectionReasonText, setRejectionReasonText] = useState('');
 
+  // Modais de confirmação visual do sistema (indispensáveis para o operador)
+  const [submissionSuccessRoute, setSubmissionSuccessRoute] = useState<Route | null>(null);
+  const [moderationApprovalConfirmation, setModerationApprovalConfirmation] = useState<Route | null>(null);
+  const [moderationRejectionConfirmation, setModerationRejectionConfirmation] = useState<{ route: Route; reason: string } | null>(null);
+
+  const isModeratorOrAdmin = profile?.role === 'admin' || profile?.email?.toLowerCase() === 'ciceroranieri@gmail.com';
+
+  const isUserAuthor = (r: Route) => {
+    if (r.author?.name === "Você (Piloto)") return true;
+    if (profile?.name && (r.author?.name?.toLowerCase() === profile.name.toLowerCase() || r.author_name?.toLowerCase() === profile.name.toLowerCase())) return true;
+    if (profile?.id && (r.author_id === profile.id || r.author?.id === profile.id)) return true;
+    if (profile?.email && (r.author_email?.toLowerCase() === profile.email.toLowerCase() || r.author_id?.toLowerCase() === profile.email.toLowerCase())) return true;
+    return false;
+  };
+
   // Photo Upload & Preview State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const detailPhotoInputRef = useRef<HTMLInputElement>(null);
@@ -258,10 +274,14 @@ export function Routes() {
       });
 
       if (result.success && result.url) {
-        const updatedRoute = { ...selectedRouteDetail, image: result.url };
+        const updatedRoute: Route = { 
+          ...selectedRouteDetail, 
+          image: result.url,
+          cover_image: result.url
+        };
         setSelectedRouteDetail(updatedRoute);
         const updatedList = routes.map(r => r.id === selectedRouteDetail.id ? updatedRoute : r);
-        saveRoutes(updatedList);
+        saveRoutes(updatedList, updatedRoute);
         showToast('Foto da rota atualizada com sucesso!', 'success');
       } else {
         showToast(result.error || 'Erro ao enviar foto.', 'error');
@@ -299,42 +319,71 @@ export function Routes() {
     infraestrutura: 4
   });
 
-  // Load routes from Hostinger MySQL Database (com fallback resiliente de cache)
+  // Load routes from Hostinger MySQL Database (com fusão resiliente de cache)
   useEffect(() => {
     let isMounted = true;
 
-    // 1. Carrega imediatamente do MySQL real da Hostinger
+    // Carrega do cache local primeiro para exibição instantânea sem tela vazia
+    const saved = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
+    let localCacheList: Route[] = [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          localCacheList = parsed;
+          setRoutes(parsed);
+        }
+      } catch {}
+    }
+
+    // Consulta o banco de dados da Hostinger / backend resiliente
     clientDbService.routes.getAll()
       .then((dbRoutes) => {
         if (!isMounted) return;
-        if (Array.isArray(dbRoutes) && dbRoutes.length > 0) {
-          setRoutes(dbRoutes);
-          localStorage.setItem('motolegado_routes_v3', JSON.stringify(dbRoutes));
-          localStorage.setItem('motolegado_routes', JSON.stringify(dbRoutes));
-          return;
-        }
+        const validDbRoutes = Array.isArray(dbRoutes) ? dbRoutes : [];
 
-        // Se o banco estiver vazio ou ainda sem registros, verifica cache local limpo
-        const saved = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              setRoutes(parsed);
-              return;
+        // Mapa unificado indexado por ID
+        const unifiedMap = new Map<string, Route>();
+
+        // 1. Insere rotas do banco
+        validDbRoutes.forEach((r) => {
+          const effectiveImg = r.image || (r as any).cover_image || DEFAULT_ROUTE_FALLBACK;
+          unifiedMap.set(r.id, {
+            ...r,
+            image: effectiveImg,
+            cover_image: effectiveImg
+          });
+        });
+
+        // 2. Preserva qualquer rota cadastrada localmente que ainda não esteja no banco
+        // (especialmente rotas 'pendente' ou recém-criadas pelo usuário)
+        localCacheList.forEach((localR) => {
+          if (!unifiedMap.has(localR.id)) {
+            unifiedMap.set(localR.id, localR);
+            // Sincroniza em background com o backend para garantir persistência definitiva
+            clientDbService.routes.save(localR).catch(() => {});
+          } else {
+            // Se já existe no banco, mantém imagem e dados mais ricos se presentes
+            const existing = unifiedMap.get(localR.id)!;
+            if (localR.image && localR.image !== DEFAULT_ROUTE_FALLBACK && (!existing.image || existing.image === DEFAULT_ROUTE_FALLBACK)) {
+              existing.image = localR.image;
+              existing.cover_image = localR.image;
             }
-          } catch {}
+          }
+        });
+
+        const finalList = Array.from(unifiedMap.values());
+        if (finalList.length > 0) {
+          setRoutes(finalList);
+          localStorage.setItem('motolegado_routes_v3', JSON.stringify(finalList));
+          localStorage.setItem('motolegado_routes', JSON.stringify(finalList));
         }
-        setRoutes([]);
       })
       .catch((err) => {
-        console.warn('[Routes] Aviso ao carregar rotas do MySQL:', err);
+        console.warn('[Routes] Aviso ao carregar rotas do backend:', err);
         if (!isMounted) return;
-        const saved = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
-        if (saved) {
-          try {
-            setRoutes(JSON.parse(saved));
-          } catch {}
+        if (localCacheList.length > 0) {
+          setRoutes(localCacheList);
         }
       });
 
@@ -394,11 +443,15 @@ export function Routes() {
     localStorage.setItem('motolegado_routes', JSON.stringify(updated));
     window.dispatchEvent(new Event('routes-updated'));
 
-    // Sincroniza persistência com o MySQL da Hostinger
+    // Sincroniza persistência com o MySQL da Hostinger / backend resiliente
     if (routeToPersist) {
-      clientDbService.routes.save(routeToPersist).catch((e) => {
-        console.warn('[Routes] Aviso ao persistir rota no MySQL:', e);
-      });
+      clientDbService.routes.save(routeToPersist)
+        .then((saved) => {
+          console.log('[Routes] Roteiro gravado com sucesso no backend:', saved?.id || routeToPersist.id);
+        })
+        .catch((e) => {
+          console.warn('[Routes] Aviso ao persistir rota no backend:', e);
+        });
     }
   };
 
@@ -410,13 +463,26 @@ export function Routes() {
   // Moderator Approve Route
   const handleApproveRoute = (routeId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const updated = routes.map(r => r.id === routeId ? { ...r, status: 'aprovado' as const, rejectionReason: undefined } : r);
-    saveRoutes(updated);
+    const targetRoute = routes.find(r => r.id === routeId);
+    if (!targetRoute) return;
+
+    const approvedRoute: Route = { 
+      ...targetRoute, 
+      status: 'aprovado' as const, 
+      rejectionReason: undefined 
+    };
+
+    const updated = routes.map(r => r.id === routeId ? approvedRoute : r);
+    saveRoutes(updated, approvedRoute);
+
     if (selectedRouteDetail && selectedRouteDetail.id === routeId) {
-      setSelectedRouteDetail({ ...selectedRouteDetail, status: 'aprovado', rejectionReason: undefined });
+      setSelectedRouteDetail(approvedRoute);
     }
     clientDbService.routes.updateStatus(routeId, 'aprovado').catch(() => {});
-    showToast("✓ Roteiro APROVADO com sucesso! Agora ele está visível publicamente na comunidade.", "success");
+
+    // Apresenta a tela de confirmação de moderação indispensável para o operador
+    setModerationApprovalConfirmation(approvedRoute);
+    showToast(`✓ Roteiro "${approvedRoute.name}" APROVADO com sucesso!`, "success");
   };
 
   // Moderator Reject Route
@@ -424,19 +490,32 @@ export function Routes() {
     e.preventDefault();
     if (!rejectingRouteId) return;
 
+    const targetRoute = routes.find(r => r.id === rejectingRouteId);
     const reason = rejectionReasonText.trim() || 'O roteiro necessita de mais detalhes nas informações de percurso ou endereço.';
-    const updated = routes.map(r => r.id === rejectingRouteId ? { ...r, status: 'rejeitado' as const, rejectionReason: reason } : r);
-    saveRoutes(updated);
 
-    if (selectedRouteDetail && selectedRouteDetail.id === rejectingRouteId) {
-      setSelectedRouteDetail({ ...selectedRouteDetail, status: 'rejeitado', rejectionReason: reason });
+    if (targetRoute) {
+      const rejectedRoute: Route = { 
+        ...targetRoute, 
+        status: 'rejeitado' as const, 
+        rejectionReason: reason 
+      };
+
+      const updated = routes.map(r => r.id === rejectingRouteId ? rejectedRoute : r);
+      saveRoutes(updated, rejectedRoute);
+
+      if (selectedRouteDetail && selectedRouteDetail.id === rejectingRouteId) {
+        setSelectedRouteDetail(rejectedRoute);
+      }
+
+      clientDbService.routes.updateStatus(rejectingRouteId, 'rejeitado', reason).catch(() => {});
+
+      // Apresenta tela de confirmação de rejeição com a justificativa gravada
+      setModerationRejectionConfirmation({ route: targetRoute, reason });
+      showToast(`✕ Roteiro "${targetRoute.name}" REJEITADO. Justificativa registrada.`, "error");
     }
-
-    clientDbService.routes.updateStatus(rejectingRouteId, 'rejeitado', reason).catch(() => {});
 
     setRejectingRouteId(null);
     setRejectionReasonText('');
-    showToast("✕ Roteiro REJEITADO. O autor poderá revisar as informações.", "error");
   };
 
   // Sugerir Descrição e Técnicas com IA Gemini
@@ -513,10 +592,16 @@ export function Routes() {
       riderTips: newRiderTips.trim() || "Verifique a calibragem dos pneus e nível de combustível antes de partir.",
       difficulty: newDifficulty,
       image: finalImage,
+      cover_image: finalImage,
       author: {
-        name: "Você (Piloto)",
-        avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200"
+        name: profile?.name || "Você (Piloto)",
+        avatar: profile?.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200",
+        id: profile?.id || 'pilot'
       },
+      author_id: profile?.id || 'pilot',
+      author_name: profile?.name || "Você (Piloto)",
+      author_avatar: profile?.avatar_url || '',
+      author_email: profile?.email || '',
       rating: calculatedAvgRating,
       totalRatingsCount: 1,
       ratingMetrics: newMetrics,
@@ -545,9 +630,9 @@ export function Routes() {
     setNewImage('');
     setIsCreateModalOpen(false);
 
-    // Notify user & select moderation tab or detail
-    showToast("🛡️ Roteiro cadastrado! Ele foi enviado para a MODERAÇÃO e ficará visível para a comunidade assim que for aprovado.", "info");
-    setSelectedRouteDetail(newRouteItem);
+    // Apresenta tela visual de confirmação indispensável para quem opera o sistema
+    setSubmissionSuccessRoute(newRouteItem);
+    showToast("🛡️ Roteiro gravado e enviado para moderação com sucesso!", "success");
   };
 
   // Toggle Favorite
@@ -621,6 +706,9 @@ export function Routes() {
     showToast(`⭐ Avaliação registrada! Nova média do roteiro: ${updatedAvgRating} / 5.0 (baseada em ${newTotalCount} avaliações de pilotos)`, "success");
   };
 
+  // Contagem de roteiros pendentes de moderação
+  const pendingRoutesCount = routes.filter(r => r.status === 'pendente').length;
+
   // Filtered List
   const filteredRoutes = routes.filter(r => {
     const matchesSearch = 
@@ -631,12 +719,12 @@ export function Routes() {
     if (!matchesSearch) return false;
 
     if (activeFilter === 'moderacao') return r.status === 'pendente';
-    if (activeFilter === 'meus') return r.author?.name === "Você (Piloto)";
-    if (activeFilter === 'favoritos') return r.isFavorite && (r.status === 'aprovado' || !r.status);
+    if (activeFilter === 'meus') return isUserAuthor(r);
+    if (activeFilter === 'favoritos') return r.isFavorite && (r.status === 'aprovado' || !r.status || isUserAuthor(r) || isModeratorOrAdmin);
     if (activeFilter === 'populares') return r.rating >= 4.8 && (r.status === 'aprovado' || !r.status);
 
-    // Default 'todos': Approved routes OR user's own created routes (which show status badge)
-    return (r.status === 'aprovado' || !r.status) || r.author?.name === "Você (Piloto)";
+    // Default 'todos': Roteiros aprovados OU roteiros pendentes do próprio usuário OU todos se for administrador/moderador
+    return (r.status === 'aprovado' || !r.status) || isUserAuthor(r) || isModeratorOrAdmin;
   });
 
   return (
@@ -682,7 +770,7 @@ export function Routes() {
               </h1>
               <p className="text-slate-400 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] sm:tracking-[0.25em] mt-1 flex items-center gap-2">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                EXPEDIÇÕES COM MODERAÇÃO E DICAS TURÍSTICAS VIA IA
+                EXPEDIÇÕES E DESTINOS PARA MOTOCICLISTAS
               </p>
             </div>
           </div>
@@ -718,17 +806,26 @@ export function Routes() {
             { id: 'todos', label: 'Todos os Roteiros' },
             { id: 'populares', label: '⭐ Mais Avaliados' },
             { id: 'favoritos', label: '❤️ Meus Favoritos' },
-            { id: 'meus', label: '👤 Meus Roteiros' }
+            { id: 'meus', label: '👤 Meus Roteiros' },
+            { 
+              id: 'moderacao', 
+              label: pendingRoutesCount > 0 ? `🛡️ Moderação (${pendingRoutesCount})` : '🛡️ Moderação',
+              badge: pendingRoutesCount
+            }
           ].map(f => (
             <button
               key={f.id}
               onClick={() => setActiveFilter(f.id as any)}
               className={cn(
-                "whitespace-nowrap shrink-0",
-                activeFilter === f.id ? "btn-filter-active" : "btn-filter-inactive"
+                "whitespace-nowrap shrink-0 flex items-center gap-1.5",
+                activeFilter === f.id ? "btn-filter-active" : "btn-filter-inactive",
+                f.id === 'moderacao' && pendingRoutesCount > 0 && activeFilter !== 'moderacao' ? "border-amber-500/40 text-amber-300 hover:border-amber-400" : ""
               )}
             >
               <span>{f.label}</span>
+              {f.id === 'moderacao' && pendingRoutesCount > 0 && (
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              )}
             </button>
           ))}
         </div>
@@ -1514,37 +1611,6 @@ export function Routes() {
                   </div>
                 )}
 
-                {/* Quick Action: Enviar para Diário de Bordo (Nova Viagem) */}
-                <div className="p-4 sm:p-5 bg-gradient-to-r from-orange-500/15 via-amber-500/10 to-slate-950 border border-orange-500/40 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg shadow-orange-950/20">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-md shadow-orange-500/30">
-                      <BookOpen size={22} className="stroke-[2.5]" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs sm:text-sm font-black uppercase text-white tracking-wide">
-                          Vai rodar este percurso?
-                        </h4>
-                        <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 text-[9px] font-black uppercase tracking-wider">
-                          Diário de Bordo
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-300 mt-0.5">
-                        Transfira todos os dados desta rota diretamente para o Diário e comece sua nova viagem com 1 clique.
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleLaunchInLogbook(selectedRouteDetail)}
-                    className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-orange-600/30 cursor-pointer transition-all active:scale-95 shrink-0"
-                    title="Enviar dados deste roteiro para criar uma nova viagem no Diário de Bordo"
-                  >
-                    <BookOpen size={15} />
-                    <span>ENVIAR PARA DIÁRIO (NOVA VIAGEM)</span>
-                  </button>
-                </div>
 
                 {/* Stats Bar */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center">
@@ -1561,78 +1627,88 @@ export function Routes() {
                   </div>
                 </div>
 
-                {/* GOOGLE MAPS DIRECT LINK & INTERACTIVE BUTTON */}
-                <div className="bg-slate-950 rounded-2xl border border-slate-800 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-black uppercase text-white flex items-center gap-2">
-                      <MapPin size={16} className="text-orange-500" />
-                      LOCALIZAÇÃO E NAVEGAÇÃO
-                    </h4>
-                    <p className="text-xs text-slate-300 font-medium">
-                      {selectedRouteDetail.mapsAddress}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setPdfExportRoute(selectedRouteDetail)}
-                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-rose-500/50 hover:border-rose-500 text-slate-100 hover:text-rose-400 font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95 shrink-0"
-                      title="Exportar roteiro completo para PDF para imprimir ou salvar com mapa e especificações"
-                    >
-                      <FileText size={14} className="text-rose-400" />
-                      EXPORTAR PDF
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setExportingGpsRoute(selectedRouteDetail)}
-                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-[#ff751f]/50 hover:border-[#ff751f] text-slate-100 hover:text-[#ff751f] font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95 shrink-0"
-                      title="Exportar roteiro em formato GPX (Garmin / TomTom) ou KML (Google Earth)"
-                    >
-                      <Download size={14} className="text-[#ff751f]" />
-                      EXPORTAR GPS (GPX / KML)
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setSharingRoute(selectedRouteDetail)}
-                      className="px-4 py-2.5 bg-gradient-to-r from-[#ff751f] to-amber-500 hover:from-[#ff853a] hover:to-amber-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-[#ff751f]/20 cursor-pointer transition-all active:scale-95 shrink-0"
-                      title="Compartilhar este roteiro com amigos ou redes sociais"
-                    >
-                      <Share2 size={14} className="stroke-[2.5]" />
-                      COMPARTILHAR
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleLaunchInLogbook(selectedRouteDetail)}
-                      className="px-4 py-2.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-orange-600/20 cursor-pointer transition-all active:scale-95"
-                      title="Enviar dados deste roteiro para criar uma nova viagem no Diário de Bordo"
-                    >
-                      <BookOpen size={14} />
-                      ENVIAR PARA DIÁRIO
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleCompleteRouteWithCamera(selectedRouteDetail)}
-                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95"
-                      title="Tirar foto com a câmera para comprovar e concluir este roteiro no Diário de Bordo"
-                    >
-                      <Camera size={14} className="text-orange-500" />
-                      COMPROVAR
-                    </button>
+                {/* GOOGLE MAPS DIRECT LINK & INTERACTIVE BUTTONS */}
+                <div className="bg-slate-950 rounded-2xl border border-slate-800 p-4 sm:p-5 space-y-4">
+                  {/* Header: Location & Google Maps direct link */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-black uppercase text-white flex items-center gap-2">
+                        <MapPin size={16} className="text-orange-500" />
+                        LOCALIZAÇÃO E NAVEGAÇÃO
+                      </h4>
+                      <p className="text-xs text-slate-300 font-medium">
+                        {selectedRouteDetail.mapsAddress}
+                      </p>
+                    </div>
 
                     <a 
                       href={selectedRouteDetail.mapsUrl || (selectedRouteDetail.mapsAddress.startsWith('http') ? selectedRouteDetail.mapsAddress : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedRouteDetail.mapsAddress)}`)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-sm shrink-0 transition-all"
+                      className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-orange-500/50 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all shrink-0 self-start sm:self-auto cursor-pointer"
                     >
                       <ExternalLink size={14} className="text-orange-500" />
-                      GOOGLE MAPS
+                      <span>ABRIR NO GOOGLE MAPS</span>
                     </a>
+                  </div>
+
+                  {/* Actions Grid divided in clean rows respecting card width */}
+                  <div className="space-y-2.5">
+                    {/* Row 1: Primary Actions (Enviar para Diário & Exportar PDF) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handleLaunchInLogbook(selectedRouteDetail)}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-orange-600/20 cursor-pointer transition-all active:scale-95"
+                        title="Enviar dados deste roteiro para criar uma nova viagem no Diário de Bordo"
+                      >
+                        <BookOpen size={15} />
+                        <span>ENVIAR PARA DIÁRIO (NOVA VIAGEM)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPdfExportRoute(selectedRouteDetail)}
+                        className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 border border-rose-500/60 hover:border-rose-500 text-slate-100 hover:text-rose-400 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95"
+                        title="Exportar roteiro completo para PDF para imprimir ou salvar com mapa e especificações"
+                      >
+                        <FileText size={15} className="text-rose-400" />
+                        <span>EXPORTAR PARA PDF (IMPRIMIR)</span>
+                      </button>
+                    </div>
+
+                    {/* Row 2: Secondary Tools (Exportar GPS, Compartilhar, Comprovar) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setExportingGpsRoute(selectedRouteDetail)}
+                        className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 border border-[#ff751f]/50 hover:border-[#ff751f] text-slate-100 hover:text-[#ff751f] font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95 truncate"
+                        title="Exportar roteiro em formato GPX (Garmin / TomTom) ou KML (Google Earth)"
+                      >
+                        <Download size={14} className="text-[#ff751f] shrink-0" />
+                        <span className="truncate">EXPORTAR GPS (GPX / KML)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSharingRoute(selectedRouteDetail)}
+                        className="w-full py-2.5 px-3 bg-gradient-to-r from-[#ff751f] to-amber-500 hover:from-[#ff853a] hover:to-amber-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#ff751f]/20 cursor-pointer transition-all active:scale-95 truncate"
+                        title="Compartilhar este roteiro com amigos ou redes sociais"
+                      >
+                        <Share2 size={14} className="stroke-[2.5] shrink-0" />
+                        <span className="truncate">COMPARTILHAR</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCompleteRouteWithCamera(selectedRouteDetail)}
+                        className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95 truncate"
+                        title="Tirar foto com a câmera para comprovar e concluir este roteiro no Diário de Bordo"
+                      >
+                        <Camera size={14} className="text-orange-500 shrink-0" />
+                        <span className="truncate">COMPROVAR</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1649,7 +1725,7 @@ export function Routes() {
 
                   <div>
                     <h4 className="text-xs font-black uppercase text-orange-400 tracking-wider mb-2 flex items-center gap-2">
-                      <Fuel size={16} /> MAIORES INFORMAÇÕES & DICAS TÉCNICAS PARA PILOTOS
+                      <Fuel size={16} /> DICAS TÉCNICAS E DE PILOTAGEM
                     </h4>
                     <div className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 whitespace-pre-line">
                       {selectedRouteDetail.riderTips}
@@ -1969,6 +2045,330 @@ export function Routes() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* MODAL DE CONFIRMAÇÃO: ROTEIRO ENVIADO PARA MODERAÇÃO COM SUCESSO */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {submissionSuccessRoute && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div 
+              initial={{ scale: 0.92, y: 20 }} 
+              animate={{ scale: 1, y: 0 }} 
+              exit={{ scale: 0.92, y: 20 }} 
+              className="bg-slate-900 border border-amber-500/40 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden"
+            >
+              {/* Subtle Ambient Glow */}
+              <div className="absolute top-0 right-0 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+              <div className="absolute bottom-0 left-0 w-72 h-72 bg-orange-500/10 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20" />
+
+              {/* Close Button */}
+              <button 
+                onClick={() => setSubmissionSuccessRoute(null)}
+                className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-white bg-slate-950/60 hover:bg-slate-800 transition-colors z-10"
+              >
+                <X size={18} />
+              </button>
+
+              {/* Top Success Badge & Heading */}
+              <div className="text-center space-y-3 pt-2">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500/20 to-orange-500/20 border border-amber-500/50 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20">
+                  <ShieldCheck size={34} className="text-amber-400" />
+                </div>
+                <div>
+                  <span className="px-3 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5 mb-2">
+                    <Clock size={12} />
+                    GRAVADO COM SUCESSO • AGUARDANDO MODERAÇÃO
+                  </span>
+                  <h2 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tight text-white">
+                    ROTEIRO ENVIADO PARA MODERAÇÃO!
+                  </h2>
+                  <p className="text-xs text-slate-300 max-w-md mx-auto mt-1">
+                    Seu cadastro foi salvo com segurança em nosso banco de dados e já foi encaminhado para a equipe de moderação.
+                  </p>
+                </div>
+              </div>
+
+              {/* Route Summary Card */}
+              <div className="bg-slate-950/80 rounded-2xl border border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4">
+                <div className="w-full sm:w-28 h-28 rounded-xl overflow-hidden shrink-0 bg-slate-900 border border-slate-800">
+                  <img 
+                    src={submissionSuccessRoute.image || DEFAULT_ROUTE_FALLBACK} 
+                    alt={submissionSuccessRoute.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = DEFAULT_ROUTE_FALLBACK;
+                    }}
+                  />
+                </div>
+                <div className="space-y-1.5 flex-1 min-w-0 w-full">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-400 text-[10px] font-black uppercase">
+                      {submissionSuccessRoute.difficulty}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400">
+                      ID: <span className="font-mono text-slate-300">{submissionSuccessRoute.id}</span>
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black italic uppercase text-white truncate">
+                    {submissionSuccessRoute.name}
+                  </h3>
+                  <p className="text-xs text-slate-400 flex items-center gap-1.5 truncate">
+                    <MapPin size={13} className="text-orange-500 shrink-0" />
+                    {submissionSuccessRoute.mapsAddress}
+                  </p>
+                  <p className="text-[11px] text-slate-400 line-clamp-2">
+                    {submissionSuccessRoute.description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Informative Step Box */}
+              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-2 text-xs">
+                <h4 className="font-black text-amber-300 uppercase tracking-wider flex items-center gap-2">
+                  <Info size={15} />
+                  O QUE VOCÊ PRECISA SABER:
+                </h4>
+                <ul className="text-slate-300 space-y-1.5 text-[11px] leading-relaxed list-disc list-inside">
+                  <li><strong>Persistência Garantida:</strong> Seus dados foram salvos tanto no banco de dados quanto na sua sessão local.</li>
+                  <li><strong>Protocolo de Segurança:</strong> Novos roteiros passam por verificação para assegurar trajetos válidos e dicas seguras antes da publicação geral.</li>
+                  <li><strong>Acompanhamento:</strong> Você pode visualizar e gerenciar este roteiro a qualquer momento na aba <strong>&quot;Meus Roteiros&quot;</strong> ou na aba <strong>&quot;Moderação&quot;</strong>.</li>
+                </ul>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button 
+                    onClick={() => {
+                      setSubmissionSuccessRoute(null);
+                      setActiveFilter('moderacao');
+                    }}
+                    className="w-full py-3 px-4 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20 transition-all active:scale-95"
+                  >
+                    <ShieldAlert size={15} />
+                    <span>VER NA ABA MODERAÇÃO</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setSubmissionSuccessRoute(null);
+                      setActiveFilter('meus');
+                    }}
+                    className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-700 transition-all active:scale-95"
+                  >
+                    <span>VER EM MEUS ROTEIROS</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-2">
+                  <button 
+                    onClick={() => {
+                      const target = submissionSuccessRoute;
+                      setSubmissionSuccessRoute(null);
+                      setSelectedRouteDetail(target);
+                    }}
+                    className="text-xs text-orange-400 hover:text-orange-300 font-bold underline cursor-pointer"
+                  >
+                    Ver detalhes completos do roteiro
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => {
+                        setSubmissionSuccessRoute(null);
+                        handleOpenCreateRoute();
+                      }}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all"
+                    >
+                      + Cadastrar Outro
+                    </button>
+                    <button 
+                      onClick={() => setSubmissionSuccessRoute(null)}
+                      className="px-5 py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 text-white rounded-xl text-xs font-bold transition-all"
+                    >
+                      Concluir
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* MODAL DE CONFIRMAÇÃO: APROVAÇÃO DE MODERAÇÃO CONCLUÍDA */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {moderationApprovalConfirmation && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div 
+              initial={{ scale: 0.92, y: 20 }} 
+              animate={{ scale: 1, y: 0 }} 
+              exit={{ scale: 0.92, y: 20 }} 
+              className="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-5 shadow-2xl relative overflow-hidden"
+            >
+              {/* Green Glow */}
+              <div className="absolute top-0 right-0 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+
+              <div className="text-center space-y-2 pt-2">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
+                  <CheckCircle size={36} className="text-emerald-400" />
+                </div>
+                <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
+                  <Check size={12} />
+                  STATUS: APROVADO & PUBLICADO
+                </span>
+                <h2 className="text-2xl font-black italic uppercase tracking-tight text-white">
+                  ROTEIRO APROVADO COM SUCESSO!
+                </h2>
+                <p className="text-xs text-slate-300">
+                  A moderação foi concluída. O roteiro agora está ativo e visível publicamente no catálogo comunitário.
+                </p>
+              </div>
+
+              {/* Route Summary */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black italic uppercase text-white truncate">
+                    {moderationApprovalConfirmation.name}
+                  </h4>
+                  <span className="px-2.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 text-[10px] font-black uppercase">
+                    {moderationApprovalConfirmation.difficulty}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 flex items-center gap-1 truncate">
+                  <MapPin size={13} className="text-orange-500 shrink-0" />
+                  {moderationApprovalConfirmation.mapsAddress}
+                </p>
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Moderador: <strong className="text-slate-200">{profile?.name || 'Administrador'}</strong></span>
+                  <span className="text-emerald-400 font-bold">Visível para Todos</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-2 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button 
+                    onClick={() => {
+                      const target = moderationApprovalConfirmation;
+                      setModerationApprovalConfirmation(null);
+                      setActiveFilter('todos');
+                      setSelectedRouteDetail(target);
+                    }}
+                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all"
+                  >
+                    <span>VER NO CATÁLOGO</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      const target = moderationApprovalConfirmation;
+                      setModerationApprovalConfirmation(null);
+                      setSharingRoute(target);
+                    }}
+                    className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-700 transition-all"
+                  >
+                    <Share2 size={13} className="text-[#ff751f]" />
+                    <span>COMPARTILHAR</span>
+                  </button>
+                </div>
+
+                <button 
+                  onClick={() => setModerationApprovalConfirmation(null)}
+                  className="w-full py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-all"
+                >
+                  Continuar Operando
+                </button>
+              </div>
+
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* MODAL DE CONFIRMAÇÃO: REJEIÇÃO / RECUSA DE MODERAÇÃO CONCLUÍDA */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {moderationRejectionConfirmation && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div 
+              initial={{ scale: 0.92, y: 20 }} 
+              animate={{ scale: 1, y: 0 }} 
+              exit={{ scale: 0.92, y: 20 }} 
+              className="bg-slate-900 border border-rose-500/40 rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-5 shadow-2xl relative overflow-hidden"
+            >
+              {/* Rose Glow */}
+              <div className="absolute top-0 right-0 w-60 h-60 bg-rose-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+
+              <div className="text-center space-y-2 pt-2">
+                <div className="w-16 h-16 rounded-full bg-rose-500/20 border border-rose-500/50 flex items-center justify-center mx-auto shadow-lg shadow-rose-500/20">
+                  <AlertTriangle size={36} className="text-rose-400" />
+                </div>
+                <span className="px-3 py-1 bg-rose-500/20 border border-rose-500/40 text-rose-300 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
+                  <X size={12} />
+                  STATUS: REJEITADO / DEVOLVIDO
+                </span>
+                <h2 className="text-2xl font-black italic uppercase tracking-tight text-white">
+                  ROTEIRO REJEITADO
+                </h2>
+                <p className="text-xs text-slate-300">
+                  A decisão de recusa e a justificativa foram gravadas com sucesso no sistema.
+                </p>
+              </div>
+
+              {/* Rejection Details & Reason Box */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-rose-500/30 space-y-3">
+                <h4 className="text-sm font-black italic uppercase text-white truncate">
+                  {moderationRejectionConfirmation.route.name}
+                </h4>
+                <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20 space-y-1">
+                  <span className="text-[10px] font-black uppercase text-rose-300 block">
+                    Justificativa Gravada pelo Moderador:
+                  </span>
+                  <p className="text-xs text-slate-200 italic leading-relaxed">
+                    &quot;{moderationRejectionConfirmation.reason}&quot;
+                  </p>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  O autor do roteiro poderá ver este motivo e submeter as correções necessárias para nova análise.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-2">
+                <button 
+                  onClick={() => setModerationRejectionConfirmation(null)}
+                  className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                >
+                  Continuar Moderando
+                </button>
+              </div>
+
             </motion.div>
           </motion.div>
         )}

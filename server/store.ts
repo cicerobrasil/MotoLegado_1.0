@@ -67,10 +67,31 @@ export interface StoredPaymentRequest {
   approved_by?: string;
 }
 
+export interface StoredRouteNotification {
+  id: string;
+  type?: 'route_shared' | 'system';
+  sender_id: string;
+  sender_name: string;
+  sender_avatar?: string;
+  recipient_id?: string;
+  route_id: string;
+  route_name: string;
+  route_destination: string;
+  route_distance?: number;
+  route_duration?: string;
+  route_image?: string;
+  title?: string;
+  message?: string;
+  created_at: string;
+  read?: boolean;
+}
+
 interface DataStore {
   pilots: Record<string, StoredPilot>;
   trips: StoredTrip[];
   pending_payments?: StoredPaymentRequest[];
+  notifications?: StoredRouteNotification[];
+  routes?: any[];
 }
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -104,6 +125,8 @@ function loadStore(): DataStore {
       const parsed = JSON.parse(content);
       if (!parsed.pilots) parsed.pilots = {};
       if (!parsed.trips) parsed.trips = [];
+      if (!parsed.notifications) parsed.notifications = [];
+      if (!parsed.routes) parsed.routes = [];
       if (!parsed.pilots['admin_ciceroranieri'] && !parsed.pilots['ciceroranieri@gmail.com']) {
         parsed.pilots[DEFAULT_ADMIN.id] = { ...DEFAULT_ADMIN };
       }
@@ -118,7 +141,9 @@ function loadStore(): DataStore {
       [DEFAULT_ADMIN.id]: { ...DEFAULT_ADMIN },
       [DEFAULT_ADMIN.email.toLowerCase()]: { ...DEFAULT_ADMIN }
     },
-    trips: []
+    trips: [],
+    notifications: [],
+    routes: []
   };
   saveStore(initialStore);
   return initialStore;
@@ -438,3 +463,166 @@ export function storeDeletePilot(pilotIdOrEmail: string): boolean {
   }
   return deleted;
 }
+
+// Obter notificações de roteiros compartilhados
+export function storeGetNotifications(pilotId?: string): StoredRouteNotification[] {
+  const store = loadStore();
+  const list = store.notifications || [];
+  if (!pilotId) return list;
+
+  const cleanPilotId = pilotId.toLowerCase().trim();
+  return list.filter(n => {
+    if (!n.recipient_id || n.recipient_id === 'all') return true;
+    return n.recipient_id.toLowerCase().trim() === cleanPilotId;
+  });
+}
+
+// Salvar / Disparar notificação de roteiro compartilhado
+export function storeSaveNotification(notif: Partial<StoredRouteNotification>): StoredRouteNotification {
+  const store = loadStore();
+  if (!store.notifications) store.notifications = [];
+
+  const newNotif: StoredRouteNotification = {
+    id: notif.id || `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    type: notif.type || 'route_shared',
+    sender_id: notif.sender_id || 'pilot_anon',
+    sender_name: notif.sender_name || 'Piloto Parceiro',
+    sender_avatar: notif.sender_avatar || '',
+    recipient_id: notif.recipient_id || 'all',
+    route_id: notif.route_id || '',
+    route_name: notif.route_name || 'Novo Roteiro',
+    route_destination: notif.route_destination || 'Estrada Aberta',
+    route_distance: notif.route_distance || 0,
+    route_duration: notif.route_duration || '',
+    route_image: notif.route_image || '',
+    title: notif.title || `Novo Roteiro Compartilhado: ${notif.route_name || 'Expedição'} 🏍️`,
+    message: notif.message || `${notif.sender_name || 'Um contato'} compartilhou um novo roteiro para acelerar juntos!`,
+    created_at: notif.created_at || new Date().toISOString(),
+    read: false
+  };
+
+  // Mantém as últimas 100 notificações mais recentes
+  store.notifications.unshift(newNotif);
+  if (store.notifications.length > 100) {
+    store.notifications = store.notifications.slice(0, 100);
+  }
+
+  saveStore(store);
+  return newNotif;
+}
+
+// Marcar notificação como lida
+export function storeMarkNotificationRead(id: string): boolean {
+  if (!id) return false;
+  const store = loadStore();
+  if (!store.notifications) return false;
+
+  const notif = store.notifications.find(n => n.id === id);
+  if (notif) {
+    notif.read = true;
+    saveStore(store);
+    return true;
+  }
+  return false;
+}
+
+// Limpar notificações
+export function storeClearNotifications(pilotId?: string): boolean {
+  const store = loadStore();
+  if (!store.notifications) return true;
+
+  if (!pilotId) {
+    store.notifications = [];
+  } else {
+    const clean = pilotId.toLowerCase().trim();
+    store.notifications = store.notifications.filter(n => {
+      if (!n.recipient_id || n.recipient_id === 'all') return false;
+      return n.recipient_id.toLowerCase().trim() !== clean;
+    });
+  }
+
+  saveStore(store);
+  return true;
+}
+
+// ============================================================================
+// ROTEIROS RESILIENTES (Fallback Local Garantido)
+// ============================================================================
+
+export function storeGetRoutes(status?: string): any[] {
+  const store = loadStore();
+  const list = store.routes || [];
+  if (!status) return list;
+  return list.filter(r => r.status === status);
+}
+
+export function storeGetRouteById(id: string): any | null {
+  if (!id) return null;
+  const store = loadStore();
+  const list = store.routes || [];
+  return list.find(r => r.id === id) || null;
+}
+
+export function storeSaveRoute(route: any): any {
+  const store = loadStore();
+  if (!store.routes) store.routes = [];
+
+  const finalId = route.id || `route_${Date.now()}`;
+  const now = new Date().toISOString();
+  const normalizedRoute = {
+    ...route,
+    id: finalId,
+    name: route.name || route.title || 'Roteiro de Moto',
+    title: route.title || route.name || 'Roteiro de Moto',
+    status: route.status || 'pendente',
+    created_at: route.created_at || now,
+    updated_at: now
+  };
+
+  const existingIdx = store.routes.findIndex(r => r.id === finalId);
+  if (existingIdx >= 0) {
+    store.routes[existingIdx] = {
+      ...store.routes[existingIdx],
+      ...normalizedRoute
+    };
+  } else {
+    store.routes.unshift(normalizedRoute);
+  }
+
+  saveStore(store);
+  return normalizedRoute;
+}
+
+export function storeUpdateRouteStatus(id: string, status: string, rejectionReason?: string): boolean {
+  if (!id) return false;
+  const store = loadStore();
+  if (!store.routes) return false;
+
+  const route = store.routes.find(r => r.id === id);
+  if (route) {
+    route.status = status;
+    if (rejectionReason !== undefined) {
+      route.rejection_reason = rejectionReason;
+      route.rejectionReason = rejectionReason;
+    }
+    route.updated_at = new Date().toISOString();
+    saveStore(store);
+    return true;
+  }
+  return false;
+}
+
+export function storeDeleteRoute(id: string): boolean {
+  if (!id) return false;
+  const store = loadStore();
+  if (!store.routes) return false;
+
+  const prevLen = store.routes.length;
+  store.routes = store.routes.filter(r => r.id !== id);
+  if (store.routes.length !== prevLen) {
+    saveStore(store);
+    return true;
+  }
+  return false;
+}
+

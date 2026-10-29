@@ -3,6 +3,7 @@ import { Menu, ChevronRight, LogOut, LogIn } from 'lucide-react';
 import { LogoMark } from './LogoMark';
 import { TourButton } from './TourButton';
 import { AccessibilityButton } from './AccessibilityButton';
+import { NotificationsBell } from './NotificationsBell';
 import { useAuth } from '../context/AuthContext';
 
 interface TopNavbarProps {
@@ -72,7 +73,7 @@ export function TopNavbar({ onOpenSidebar }: TopNavbarProps) {
         {/* Mobile Logo */}
         <div className="lg:hidden flex items-center shrink-0">
           <Link 
-            to="/profile"
+            to="/profile" 
             onClick={() => {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
@@ -93,8 +94,11 @@ export function TopNavbar({ onOpenSidebar }: TopNavbarProps) {
         </div>
       </div>
 
-      {/* Right: Quick Action Controls (Guia, Tema, Sair & Perfil) */}
+      {/* Right: Quick Action Controls (Notificações, Guia, Tema, Sair & Perfil) */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        {/* Notificações de Roteiros Compartilhados via Service Worker */}
+        <NotificationsBell />
+
         {/* Guia do Piloto */}
         <TourButton variant="top-menu" />
 

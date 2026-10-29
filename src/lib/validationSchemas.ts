@@ -124,6 +124,7 @@ export const routeSchema = z.object({
   riderTips: z.string().max(3000).optional(),
   difficulty: z.enum(['Fácil', 'Médio', 'Difícil', 'Especialista']),
   image: z.string().optional(),
+  cover_image: z.string().optional(),
   distance: z.coerce.number().min(0).optional(),
   duration: z.string().optional(),
   startPoint: z.string().optional(),

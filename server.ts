@@ -26,7 +26,11 @@ import {
   storeDeleteTrip,
   storeGetPaymentRequests,
   storeSavePaymentRequest,
-  storeApprovePaymentRequest
+  storeApprovePaymentRequest,
+  storeGetNotifications,
+  storeSaveNotification,
+  storeMarkNotificationRead,
+  storeClearNotifications
 } from './server/store';
 import { parseGoogleMapsRoute, calculateRouteDistanceAndDuration, extractMetricsFromText } from './server/mapsParser';
 import { sanitizeInputsMiddleware } from './server/sanitizer';
@@ -85,6 +89,17 @@ async function startServer() {
       
       const filePath = path.join(targetFolder, safeName);
       fs.writeFileSync(filePath, buffer);
+
+      // Também espelha em public/uploads para garantia de entrega imediata no Vite e Express
+      try {
+        const publicFolder = path.join(process.cwd(), 'public', 'uploads', safeFolder);
+        if (!fs.existsSync(publicFolder)) {
+          fs.mkdirSync(publicFolder, { recursive: true });
+        }
+        fs.writeFileSync(path.join(publicFolder, safeName), buffer);
+      } catch (pubErr) {
+        // Silencioso se public não estiver gravável
+      }
 
       const publicUrl = `/uploads/${safeFolder}/${safeName}`;
       return res.json({ success: true, url: publicUrl });
@@ -513,6 +528,202 @@ Mantenha a linguagem entusiasmada, técnica para motociclistas e bem estruturada
     } catch (err) {
       console.error('Erro no webhook:', err);
       res.status(200).send('OK');
+    }
+  });
+
+  // =========================================================================
+  // SISTEMA DE NOTIFICAÇÕES PUSH & ROTEIROS COMPARTILHADOS (SERVICE WORKER)
+  // =========================================================================
+  app.get('/api/notifications', async (req, res) => {
+    try {
+      const pilotId = req.query.pilot_id as string;
+      const pool = getDbPool();
+
+      if (pool) {
+        try {
+          const sql = pilotId 
+            ? 'SELECT * FROM notifications WHERE recipient_id = "all" OR recipient_id = ? OR recipient_id = "" ORDER BY created_at DESC LIMIT 50'
+            : 'SELECT * FROM notifications ORDER BY created_at DESC LIMIT 50';
+          const params = pilotId ? [pilotId] : [];
+          const [rows]: any = await pool.query(sql, params);
+
+          if (Array.isArray(rows) && rows.length > 0) {
+            const formatted = rows.map((r: any) => ({
+              id: r.id,
+              type: r.type || 'route_shared',
+              sender_id: r.sender_id,
+              sender_name: r.sender_name,
+              sender_avatar: r.sender_avatar,
+              recipient_id: r.recipient_id,
+              route_id: r.route_id,
+              route_name: r.route_name,
+              route_destination: r.route_destination,
+              route_distance: Number(r.route_distance) || 0,
+              route_duration: r.route_duration,
+              route_image: r.route_image,
+              title: r.title,
+              message: r.message,
+              created_at: r.created_at,
+              read: Boolean(r.is_read)
+            }));
+            return res.json({ success: true, notifications: formatted });
+          }
+        } catch (dbErr) {
+          console.warn('[Notifications] Consulta MySQL falhou, usando fallback store:', dbErr);
+        }
+      }
+
+      // Fallback para store local JSON
+      const notifications = storeGetNotifications(pilotId);
+      return res.json({ success: true, notifications });
+    } catch (err: any) {
+      console.error('[API NOTIFICATIONS ERROR]:', err);
+      return res.status(500).json({ success: false, error: err.message, notifications: [] });
+    }
+  });
+
+  app.post('/api/notifications/route-share', async (req, res) => {
+    try {
+      const {
+        sender_id,
+        sender_name,
+        sender_avatar,
+        recipient_id = 'all',
+        route_id,
+        route_name,
+        route_destination,
+        route_distance,
+        route_duration,
+        route_image,
+        title,
+        message
+      } = req.body;
+
+      if (!route_id || !route_name) {
+        return res.status(400).json({ success: false, error: 'Identificador e nome do roteiro são obrigatórios.' });
+      }
+
+      const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const finalTitle = title || `Novo Roteiro: ${route_name} 🏍️`;
+      const finalMessage = message || `${sender_name || 'Um motociclista parceiro'} compartilhou o roteiro "${route_name}" (${route_distance ? `~${route_distance} km` : 'rota'}) para acelerar juntos!`;
+
+      // 1. Salvar no store.json (garante persistência imediata)
+      const savedNotif = storeSaveNotification({
+        id: notifId,
+        type: 'route_shared',
+        sender_id: sender_id || 'pilot_ciceroranieri',
+        sender_name: sender_name || 'Cícero Ranieri',
+        sender_avatar: sender_avatar || '',
+        recipient_id: recipient_id || 'all',
+        route_id,
+        route_name,
+        route_destination: route_destination || '',
+        route_distance: Number(route_distance) || 0,
+        route_duration: route_duration || '',
+        route_image: route_image || '',
+        title: finalTitle,
+        message: finalMessage,
+        created_at: new Date().toISOString()
+      });
+
+      // 2. Tenta persistir no MySQL
+      const pool = getDbPool();
+      if (pool) {
+        try {
+          await pool.query(
+            `INSERT INTO notifications 
+             (id, type, sender_id, sender_name, sender_avatar, recipient_id, route_id, route_name, route_destination, route_distance, route_duration, route_image, title, message, is_read, created_at)
+             VALUES (?, 'route_shared', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())`,
+            [
+              notifId,
+              sender_id || null,
+              sender_name || 'Piloto Parceiro',
+              sender_avatar || null,
+              recipient_id || 'all',
+              route_id,
+              route_name,
+              route_destination || null,
+              Number(route_distance) || 0,
+              route_duration || null,
+              route_image || null,
+              finalTitle,
+              finalMessage
+            ]
+          );
+        } catch (dbErr) {
+          console.warn('[Notifications] Gravação MySQL falhou, mas salvo no store:', dbErr);
+        }
+      }
+
+      console.log(`[Push Notification] Roteiro "${route_name}" compartilhado com sucesso para ${recipient_id}`);
+      return res.json({ 
+        success: true, 
+        message: 'Notificação de roteiro compartilhado enviada com sucesso!',
+        notification: savedNotif
+      });
+    } catch (err: any) {
+      console.error('[API ROUTE-SHARE ERROR]:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/notifications/:id/read', async (req, res) => {
+    try {
+      const { id } = req.params;
+      storeMarkNotificationRead(id);
+
+      const pool = getDbPool();
+      if (pool) {
+        try {
+          await pool.query('UPDATE notifications SET is_read = 1 WHERE id = ?', [id]);
+        } catch (dbErr) {
+          console.warn('[Notifications] Update read status falhou no MySQL:', dbErr);
+        }
+      }
+
+      return res.json({ success: true, message: 'Notificação marcada como lida' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/notifications/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const store = storeClearNotifications(id);
+
+      const pool = getDbPool();
+      if (pool) {
+        try {
+          await pool.query('DELETE FROM notifications WHERE id = ?', [id]);
+        } catch (dbErr) {}
+      }
+
+      return res.json({ success: true, message: 'Notificação excluída com sucesso' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/notifications/clear', async (req, res) => {
+    try {
+      const { pilot_id } = req.body;
+      storeClearNotifications(pilot_id);
+
+      const pool = getDbPool();
+      if (pool) {
+        try {
+          if (pilot_id) {
+            await pool.query('DELETE FROM notifications WHERE recipient_id = ? OR recipient_id = "all"', [pilot_id]);
+          } else {
+            await pool.query('DELETE FROM notifications');
+          }
+        } catch (dbErr) {}
+      }
+
+      return res.json({ success: true, message: 'Todas as notificações foram limpas com sucesso!' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 

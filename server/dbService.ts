@@ -11,7 +11,12 @@ import {
   storeDeletePilot,
   storeGetPaymentRequests,
   storeSavePaymentRequest,
-  storeApprovePaymentRequest
+  storeApprovePaymentRequest,
+  storeGetRoutes,
+  storeGetRouteById,
+  storeSaveRoute,
+  storeUpdateRouteStatus,
+  storeDeleteRoute
 } from './store';
 
 /**
@@ -526,6 +531,7 @@ export class HostingerDbService {
   // ==========================================================================
 
   async getRoutes(status?: string): Promise<DbRoute[]> {
+    const localRoutes = storeGetRoutes(status);
     try {
       let query = 'SELECT * FROM routes';
       const params: any[] = [];
@@ -537,15 +543,25 @@ export class HostingerDbService {
 
       const rows: any = await safeMySqlQuery(query, params);
       if (rows && rows[0] && Array.isArray(rows[0])) {
-        return rows[0].map(this.normalizeRouteRow);
+        const dbList = rows[0].map(this.normalizeRouteRow);
+        // Merge with local routes to ensure any pending or unsynced routes are preserved
+        const idMap = new Map<string, DbRoute>();
+        dbList.forEach(r => idMap.set(r.id, r));
+        localRoutes.forEach(lr => {
+          if (!idMap.has(lr.id)) {
+            idMap.set(lr.id, lr);
+          }
+        });
+        return Array.from(idMap.values());
       }
     } catch (err) {
       console.warn('[HostingerDbService] getRoutes MySQL fallback:', err);
     }
-    return [];
+    return localRoutes;
   }
 
   async getRouteById(id: string): Promise<DbRoute | null> {
+    const local = storeGetRouteById(id);
     try {
       const rows: any = await safeMySqlQuery('SELECT * FROM routes WHERE id = ? LIMIT 1', [id]);
       if (rows && rows[0] && Array.isArray(rows[0]) && rows[0].length > 0) {
@@ -554,7 +570,7 @@ export class HostingerDbService {
     } catch (err) {
       console.warn('[HostingerDbService] getRouteById fallback:', err);
     }
-    return null;
+    return local;
   }
 
   async saveRoute(route: Partial<DbRoute>): Promise<DbRoute> {
@@ -571,8 +587,22 @@ export class HostingerDbService {
 
     const title = route.title || route.name || 'Roteiro de Moto';
     const desc = route.description || '';
-    const status = route.status || 'aprovado';
+    const status = route.status || 'pendente';
+    const coverImage = (route as any).cover_image || (route as any).image || (route as any).banner_url || null;
 
+    // 1. Persistência imediata garantida no arquivo local store.json
+    const localSaved = storeSaveRoute({
+      ...route,
+      id: finalId,
+      title,
+      name: title,
+      description: desc,
+      status,
+      cover_image: coverImage,
+      image: coverImage
+    });
+
+    // 2. Persistência no MySQL da Hostinger
     try {
       await safeMySqlQuery(`
         INSERT INTO routes (
@@ -597,7 +627,7 @@ export class HostingerDbService {
           duration = VALUES(duration),
           difficulty = VALUES(difficulty),
           road_type = VALUES(road_type),
-          cover_image = VALUES(cover_image),
+          cover_image = IFNULL(VALUES(cover_image), routes.cover_image),
           waypoints = VALUES(waypoints),
           rating = VALUES(rating),
           total_ratings_count = VALUES(total_ratings_count),
@@ -622,7 +652,7 @@ export class HostingerDbService {
         route.duration || null,
         route.difficulty || 'Médio',
         route.road_type || null,
-        route.cover_image || null,
+        coverImage,
         waypointsJson,
         route.rating || 5.0,
         route.total_ratings_count || 1,
@@ -635,10 +665,20 @@ export class HostingerDbService {
       console.warn('[HostingerDbService] saveRoute MySQL warning:', err);
     }
 
-    return this.normalizeRouteRow({ ...route, id: finalId, title, description: desc, status });
+    return this.normalizeRouteRow({ 
+      ...route, 
+      id: finalId, 
+      title, 
+      name: title,
+      description: desc, 
+      status, 
+      cover_image: coverImage, 
+      image: coverImage 
+    });
   }
 
   async updateRouteStatus(id: string, status: 'aprovado' | 'pendente' | 'rejeitado', rejectionReason?: string): Promise<boolean> {
+    storeUpdateRouteStatus(id, status, rejectionReason);
     try {
       await safeMySqlQuery(
         'UPDATE routes SET status = ?, rejection_reason = ? WHERE id = ?',
@@ -647,16 +687,17 @@ export class HostingerDbService {
       return true;
     } catch (err) {
       console.warn('[HostingerDbService] updateRouteStatus MySQL warning:', err);
-      return false;
+      return true; // Local store já atualizou com sucesso
     }
   }
 
   async deleteRoute(id: string): Promise<boolean> {
+    storeDeleteRoute(id);
     try {
       await safeMySqlQuery('DELETE FROM routes WHERE id = ?', [id]);
       return true;
     } catch {
-      return false;
+      return true;
     }
   }
 
@@ -674,10 +715,13 @@ export class HostingerDbService {
       try { reviews = JSON.parse(reviews); } catch { reviews = []; }
     }
 
+    const effectiveImage = row.cover_image || row.image || row.banner_url || null;
+
     return {
       ...row,
       name: row.title || row.name,
-      image: row.cover_image || row.image,
+      image: effectiveImage,
+      cover_image: effectiveImage,
       mapsAddress: row.maps_address || row.mapsAddress,
       mapsUrl: row.maps_url || row.mapsUrl,
       riderTips: row.rider_tips || row.riderTips,

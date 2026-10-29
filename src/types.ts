@@ -36,12 +36,18 @@ export interface Route {
   duration?: string; // tempo estimado (opcional, calculado no diário de bordo)
   difficulty: RouteDifficulty;
   image?: string;
+  cover_image?: string;
   startPoint?: string;
   endPoint?: string;
   author?: {
     name: string;
     avatar: string;
+    id?: string;
   };
+  author_id?: string;
+  author_name?: string;
+  author_avatar?: string;
+  author_email?: string;
   rating: number; // Média de avaliação
   totalRatingsCount: number;
   ratingMetrics: RouteRatingMetrics;

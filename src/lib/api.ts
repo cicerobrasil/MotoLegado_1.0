@@ -307,7 +307,14 @@ export async function getRouteByIdFromHostinger(id: string) {
 }
 
 export async function saveRouteToHostinger(routeData: any) {
-  const validation = validateWithZod(routeSchema, routeData);
+  const effectiveImg = routeData.image || routeData.cover_image || '';
+  const payload = {
+    ...routeData,
+    image: effectiveImg,
+    cover_image: effectiveImg
+  };
+
+  const validation = validateWithZod(routeSchema, payload);
   if (!validation.success) {
     console.warn('[Zod Validation] Roteiro inválido antes do envio:', validation.error);
     return routeData;

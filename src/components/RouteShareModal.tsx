@@ -16,13 +16,23 @@ import {
   Smartphone,
   Sparkles,
   Compass,
-  Download
+  Download,
+  BellRing,
+  Radio,
+  Users,
+  Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Route } from '../types';
 import { estimateRouteMetrics, DEFAULT_ROUTE_FALLBACK } from './Routes';
 import { exportRouteToGpx, exportRouteToKml } from '../lib/gpsExport';
 import { cn } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
+import { 
+  dispatchRouteShareNotification, 
+  getPushPermissionStatus, 
+  requestPushPermission 
+} from '../lib/pushNotifications';
 
 interface RouteShareModalProps {
   route: Route | null;
@@ -35,6 +45,12 @@ export function RouteShareModal({ route, isOpen, onClose, onToast }: RouteShareM
   const [copied, setCopied] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
   const [canNativeShare, setCanNativeShare] = useState(false);
+  const [isPushSending, setIsPushSending] = useState(false);
+  const [pushSent, setPushSent] = useState(false);
+  const [selectedRecipient, setSelectedRecipient] = useState<string>('all');
+  const [customNote, setCustomNote] = useState<string>('');
+
+  const { profile, user } = useAuth();
 
   useEffect(() => {
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
@@ -46,8 +62,45 @@ export function RouteShareModal({ route, isOpen, onClose, onToast }: RouteShareM
     if (!isOpen) {
       setCopied(false);
       setShowQrCode(false);
+      setPushSent(false);
+      setCustomNote('');
     }
   }, [isOpen]);
+
+  const handleSendPushToContacts = async () => {
+    if (!route) return;
+    setIsPushSending(true);
+    try {
+      const perm = getPushPermissionStatus();
+      if (perm === 'default') {
+        await requestPushPermission();
+      }
+
+      const senderName = profile?.name || user?.user_metadata?.name || 'Cícero Ranieri';
+      const senderAvatar = profile?.avatar_url || '';
+
+      await dispatchRouteShareNotification({
+        route,
+        sender: {
+          id: profile?.id || user?.id,
+          name: senderName,
+          avatar: senderAvatar
+        },
+        recipientId: selectedRecipient,
+        customMessage: customNote.trim() || undefined
+      });
+
+      setPushSent(true);
+      if (onToast) {
+        onToast(`Notificação push do roteiro "${route.name}" disparada para os contatos com sucesso!`, 'success');
+      }
+      setTimeout(() => setPushSent(false), 5000);
+    } catch (err: any) {
+      if (onToast) onToast('Falha ao enviar notificação push: ' + (err?.message || err), 'error');
+    } finally {
+      setIsPushSending(false);
+    }
+  };
 
   if (!isOpen || !route) return null;
 
@@ -281,6 +334,69 @@ export function RouteShareModal({ route, isOpen, onClose, onToast }: RouteShareM
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* Sistema de Notificação Push via Service Worker para Contatos */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-slate-950 border border-orange-500/40 space-y-3 shadow-lg shadow-orange-950/20">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400 shrink-0">
+                    <BellRing size={16} className="text-orange-400 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-white tracking-wide flex items-center gap-2">
+                      <span>Avisar Contatos via Push Notification</span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[8px] font-mono font-black uppercase">
+                        Service Worker
+                      </span>
+                    </h4>
+                    <p className="text-[10.5px] text-slate-300">
+                      Dispara um alerta nativo no dispositivo e painel dos seus contatos avisando sobre este roteiro.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mensagem customizada opcional */}
+              <div className="space-y-1">
+                <input
+                  type="text"
+                  placeholder="Mensagem aos parceiros (ex: Bora rodar esse sábado? Quem anima?)"
+                  value={customNote}
+                  onChange={(e) => setCustomNote(e.target.value)}
+                  className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-400 outline-none focus:border-orange-500 transition-colors"
+                />
+              </div>
+
+              {/* Botão de Disparo Push */}
+              <button
+                type="button"
+                disabled={isPushSending || pushSent}
+                onClick={handleSendPushToContacts}
+                className={cn(
+                  "w-full py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 cursor-pointer disabled:opacity-60",
+                  pushSent
+                    ? "bg-emerald-600 text-white shadow-emerald-600/30"
+                    : "bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white shadow-orange-600/30"
+                )}
+              >
+                {isPushSending ? (
+                  <>
+                    <Radio size={14} className="animate-spin text-white" />
+                    <span>Enviando Push aos Contatos...</span>
+                  </>
+                ) : pushSent ? (
+                  <>
+                    <Check size={15} className="stroke-[3]" />
+                    <span>Notificação Push Disparada com Sucesso!</span>
+                  </>
+                ) : (
+                  <>
+                    <BellRing size={14} />
+                    <span>Disparar Notificação Push via Service Worker</span>
+                  </>
+                )}
+              </button>
             </div>
 
             {/* Quick Share to Social Networks */}
