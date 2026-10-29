@@ -98,12 +98,14 @@ async function startServer() {
   app.post('/api/routes/ai-suggest-route', async (req, res) => {
     try {
       const { title, address } = req.body;
+      const targetQuery = (title || '').trim() || (address || '').trim();
 
-      if (!title || !title.trim()) {
-        return res.status(400).json({ error: 'Título do roteiro é obrigatório para gerar sugestão com IA.' });
+      if (!targetQuery) {
+        return res.status(400).json({ error: 'Informe o título ou a localização do roteiro para a IA sugerir a descrição.' });
       }
 
-      const fallbackDescription = `Roteiro incrível por "${title}"${address ? ` localizado em ${address}` : ''}. Um percurso espetacular que combina belas paisagens naturais, trechos sinuosos e uma experiência imersiva para quem pilota sobre duas rodas. Pelo caminho, você encontrará mirantes panorâmicos com vista privilegiada, paradas estratégicas para descanso e gastronomia regional típica da serra.`;
+      const effectiveTitle = (title || '').trim() || targetQuery;
+      const fallbackDescription = `Roteiro incrível por "${effectiveTitle}"${address ? ` localizado em ${address}` : ''}. Um percurso espetacular que combina belas paisagens naturais, trechos sinuosos e uma experiência imersiva para quem pilota sobre duas rodas. Pelo caminho, você encontrará mirantes panorâmicos com vista privilegiada, paradas estratégicas para descanso e gastronomia regional típica da serra.`;
 
       const fallbackTechniques = `• Pilotagem & Curvas: Mantenha postura relaxada nos braços, olhar direcionado para a saída de cada curva e atenção à inclinação da moto em trechos com declive.\n• Asfalto & Aderência: Fique atento a eventuais resíduos de folhas ou umidade nas curvas sombreadas no período da manhã.\n• Planejamento: Abasteça a moto nas cidades-base e mantenha a calibragem dos pneus adequada para o tipo de percurso.\n• Equipamentos: Jaqueta com proteções completas, luvas e viseira limpa para máxima visibilidade nas variações de luminosidade.`;
 
@@ -115,16 +117,23 @@ async function startServer() {
         });
       }
 
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({ 
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build'
+          }
+        }
+      });
 
-      const prompt = `Você é um experiente motociclista e guia de viagens de moto no Brasil e América do Sul.
-Para o roteiro de moto a seguir:
-- Título do Roteiro: "${title}"
-- Endereço / Localização: "${address || 'Não especificado'}"
+      const prompt = `Você é um experiente motociclista estradeiro e instrutor de pilotagem no Brasil e América do Sul.
+Para o seguinte roteiro de moto:
+- Título do Roteiro: "${effectiveTitle}"
+- Endereço / Localização / Destino: "${address || 'Não especificado'}"
 
-Gere uma sugestão em JSON estrito com dois campos em português:
-1. "description": Descrição envolvente e rica do local e da experiência de pilotagem (2 a 3 parágrafos fluídos sobre paisagem, estrada, história ou atmosfera).
-2. "techniques": Dicas técnicas práticas de pilotagem para essa rota (itens com marcadores • abordando curvas, frenagem, marcha/tração, qualidade do piso, segurança, postos e melhor horário).
+Gere uma sugestão em formato JSON estrito com dois campos em português:
+1. "description": Descrição envolvente, rica e cênica do local e da experiência de viagem sobre duas rodas (2 a 3 parágrafos fluídos sobre visual, relevo, pontos de parada panorâmicos e atmosfera estradeira).
+2. "techniques": Dicas técnicas práticas de pilotagem para esta rota (itens claros com marcadores • abordando técnica em curvas, frenagem dianteira/traseira, tração e marcha, qualidade do piso e aderência, abastecimento e postos, equipamentos essenciais e segurança).
 
 Responda EXCLUSIVAMENTE em formato JSON:
 {

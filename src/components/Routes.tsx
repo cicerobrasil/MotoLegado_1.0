@@ -4,7 +4,7 @@ import {
   MapPin, Star, Clock, ArrowRight, Plus, Search, Sparkles, Navigation, 
   ExternalLink, RefreshCw, Check, Fuel, Info, X, Heart, Award,
   ShieldAlert, CheckCircle, XCircle, Lock, Camera, Upload, Image as ImageIcon,
-  AlertCircle, Trash2, Loader2, BookOpen, Share2, Download
+  AlertCircle, Trash2, Loader2, BookOpen, Share2, Download, FileText, Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Route, RouteDifficulty, RouteRatingMetrics, RouteReview } from '../types';
@@ -13,6 +13,7 @@ import { isUserProOrBonificado } from '../lib/permissions';
 import { UpgradeModal } from './UpgradeModal';
 import { RouteShareModal } from './RouteShareModal';
 import { GpsExportModal } from './GpsExportModal';
+import { RoutePdfModal } from './RoutePdfModal';
 import { uploadImageToStorage } from '../lib/storage';
 import { clientDbService } from '../lib/dbService';
 import { routeSchema, validateWithZod } from '../lib/validationSchemas';
@@ -134,15 +135,24 @@ export function Routes() {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [sharingRoute, setSharingRoute] = useState<Route | null>(null);
   const [exportingGpsRoute, setExportingGpsRoute] = useState<Route | null>(null);
+  const [pdfExportRoute, setPdfExportRoute] = useState<Route | null>(null);
+
+  const handleExportPdf = (targetRoute: Route, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setPdfExportRoute(targetRoute);
+  };
 
   const handleLaunchInLogbook = (targetRoute: Route, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const metrics = estimateRouteMetrics(targetRoute);
     const query = new URLSearchParams({
       routeTitle: targetRoute.name,
       routeDest: targetRoute.mapsAddress || targetRoute.endPoint || '',
       routeOrigin: targetRoute.startPoint || '',
       routeDesc: targetRoute.description || '',
       routeImg: targetRoute.image || '',
+      routeDist: String(targetRoute.distance || metrics.distance || '150'),
+      routeDuration: targetRoute.duration || metrics.duration || '2h 15min',
       routeMaps: targetRoute.mapsUrl || (targetRoute.mapsAddress.startsWith('http') ? targetRoute.mapsAddress : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetRoute.mapsAddress || targetRoute.name)}`)
     }).toString();
     navigate(`/logbook?${query}`);
@@ -150,12 +160,15 @@ export function Routes() {
 
   const handleCompleteRouteWithCamera = (targetRoute: Route, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const metrics = estimateRouteMetrics(targetRoute);
     const query = new URLSearchParams({
       routeTitle: targetRoute.name,
       routeDest: targetRoute.mapsAddress || targetRoute.endPoint || '',
       routeOrigin: targetRoute.startPoint || '',
       routeDesc: targetRoute.description || '',
       routeImg: targetRoute.image || '',
+      routeDist: String(targetRoute.distance || metrics.distance || '150'),
+      routeDuration: targetRoute.duration || metrics.duration || '2h 15min',
       routeMaps: targetRoute.mapsUrl || (targetRoute.mapsAddress.startsWith('http') ? targetRoute.mapsAddress : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(targetRoute.mapsAddress || targetRoute.name)}`),
       openCamera: 'true'
     }).toString();
@@ -275,6 +288,8 @@ export function Routes() {
   const [aiError, setAiError] = useState<string | null>(null);
 
   // User Rating Form State
+  const [userOverallRating, setUserOverallRating] = useState<number>(5);
+  const [hoverRating, setHoverRating] = useState<number>(0);
   const [userReviewComment, setUserReviewComment] = useState('');
   const [userReviewMetrics, setUserReviewMetrics] = useState<RouteRatingMetrics>({
     paisagem: 5,
@@ -426,8 +441,9 @@ export function Routes() {
 
   // Sugerir Descrição e Técnicas com IA Gemini
   const handleSuggestAiRouteContent = async () => {
-    if (!newTitle.trim()) {
-      showToast("Por favor, preencha o Título do Roteiro para a IA gerar a sugestão.", "info");
+    const queryTerm = newTitle.trim() || newMapsAddress.trim();
+    if (!queryTerm) {
+      showToast("Por favor, informe o Título ou o Endereço/Destino do Roteiro para a IA sugerir a descrição e as técnicas.", "info");
       return;
     }
 
@@ -454,12 +470,13 @@ export function Routes() {
       }
     } catch (err: any) {
       console.warn("API Error, using fallback suggestions", err);
-      const fallbackDesc = `Roteiro fascinante por "${newTitle.trim()}"${newMapsAddress.trim() ? ` (${newMapsAddress.trim()})` : ''}. Um percurso repleto de belezas cênicas, curvas dinâmicas e paisagens ideais para quem viaja de moto.`;
+      const effectiveTitle = newTitle.trim() || newMapsAddress.trim() || 'Roteiro de Moto';
+      const fallbackDesc = `Roteiro fascinante por "${effectiveTitle}"${newMapsAddress.trim() ? ` (${newMapsAddress.trim()})` : ''}. Um percurso repleto de belezas cênicas, curvas dinâmicas e paisagens ideais para quem viaja de moto.`;
       const fallbackTech = `• Pilotagem & Curvas: Mantenha olhar na saída da curva, postura relaxada e modulação precisa no acelerador.\n• Atenção ao Asfalto: Cuidado com possíveis trechos úmidos pela manhã e folhas em curvas sombreadas.\n• Planejamento: Abasteça a moto nos pontos de apoio e verifique a calibragem dos pneus.\n• Segurança: Uso de equipamentos completos de proteção para todas as condições climáticas.`;
 
       setNewDescription(fallbackDesc);
       setNewRiderTips(fallbackTech);
-      showToast("✨ Sugestão gerada com sucesso!", "success");
+      showToast("✨ Sugestão de descrição e técnicas gerada com sucesso!", "success");
     } finally {
       setIsAiGenerating(false);
     }
@@ -543,41 +560,48 @@ export function Routes() {
     }
   };
 
-  // Submit User Review / Rating to Selected Route
+  // Submit User Review / Rating to Selected Route (Baseado na média de avaliação dos pilotos)
   const handleSubmitRating = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRouteDetail) return;
 
-    const overallRating = parseFloat(
+    const computedMetricAvg = parseFloat(
       ((userReviewMetrics.paisagem + userReviewMetrics.asfalto + userReviewMetrics.curvas + userReviewMetrics.seguranca + userReviewMetrics.infraestrutura) / 5).toFixed(1)
     );
+    const finalUserRating = userOverallRating || computedMetricAvg;
+
+    const pilotDisplayName = profile?.name || 'Piloto Registrado';
+    const pilotAvatarUrl = profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(pilotDisplayName)}&background=ea580c&color=ffffff&bold=true`;
 
     const newReview: RouteReview = {
       id: "rev-" + Date.now(),
-      pilotName: "Piloto Registrado",
-      pilotAvatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100",
-      date: "Hoje",
-      overallRating,
+      pilotName: pilotDisplayName,
+      pilotAvatar: pilotAvatarUrl,
+      date: new Date().toLocaleDateString('pt-BR'),
+      overallRating: finalUserRating,
       comment: userReviewComment.trim() || "Roteiro excelente! Ótimas curvas e belas paisagens.",
       metrics: userReviewMetrics
     };
 
     const existingReviews = selectedRouteDetail.reviews || [];
     const updatedReviews = [newReview, ...existingReviews];
-    const newTotalCount = selectedRouteDetail.totalRatingsCount + 1;
+    const curCount = selectedRouteDetail.totalRatingsCount || 0;
+    const newTotalCount = curCount + 1;
 
-    // Recalculate average metrics
-    const curMetrics = selectedRouteDetail.ratingMetrics;
+    // Recalcular métricas médias ponderadas dos pilotos
+    const curMetrics = selectedRouteDetail.ratingMetrics || { paisagem: 5, asfalto: 5, curvas: 5, seguranca: 5, infraestrutura: 5 };
     const updatedMetrics: RouteRatingMetrics = {
-      paisagem: parseFloat(((curMetrics.paisagem * selectedRouteDetail.totalRatingsCount + userReviewMetrics.paisagem) / newTotalCount).toFixed(1)),
-      asfalto: parseFloat(((curMetrics.asfalto * selectedRouteDetail.totalRatingsCount + userReviewMetrics.asfalto) / newTotalCount).toFixed(1)),
-      curvas: parseFloat(((curMetrics.curvas * selectedRouteDetail.totalRatingsCount + userReviewMetrics.curvas) / newTotalCount).toFixed(1)),
-      seguranca: parseFloat(((curMetrics.seguranca * selectedRouteDetail.totalRatingsCount + userReviewMetrics.seguranca) / newTotalCount).toFixed(1)),
-      infraestrutura: parseFloat(((curMetrics.infraestrutura * selectedRouteDetail.totalRatingsCount + userReviewMetrics.infraestrutura) / newTotalCount).toFixed(1)),
+      paisagem: parseFloat(((curMetrics.paisagem * curCount + userReviewMetrics.paisagem) / newTotalCount).toFixed(1)),
+      asfalto: parseFloat(((curMetrics.asfalto * curCount + userReviewMetrics.asfalto) / newTotalCount).toFixed(1)),
+      curvas: parseFloat(((curMetrics.curvas * curCount + userReviewMetrics.curvas) / newTotalCount).toFixed(1)),
+      seguranca: parseFloat(((curMetrics.seguranca * curCount + userReviewMetrics.seguranca) / newTotalCount).toFixed(1)),
+      infraestrutura: parseFloat(((curMetrics.infraestrutura * curCount + userReviewMetrics.infraestrutura) / newTotalCount).toFixed(1)),
     };
 
+    // A nova nota do roteiro é a média exata das avaliações dos pilotos
+    const curRating = typeof selectedRouteDetail.rating === 'number' ? selectedRouteDetail.rating : 5.0;
     const updatedAvgRating = parseFloat(
-      ((updatedMetrics.paisagem + updatedMetrics.asfalto + updatedMetrics.curvas + updatedMetrics.seguranca + updatedMetrics.infraestrutura) / 5).toFixed(1)
+      (((curRating * curCount) + finalUserRating) / newTotalCount).toFixed(1)
     );
 
     const updatedRoute: Route = {
@@ -594,7 +618,7 @@ export function Routes() {
 
     setIsRatingModalOpen(false);
     setUserReviewComment('');
-    showToast("Avaliação e notas de pilotagem registradas com sucesso!", "success");
+    showToast(`⭐ Avaliação registrada! Nova média do roteiro: ${updatedAvgRating} / 5.0 (baseada em ${newTotalCount} avaliações de pilotos)`, "success");
   };
 
   // Filtered List
@@ -774,6 +798,14 @@ export function Routes() {
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button 
+                        onClick={(e) => handleExportPdf(route, e)}
+                        className="p-2 rounded-full backdrop-blur-md border border-slate-800 bg-slate-950/70 text-slate-300 hover:text-rose-400 hover:border-rose-500/50 transition-all cursor-pointer shadow-md active:scale-95"
+                        title="Exportar para PDF (Imprimir / Salvar)"
+                      >
+                        <FileText size={14} />
+                      </button>
+
+                      <button 
                         onClick={(e) => {
                           e.stopPropagation();
                           setExportingGpsRoute(route);
@@ -880,7 +912,16 @@ export function Routes() {
                     <span>ENVIAR P/ DIÁRIO (NOVA VIAGEM)</span>
                   </button>
 
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                    <button 
+                      onClick={(e) => handleExportPdf(route, e)}
+                      className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-rose-400 border border-slate-800 hover:border-rose-500/50 text-[9px] sm:text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm group/pdf active:scale-95"
+                      title="Exportar para PDF para imprimir ou salvar com mapa e especificações"
+                    >
+                      <FileText size={12} className="text-rose-400 group-hover/pdf:scale-110 transition-transform shrink-0" />
+                      <span className="truncate">Exportar PDF</span>
+                    </button>
+
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
@@ -892,7 +933,9 @@ export function Routes() {
                       <Share2 size={12} className="text-[#ff751f] group-hover/share:scale-110 transition-transform shrink-0" />
                       <span className="truncate">Compartilhar</span>
                     </button>
+                  </div>
 
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     <button 
                       onClick={(e) => handleCompleteRouteWithCamera(route, e)}
                       className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-[9px] sm:text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-sm group/cam active:scale-95"
@@ -1151,51 +1194,84 @@ export function Routes() {
                   </div>
                 </div>
 
-                {/* Description & Rider Tips */}
+                {/* Description & Rider Tips with AI Suggestion */}
                 <div className="space-y-4 pt-2 border-t border-slate-800">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <h3 className="text-xs font-black uppercase text-orange-400 tracking-widest flex items-center gap-2">
-                      <Info size={14} /> 2. DESCRIÇÃO E DICAS TÉCNICAS
-                    </h3>
+                  <div className="p-4 bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-slate-900 border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center shrink-0 shadow-md shadow-orange-500/20">
+                        <Sparkles size={18} className="fill-slate-950" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-black uppercase text-white tracking-wide">
+                            ASSISTENTE IA PARA ROTEIROS
+                          </h4>
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[8px] font-black uppercase tracking-wider">
+                            GEMINI 3.8
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 mt-0.5">
+                          Gera automaticamente uma descrição rica do local e técnicas práticas de pilotagem para a estrada.
+                        </p>
+                      </div>
+                    </div>
 
                     <button 
                       type="button"
                       disabled={isAiGenerating}
                       onClick={handleSuggestAiRouteContent}
-                      className="px-4 py-2 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-50 shrink-0 shadow-md cursor-pointer active:scale-95"
+                      className="px-4 py-2.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-50 shrink-0 shadow-md shadow-orange-600/30 cursor-pointer active:scale-95"
                     >
                       {isAiGenerating ? (
                         <>
-                          <RefreshCw size={12} className="animate-spin" /> Sugerindo com IA...
+                          <RefreshCw size={14} className="animate-spin text-white" />
+                          <span>Gerando com IA...</span>
                         </>
                       ) : (
                         <>
-                          <Sparkles size={12} className="text-amber-200" /> Sugerir com IA (Descrição & Técnicas)
+                          <Sparkles size={14} className="text-amber-200 fill-amber-200" />
+                          <span>Sugerir com IA</span>
                         </>
                       )}
                     </button>
                   </div>
 
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Descrição do Local e Experiência do Percurso</label>
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                          <Info size={13} className="text-orange-400" />
+                          Descrição do Local e Experiência do Percurso
+                        </label>
+                        <span className="text-[9px] text-orange-400/90 font-bold uppercase tracking-wider">
+                          Paisagem, visual e atrativos
+                        </span>
+                      </div>
                       <textarea 
                         rows={3}
                         placeholder="Descreva o que os pilotos encontrarão nesta rota (paisagens, qualidade do piso, trechos históricos)... Ou clique no botão 'Sugerir com IA' acima."
                         value={newDescription}
                         onChange={(e) => setNewDescription(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-orange-500"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-orange-500 transition-colors leading-relaxed"
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Maiores Informações & Dicas Técnicas do Local</label>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                          <Fuel size={13} className="text-amber-400" />
+                          Dicas Técnicas e Instruções de Pilotagem
+                        </label>
+                        <span className="text-[9px] text-amber-400/90 font-bold uppercase tracking-wider">
+                          Curvas, piso, postos e segurança
+                        </span>
+                      </div>
                       <textarea 
-                        rows={3}
-                        placeholder="Dicas sobre pilotagem em curvas, frenagem, postos de combustível, condições de asfalto, radares, melhor época do ano..."
+                        rows={4}
+                        placeholder="Dicas técnicas de pilotagem em curvas, frenagem dianteira/traseira, postos de combustível, condições de asfalto, radares, melhor época do ano..."
                         value={newRiderTips}
                         onChange={(e) => setNewRiderTips(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-orange-500"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 outline-none focus:border-orange-500 transition-colors leading-relaxed font-mono text-[11px]"
                       />
                     </div>
                   </div>
@@ -1311,6 +1387,15 @@ export function Routes() {
                 />
 
                 <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+                  <button 
+                    onClick={() => setPdfExportRoute(selectedRouteDetail)}
+                    className="px-3.5 py-1.5 bg-slate-900/90 hover:bg-slate-800 border border-rose-500/40 hover:border-rose-500 text-slate-100 hover:text-rose-400 font-black text-xs uppercase tracking-wider rounded-full flex items-center gap-1.5 backdrop-blur-md transition-all shadow-md cursor-pointer active:scale-95"
+                    title="Exportar para PDF para imprimir ou salvar com mapa e especificações"
+                  >
+                    <FileText size={13} className="text-rose-400" />
+                    <span>Exportar PDF</span>
+                  </button>
+
                   <button 
                     onClick={() => setExportingGpsRoute(selectedRouteDetail)}
                     className="px-3.5 py-1.5 bg-slate-900/90 hover:bg-slate-800 border border-[#ff751f]/40 hover:border-[#ff751f] text-slate-100 hover:text-[#ff751f] font-black text-xs uppercase tracking-wider rounded-full flex items-center gap-1.5 backdrop-blur-md transition-all shadow-md cursor-pointer active:scale-95"
@@ -1429,6 +1514,38 @@ export function Routes() {
                   </div>
                 )}
 
+                {/* Quick Action: Enviar para Diário de Bordo (Nova Viagem) */}
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-orange-500/15 via-amber-500/10 to-slate-950 border border-orange-500/40 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg shadow-orange-950/20">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-md shadow-orange-500/30">
+                      <BookOpen size={22} className="stroke-[2.5]" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs sm:text-sm font-black uppercase text-white tracking-wide">
+                          Vai rodar este percurso?
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 text-[9px] font-black uppercase tracking-wider">
+                          Diário de Bordo
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        Transfira todos os dados desta rota diretamente para o Diário e comece sua nova viagem com 1 clique.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleLaunchInLogbook(selectedRouteDetail)}
+                    className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-orange-600/30 cursor-pointer transition-all active:scale-95 shrink-0"
+                    title="Enviar dados deste roteiro para criar uma nova viagem no Diário de Bordo"
+                  >
+                    <BookOpen size={15} />
+                    <span>ENVIAR PARA DIÁRIO (NOVA VIAGEM)</span>
+                  </button>
+                </div>
+
                 {/* Stats Bar */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center">
                   <div>
@@ -1436,10 +1553,10 @@ export function Routes() {
                     <span className="text-sm font-black text-orange-400 uppercase">{selectedRouteDetail.difficulty}</span>
                   </div>
                   <div>
-                    <span className="text-[9px] font-black uppercase text-slate-500 block">Avaliação Média</span>
-                    <span className="text-sm font-black text-amber-400 flex items-center justify-center gap-1">
-                      <Star size={14} className="fill-amber-400" />
-                      {selectedRouteDetail.rating} / 5.0
+                    <span className="text-[9px] font-black uppercase text-slate-500 block">Média de Avaliação dos Pilotos</span>
+                    <span className="text-sm font-black text-amber-400 flex items-center justify-center gap-1.5">
+                      <Star size={15} className="fill-amber-400 text-amber-400" />
+                      {selectedRouteDetail.rating.toFixed(1)} / 5.0 ({selectedRouteDetail.totalRatingsCount} {selectedRouteDetail.totalRatingsCount === 1 ? 'piloto' : 'pilotos'})
                     </span>
                   </div>
                 </div>
@@ -1457,6 +1574,16 @@ export function Routes() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setPdfExportRoute(selectedRouteDetail)}
+                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-rose-500/50 hover:border-rose-500 text-slate-100 hover:text-rose-400 font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95 shrink-0"
+                      title="Exportar roteiro completo para PDF para imprimir ou salvar com mapa e especificações"
+                    >
+                      <FileText size={14} className="text-rose-400" />
+                      EXPORTAR PDF
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => setExportingGpsRoute(selectedRouteDetail)}
@@ -1484,7 +1611,7 @@ export function Routes() {
                       title="Enviar dados deste roteiro para criar uma nova viagem no Diário de Bordo"
                     >
                       <BookOpen size={14} />
-                      ENVIAR PARA DIÁRIO (NOVA VIAGEM)
+                      ENVIAR PARA DIÁRIO
                     </button>
 
                     <button
@@ -1522,7 +1649,7 @@ export function Routes() {
 
                   <div>
                     <h4 className="text-xs font-black uppercase text-orange-400 tracking-wider mb-2 flex items-center gap-2">
-                      <Fuel size={16} /> MAIORES INFORMAÇÕES & DICAS PARA PILOTOS
+                      <Fuel size={16} /> MAIORES INFORMAÇÕES & DICAS TÉCNICAS PARA PILOTOS
                     </h4>
                     <div className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 whitespace-pre-line">
                       {selectedRouteDetail.riderTips}
@@ -1536,20 +1663,63 @@ export function Routes() {
                     <div>
                       <h4 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-2">
                         <Award size={16} className="text-amber-400" />
-                        AVALIAÇÃO DA PISTA PELOS PILOTOS (1 A 5 ESTRELAS)
+                        AVALIAÇÃO DO ROTEIRO (MÉDIA DOS PILOTOS)
                       </h4>
-                      <p className="text-[10px] text-slate-400">
-                        Baseado em {selectedRouteDetail.totalRatingsCount} {selectedRouteDetail.totalRatingsCount === 1 ? 'piloto' : 'pilotos'}
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        Média ponderada baseada na nota e critérios de {selectedRouteDetail.totalRatingsCount} {selectedRouteDetail.totalRatingsCount === 1 ? 'piloto' : 'pilotos'}.
                       </p>
                     </div>
 
                     <button 
-                      onClick={() => setIsRatingModalOpen(true)}
-                      className="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-orange-600/20"
+                      onClick={() => {
+                        setUserOverallRating(5);
+                        setIsRatingModalOpen(true);
+                      }}
+                      className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 cursor-pointer active:scale-95 transition-all"
                     >
-                      <Star size={14} className="fill-white" />
+                      <Star size={14} className="fill-slate-950 text-slate-950" />
                       AVALIAR ROTEIRO
                     </button>
+                  </div>
+
+                  {/* Highlighted Average Score Box */}
+                  <div className="p-5 bg-gradient-to-br from-slate-950 to-slate-900 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-4 text-center sm:text-left">
+                      <div className="text-4xl md:text-5xl font-black text-amber-400 font-mono tracking-tight flex items-baseline gap-1">
+                        <span>{selectedRouteDetail.rating.toFixed(1)}</span>
+                        <span className="text-sm font-bold text-slate-500">/ 5.0</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1 text-amber-400">
+                          {[1, 2, 3, 4, 5].map((starVal) => (
+                            <Star
+                              key={starVal}
+                              size={18}
+                              className={starVal <= Math.round(selectedRouteDetail.rating) ? "fill-amber-400 text-amber-400" : "text-slate-700"}
+                            />
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-slate-300 font-bold uppercase tracking-wider mt-1">
+                          Média calculada de {selectedRouteDetail.totalRatingsCount} {selectedRouteDetail.totalRatingsCount === 1 ? 'avaliação' : 'avaliações'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Metric Highlights Pill Grid */}
+                    <div className="flex-1 w-full grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {[
+                        { label: 'Paisagem', val: selectedRouteDetail.ratingMetrics.paisagem },
+                        { label: 'Asfalto', val: selectedRouteDetail.ratingMetrics.asfalto },
+                        { label: 'Curvas', val: selectedRouteDetail.ratingMetrics.curvas },
+                        { label: 'Segurança', val: selectedRouteDetail.ratingMetrics.seguranca },
+                        { label: 'Apoio', val: selectedRouteDetail.ratingMetrics.infraestrutura },
+                      ].map((item) => (
+                        <div key={item.label} className="bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-1.5 flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 uppercase font-bold">{item.label}</span>
+                          <span className="text-xs font-mono font-black text-amber-400">{item.val}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Rating Breakdown Bars */}
@@ -1646,7 +1816,44 @@ export function Routes() {
 
               <form onSubmit={handleSubmitRating} className="space-y-5">
                 
+                {/* Clickable 1-5 Star Picker */}
+                <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-center space-y-2">
+                  <label className="text-[11px] font-black uppercase text-amber-400 tracking-wider block">
+                    Sua Nota Geral (1 a 5 estrelas)
+                  </label>
+                  <div className="flex items-center justify-center gap-2 py-1">
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const activeScore = hoverRating || userOverallRating || 5;
+                      const isFilled = star <= activeScore;
+                      return (
+                        <button
+                          key={star}
+                          type="button"
+                          onMouseEnter={() => setHoverRating(star)}
+                          onMouseLeave={() => setHoverRating(0)}
+                          onClick={() => setUserOverallRating(star)}
+                          className="p-1.5 transition-transform hover:scale-125 focus:outline-none cursor-pointer"
+                        >
+                          <Star
+                            size={32}
+                            className={isFilled ? "fill-amber-400 text-amber-400" : "text-slate-700"}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="text-xs font-bold text-slate-300">
+                    Nota do Piloto: <span className="text-amber-400 font-mono font-black">{hoverRating || userOverallRating || 5} de 5</span> estrelas
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Sua nota entrará no cálculo da média geral deste roteiro.
+                  </p>
+                </div>
+
                 <div className="space-y-4 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                  <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider pb-1 border-b border-slate-800">
+                    Critérios Detalhados da Pista (1 a 5)
+                  </div>
                   {[
                     { key: 'paisagem', label: 'Paisagem & Mirantes' },
                     { key: 'asfalto', label: 'Qualidade do Asfalto' },
@@ -1787,6 +1994,13 @@ export function Routes() {
         isOpen={!!exportingGpsRoute}
         onClose={() => setExportingGpsRoute(null)}
         onToast={showToast}
+      />
+
+      {/* Modal de Exportação para PDF (Imprimir / Salvar) */}
+      <RoutePdfModal 
+        route={pdfExportRoute}
+        pilotName={profile?.name}
+        onClose={() => setPdfExportRoute(null)}
       />
     </div>
   );
