@@ -1,9 +1,8 @@
 // MotoLegado - Service Worker com Suporte a Notificações Push & PWA
-const CACHE_NAME = 'motolegado-pwa-v1';
+const CACHE_NAME = 'motolegado-pwa-v2-live';
 
-// Recursos críticos para cache inicial
+// Recursos críticos para cache inicial (NUNCA incluir rotas HTML como '/' para não servir index obsoleto)
 const PRECACHE_ASSETS = [
-  '/',
   '/favicon-32x32.png',
   '/icon.svg',
   '/pwa-192x192.png',
@@ -36,12 +35,20 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Interceptação de Requisições de Rede (Cache First para assets estáticos, Network First para API)
+// Interceptação de Requisições de Rede (Garante que HTML e API sempre venham da rede)
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // Ignora rotas de API e chamadas externas não GET
   if (url.pathname.startsWith('/api/') || event.request.method !== 'GET') {
+    return;
+  }
+
+  // Navegação de páginas (HTML) NUNCA deve ser servida de cache velho: busca sempre a versão fresca
+  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' }).catch(() => caches.match(event.request))
+    );
     return;
   }
 

@@ -319,76 +319,86 @@ export function Routes() {
     infraestrutura: 4
   });
 
-  // Load routes from Hostinger MySQL Database (com fusão resiliente de cache)
-  useEffect(() => {
-    let isMounted = true;
+  const [isRefreshingRoutes, setIsRefreshingRoutes] = useState(false);
+  const [isLoadingRoutes, setIsLoadingRoutes] = useState(true);
 
-    // Carrega do cache local primeiro para exibição instantânea sem tela vazia
-    const saved = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
-    let localCacheList: Route[] = [];
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          localCacheList = parsed;
-          setRoutes(parsed);
-        }
-      } catch {}
+  // Consulta e sincronização das rotas com o MySQL da Hostinger / backend como fonte única da verdade
+  const fetchLiveRoutes = async (isManual = false) => {
+    if (isManual) {
+      setIsRefreshingRoutes(true);
+    } else {
+      setIsLoadingRoutes(true);
     }
 
-    // Consulta o banco de dados da Hostinger / backend resiliente
-    clientDbService.routes.getAll()
-      .then((dbRoutes) => {
-        if (!isMounted) return;
-        const validDbRoutes = Array.isArray(dbRoutes) ? dbRoutes : [];
+    try {
+      // Purga qualquer resíduo anterior do localStorage em qualquer estação
+      try {
+        localStorage.removeItem('motolegado_routes_v3');
+        localStorage.removeItem('motolegado_routes');
+      } catch {}
 
-        // Mapa unificado indexado por ID
-        const unifiedMap = new Map<string, Route>();
+      const dbRoutes = await clientDbService.routes.getAll();
+      const validDbRoutes = Array.isArray(dbRoutes) ? dbRoutes : [];
 
-        // 1. Insere rotas do banco
-        validDbRoutes.forEach((r) => {
-          const effectiveImg = r.image || (r as any).cover_image || DEFAULT_ROUTE_FALLBACK;
-          unifiedMap.set(r.id, {
-            ...r,
-            image: effectiveImg,
-            cover_image: effectiveImg
-          });
-        });
-
-        // 2. Preserva qualquer rota cadastrada localmente que ainda não esteja no banco
-        // (especialmente rotas 'pendente' ou recém-criadas pelo usuário)
-        localCacheList.forEach((localR) => {
-          if (!unifiedMap.has(localR.id)) {
-            unifiedMap.set(localR.id, localR);
-            // Sincroniza em background com o backend para garantir persistência definitiva
-            clientDbService.routes.save(localR).catch(() => {});
-          } else {
-            // Se já existe no banco, mantém imagem e dados mais ricos se presentes
-            const existing = unifiedMap.get(localR.id)!;
-            if (localR.image && localR.image !== DEFAULT_ROUTE_FALLBACK && (!existing.image || existing.image === DEFAULT_ROUTE_FALLBACK)) {
-              existing.image = localR.image;
-              existing.cover_image = localR.image;
-            }
-          }
-        });
-
-        const finalList = Array.from(unifiedMap.values());
-        if (finalList.length > 0) {
-          setRoutes(finalList);
-          localStorage.setItem('motolegado_routes_v3', JSON.stringify(finalList));
-          localStorage.setItem('motolegado_routes', JSON.stringify(finalList));
-        }
-      })
-      .catch((err) => {
-        console.warn('[Routes] Aviso ao carregar rotas do backend:', err);
-        if (!isMounted) return;
-        if (localCacheList.length > 0) {
-          setRoutes(localCacheList);
-        }
+      const normalizedList = validDbRoutes.map((r) => {
+        const effectiveImg = r.image || (r as any).cover_image || DEFAULT_ROUTE_FALLBACK;
+        return {
+          ...r,
+          image: effectiveImg,
+          cover_image: effectiveImg
+        };
       });
 
-    return () => { isMounted = false; };
+      // A lista do banco de dados É a verdade definitiva do sistema.
+      // Substitui integralmente o estado em memória e purga caches legados
+      setRoutes(normalizedList);
+
+      if (isManual) {
+        showToast('Rotas sincronizadas com sucesso com o servidor!', 'success');
+      }
+    } catch (err) {
+      console.warn('[Routes] Aviso ao carregar rotas do backend:', err);
+      if (isManual) {
+        showToast('Não foi possível sincronizar no momento. Verifique a conexão.', 'error');
+      }
+    } finally {
+      if (isManual) setIsRefreshingRoutes(false);
+      setIsLoadingRoutes(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveRoutes(false);
+
+    const handleSync = () => fetchLiveRoutes(false);
+    window.addEventListener('routes-updated', handleSync);
+    return () => {
+      window.removeEventListener('routes-updated', handleSync);
+    };
   }, []);
+
+  const handleDeleteRoute = async (targetRoute: Route, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const confirmed = window.confirm(`Deseja excluir permanentemente o roteiro "${targetRoute.name}"?\nEsta ação removerá o registro para todos os usuários e estações.`);
+    if (!confirmed) return;
+
+    try {
+      await clientDbService.routes.delete(targetRoute.id);
+      const remaining = routes.filter(r => r.id !== targetRoute.id);
+      setRoutes(remaining);
+      try {
+        localStorage.removeItem('motolegado_routes_v3');
+        localStorage.removeItem('motolegado_routes');
+      } catch {}
+      window.dispatchEvent(new Event('routes-updated'));
+      if (selectedRouteDetail?.id === targetRoute.id) {
+        setSelectedRouteDetail(null);
+      }
+      showToast('Roteiro excluído permanentemente com sucesso!', 'success');
+    } catch (err: any) {
+      showToast('Falha ao excluir roteiro: ' + (err?.message || 'Erro no servidor'), 'error');
+    }
+  };
 
   // Trata abertura automática de rota/viagem compartilhada via link único (/routes?routeId=...)
   useEffect(() => {
@@ -439,8 +449,10 @@ export function Routes() {
 
   const saveRoutes = (updated: Route[], routeToPersist?: Route) => {
     setRoutes(updated);
-    localStorage.setItem('motolegado_routes_v3', JSON.stringify(updated));
-    localStorage.setItem('motolegado_routes', JSON.stringify(updated));
+    try {
+      localStorage.removeItem('motolegado_routes_v3');
+      localStorage.removeItem('motolegado_routes');
+    } catch {}
     window.dispatchEvent(new Event('routes-updated'));
 
     // Sincroniza persistência com o MySQL da Hostinger / backend resiliente
@@ -776,13 +788,26 @@ export function Routes() {
           </div>
         </div>
 
-        <button 
-          onClick={handleOpenCreateRoute}
-          className="w-full lg:w-auto btn-primary"
-        >
-          {isVip ? <Plus size={16} /> : <Lock size={15} />}
-          <span>{isVip ? "CRIAR ROTEIRO AGORA" : "+ CRIAR ROTEIRO (VIP PRO)"}</span>
-        </button>
+        <div className="flex items-center gap-2.5 w-full lg:w-auto">
+          <button 
+            type="button"
+            onClick={() => fetchLiveRoutes(true)}
+            disabled={isRefreshingRoutes}
+            className="flex-1 lg:flex-none px-4 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-orange-500/50 text-slate-200 hover:text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-95 disabled:opacity-50"
+            title="Buscar versão mais recente e limpar dados em cache do servidor"
+          >
+            <RefreshCw size={15} className={cn("text-orange-500", isRefreshingRoutes && "animate-spin")} />
+            <span>{isRefreshingRoutes ? "Atualizando..." : "Sincronizar"}</span>
+          </button>
+
+          <button 
+            onClick={handleOpenCreateRoute}
+            className="flex-1 lg:flex-none btn-primary"
+          >
+            {isVip ? <Plus size={16} /> : <Lock size={15} />}
+            <span>{isVip ? "CRIAR ROTEIRO AGORA" : "+ CRIAR ROTEIRO (VIP PRO)"}</span>
+          </button>
+        </div>
       </header>
 
       {/* FILTER & MODERATION NAVIGATION BAR */}
@@ -935,6 +960,16 @@ export function Routes() {
                       >
                         <Heart size={14} className={route.isFavorite ? "fill-white" : ""} />
                       </button>
+
+                      {(isUserAuthor(route) || isModeratorOrAdmin) && (
+                        <button 
+                          onClick={(e) => handleDeleteRoute(route, e)}
+                          className="p-2 rounded-full backdrop-blur-md border border-slate-800 bg-slate-950/70 text-slate-400 hover:text-red-400 hover:border-red-500/50 transition-all cursor-pointer shadow-md active:scale-95"
+                          title="Excluir Roteiro Permanentemente do Servidor"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1056,7 +1091,15 @@ export function Routes() {
           );
         })}
 
-        {filteredRoutes.length === 0 && (
+        {isLoadingRoutes && routes.length === 0 ? (
+          <div className="col-span-full py-20 text-center bg-slate-900/40 border border-slate-800 rounded-3xl space-y-4">
+            <Loader2 size={36} className="text-orange-500 mx-auto animate-spin" />
+            <h3 className="text-base font-black italic uppercase text-slate-200">Consultando Banco de Dados...</h3>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              Sincronizando a versão mais recente dos roteiros diretamente do servidor sem cache.
+            </p>
+          </div>
+        ) : filteredRoutes.length === 0 ? (
           <div className="col-span-full py-16 text-center bg-slate-900/40 border border-slate-800 rounded-3xl space-y-3">
             <Navigation size={36} className="text-slate-600 mx-auto animate-bounce" />
             <h3 className="text-lg font-black italic uppercase text-slate-300">Nenhum Roteiro Encontrado</h3>
@@ -1075,7 +1118,7 @@ export function Routes() {
               </button>
             )}
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* ========================================================================= */}
@@ -1524,6 +1567,17 @@ export function Routes() {
                     )}
                     <span>{isUploadingDetailPhoto ? 'Enviando...' : 'Trocar Foto'}</span>
                   </button>
+
+                  {(isUserAuthor(selectedRouteDetail) || isModeratorOrAdmin) && (
+                    <button 
+                      onClick={(e) => handleDeleteRoute(selectedRouteDetail, e)}
+                      className="px-3 py-1.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-500/50 hover:border-rose-400 text-xs font-bold text-rose-200 rounded-full flex items-center gap-1.5 backdrop-blur-md transition-all shadow-md cursor-pointer"
+                      title="Excluir este roteiro permanentemente do servidor"
+                    >
+                      <Trash2 size={13} className="text-rose-400" />
+                      <span>Excluir</span>
+                    </button>
+                  )}
 
                   <button 
                     onClick={() => setSelectedRouteDetail(null)}

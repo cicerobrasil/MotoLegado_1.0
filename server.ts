@@ -48,6 +48,17 @@ async function startServer() {
   // Camada global de sanitização contra injeção de scripts maliciosos (XSS)
   app.use(sanitizeInputsMiddleware);
 
+  // Política estrita de anti-caching: impede que navegadores, proxies ou CDNs retenham dados obsoletos ou retornem 304 Not Modified
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/' || req.path.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+    }
+    next();
+  });
+
   // Armazenamento local de uploads no próprio servidor Hostinger / VPS
   const uploadsDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadsDir)) {

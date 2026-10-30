@@ -9,6 +9,8 @@
  * - Garante que somente dados autênticos persistidos no banco de dados da Hostinger permaneçam.
  */
 
+import { initClientCacheGuard } from './cacheManager';
+
 // IDs conhecidos de dados mockados / sementes legadas
 const MOCK_EVENT_IDS = new Set([
   'e_fest_1', 'e_fest_2', 'e_sul_1', 'e_pend_1', 'e_pend_2', 
@@ -130,30 +132,33 @@ export function limparCacheEEstadoGlobal(): void {
   if (typeof window === 'undefined') return;
 
   try {
-    // 1. Limpeza completa e incondicional do sessionStorage em cada carregamento
+    // 1. Executa o guardião de cache do cliente e purga de versões legadas
+    initClientCacheGuard();
+
+    // 2. Limpeza completa e incondicional do sessionStorage em cada carregamento
     try {
       sessionStorage.clear();
     } catch (e) {
       console.warn('[systemReset] Aviso ao limpar sessionStorage:', e);
     }
 
-    // 2. Remoção incondicional de chaves globais de resíduos de teste e modo demo
+    // 3. Remoção incondicional de chaves globais de resíduos de teste e modo demo
     DIRTY_RESIDUE_KEYS.forEach(key => {
       try {
         localStorage.removeItem(key);
       } catch {}
     });
 
-    // 3. Forçar logout se houver usuário convidado, modelo ou de teste
+    // 4. Forçar logout se houver usuário convidado, modelo ou de teste
     FORCE_GUEST_AND_TEST_LOGOUT();
 
-    // 4. Limpeza rigorosa de eventos mockados
+    // 5. Limpeza rigorosa de eventos mockados
     CLEAN_MOCK_EVENTS();
 
-    // 5. Limpeza rigorosa de parceiros mockados
+    // 6. Limpeza rigorosa de parceiros mockados
     CLEAN_MOCK_PARTNERS();
 
-    // 6. Limpeza rigorosa de roteiros mockados
+    // 7. Limpeza incondicional de roteiros locais obsoletos (banco de dados é a única verdade)
     CLEAN_MOCK_ROUTES();
 
     // 7. Limpeza rigorosa de viagens locais mockadas
@@ -341,34 +346,15 @@ function CLEAN_MOCK_PARTNERS(): void {
 }
 
 /**
- * Limpeza rigorosa de roteiros mockados
+ * Limpeza incondicional de cache de roteiros
+ * Garante que dados excluídos ou obsoletos em estações antigas nunca ressurjam
  */
 function CLEAN_MOCK_ROUTES(): void {
   const checkKeys = ['motolegado_routes', 'motolegado_routes_v3'];
   checkKeys.forEach(key => {
-    const raw = localStorage.getItem(key);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const cleaned = parsed.filter((r: any) => {
-            if (!r || !r.id) return false;
-            if (MOCK_ROUTE_IDS.has(String(r.id))) return false;
-            const name = String(r.name || '').toLowerCase();
-            const address = String(r.mapsAddress || '').toLowerCase();
-            const author = String(r.author?.name || '').toLowerCase();
-            const isMock = name.includes('cunha') || name.includes('paraty') || 
-                           address.includes('cunha') || address.includes('paraty') ||
-                           author.includes('renato') || name.includes('estrada real') ||
-                           name.includes('roteiro teste') || name.includes('mock');
-            return !isMock;
-          });
-          localStorage.setItem(key, JSON.stringify(cleaned));
-        }
-      } catch {
-        localStorage.setItem(key, JSON.stringify([]));
-      }
-    }
+    try {
+      localStorage.removeItem(key);
+    } catch {}
   });
 }
 

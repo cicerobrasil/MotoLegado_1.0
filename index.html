@@ -8,6 +8,44 @@
     <meta property="og:title" content="MotoLegado" />
     <meta property="og:description" content="Plataforma completa para motociclistas e estradeiros com diário de bordo, rotas, eventos, parceiros e ranking comunitário." />
 
+    <!-- Anti-cache meta tags para forçar atualização em todas as estações e navegadores -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
+    <!-- Script de Invalidação Imediata de Cache Obsoleto e Sincronização entre Máquinas -->
+    <script>
+      (function() {
+        try {
+          var CURRENT_BUILD = '2026.10.30_v5_live_sync';
+          var cachedBuild = localStorage.getItem('motolegado_app_cache_v');
+          if (cachedBuild !== CURRENT_BUILD) {
+            // Limpa dados de entidades em cache local para que sempre venham 100% atualizados do servidor
+            var keysToRemove = [
+              'motolegado_routes',
+              'motolegado_routes_v3',
+              'motolegado_events',
+              'motolegado_partners',
+              'motolegado_partners_moderation',
+              'motolegado_community_posts_v1',
+              'motolegado_clubs',
+              'motolegado_clubs_moderation',
+              'motolegado_mural_posts'
+            ];
+            for (var i = 0; i < keysToRemove.length; i++) {
+              localStorage.removeItem(keysToRemove[i]);
+            }
+            if ('caches' in window) {
+              caches.keys().then(function(keys) {
+                keys.forEach(function(k) { caches.delete(k); });
+              });
+            }
+            localStorage.setItem('motolegado_app_cache_v', CURRENT_BUILD);
+          }
+        } catch(e) {}
+      })();
+    </script>
+
     <!-- React Fast Refresh Preamble Safety (guarantees $RefreshReg$ is defined before any modules load) -->
     <script>
       window.$RefreshReg$ = window.$RefreshReg$ || function() {};

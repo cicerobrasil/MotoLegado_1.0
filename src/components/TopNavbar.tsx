@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, ChevronRight, LogOut, LogIn } from 'lucide-react';
+import { Menu, ChevronRight, LogOut, LogIn, RefreshCw } from 'lucide-react';
 import { LogoMark } from './LogoMark';
 import { TourButton } from './TourButton';
 import { AccessibilityButton } from './AccessibilityButton';
 import { NotificationsBell } from './NotificationsBell';
 import { useAuth } from '../context/AuthContext';
+import { forceHardReload } from '../utils/cacheManager';
 
 interface TopNavbarProps {
   onOpenSidebar: () => void;
@@ -41,6 +43,12 @@ export function TopNavbar({ onOpenSidebar }: TopNavbarProps) {
       : '';
 
   const currentPageTitle = ROUTE_NAMES[location.pathname] || 'MotoLegado';
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncApp = () => {
+    setIsSyncing(true);
+    forceHardReload();
+  };
 
   const handleSignOut = async () => {
     try {
@@ -94,8 +102,19 @@ export function TopNavbar({ onOpenSidebar }: TopNavbarProps) {
         </div>
       </div>
 
-      {/* Right: Quick Action Controls (Notificações, Guia, Tema, Sair & Perfil) */}
+      {/* Right: Quick Action Controls (Sincronizar, Notificações, Guia, Tema, Sair & Perfil) */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        {/* Sincronizar Tudo & Limpar Cache */}
+        <button
+          onClick={handleSyncApp}
+          disabled={isSyncing}
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 border border-slate-800 hover:border-orange-500 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer shrink-0 disabled:opacity-50"
+          title="Limpar Cache e Sincronizar Dados em Tempo Real com o Servidor"
+          aria-label="Sincronizar Dados"
+        >
+          <RefreshCw size={16} className={isSyncing ? "animate-spin text-orange-500" : "text-slate-400 hover:text-orange-400"} />
+        </button>
+
         {/* Notificações de Roteiros Compartilhados via Service Worker */}
         <NotificationsBell />
 

@@ -6,6 +6,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { uploadImageToStorage } from '../lib/storage';
 import { syncTripToHostinger, getTripsFromHostinger, deleteTripFromHostinger } from '../lib/api';
+import { clientDbService } from '../lib/dbService';
 import { UpgradeModal, UpgradeFeatureTrigger } from './UpgradeModal';
 import { TripChecklist } from './TripChecklist';
 import { TripReportModal } from './TripReportModal';
@@ -740,30 +741,27 @@ export function Logbook() {
   const [availableRoutes, setAvailableRoutes] = useState<Route[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string>('');
 
-  // Carrega roteiros para o seletor
+  // Carrega roteiros para o seletor diretamente da fonte da verdade (banco de dados)
   useEffect(() => {
+    let isMounted = true;
     const loadRoutes = () => {
-      try {
-        const saved = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            setAvailableRoutes(parsed);
-            return;
-          }
-        }
-      } catch (err) {
-        console.error('Erro ao carregar roteiros:', err);
-      }
-      setAvailableRoutes([]);
+      clientDbService.routes.getAll()
+        .then((dbRoutes) => {
+          if (!isMounted) return;
+          const list = Array.isArray(dbRoutes) ? dbRoutes : [];
+          setAvailableRoutes(list);
+        })
+        .catch((err) => {
+          console.error('[Logbook] Erro ao carregar roteiros do banco:', err);
+          if (isMounted) setAvailableRoutes([]);
+        });
     };
 
     loadRoutes();
     window.addEventListener('routes-updated', loadRoutes);
-    window.addEventListener('storage', loadRoutes);
     return () => {
+      isMounted = false;
       window.removeEventListener('routes-updated', loadRoutes);
-      window.removeEventListener('storage', loadRoutes);
     };
   }, []);
 

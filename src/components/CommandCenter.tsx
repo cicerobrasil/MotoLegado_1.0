@@ -783,35 +783,17 @@ export function CommandCenter() {
       localStorage.setItem('motolegado_partners', JSON.stringify([]));
     }
 
-    // Load Routes for Moderation
+    // Load Routes for Moderation directly from live database
     const loadRoutes = () => {
-      const savedRoutes = localStorage.getItem('motolegado_routes_v3') || localStorage.getItem('motolegado_routes');
-      if (savedRoutes) {
-        try { 
-          const parsed = JSON.parse(savedRoutes);
-          const mockIds = ['serra-rio-rastro', 'estrada-graciosa', 'rota-das-hortensias', 'route-pending-1', '1'];
-          const cleaned = Array.isArray(parsed) ? parsed.filter((r: Route) => {
-            const name = (r.name || '').toLowerCase();
-            const address = (r.mapsAddress || '').toLowerCase();
-            const author = (r.author?.name || '').toLowerCase();
-            const isMock = mockIds.includes(r.id) ||
-              name.includes('cunha') || name.includes('paraty') || address.includes('cunha') || address.includes('paraty') ||
-              author.includes('renato') || name.includes('estrada real');
-            return !isMock;
-          }) : [];
-          setRoutes(cleaned); 
-          localStorage.setItem('motolegado_routes', JSON.stringify(cleaned));
-          localStorage.setItem('motolegado_routes_v3', JSON.stringify(cleaned));
-        } catch (e) { 
-          setRoutes([]); 
-          localStorage.setItem('motolegado_routes', JSON.stringify([]));
-          localStorage.setItem('motolegado_routes_v3', JSON.stringify([]));
-        }
-      } else {
-        setRoutes([]);
-        localStorage.setItem('motolegado_routes', JSON.stringify([]));
-        localStorage.setItem('motolegado_routes_v3', JSON.stringify([]));
-      }
+      clientDbService.routes.getAll()
+        .then((dbRoutes) => {
+          const list = Array.isArray(dbRoutes) ? dbRoutes : [];
+          setRoutes(list);
+        })
+        .catch((e) => {
+          console.warn('[CommandCenter] Falha ao carregar rotas do banco:', e);
+          setRoutes([]);
+        });
     };
     loadRoutes();
 

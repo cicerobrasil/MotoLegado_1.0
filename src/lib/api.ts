@@ -52,9 +52,18 @@ export async function fetchFromApi<T = any>(endpoint: string, options: RequestIn
       }
     }
 
-    const res = await fetch(endpoint, {
+    // Cache-Busting estrito para prevenir 304 Not Modified, disk cache e divergência entre navegadores/estações
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const cacheBuster = `_cb=${Date.now()}`;
+    const targetUrl = endpoint.startsWith('/api') ? `${endpoint}${separator}${cacheBuster}` : endpoint;
+
+    const res = await fetch(targetUrl, {
+      cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
         ...(finalOptions.headers || {})
       },
       ...finalOptions
