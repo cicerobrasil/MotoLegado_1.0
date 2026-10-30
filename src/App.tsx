@@ -29,6 +29,47 @@ import { GlobalImageLightbox } from "./components/GlobalImageLightbox";
 import { cn } from "./lib/utils";
 import "./utils/systemReset";
 
+import { useAuth } from "./context/AuthContext";
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, profile, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#ff751f] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user && !profile) {
+    return <Navigate to="/" replace state={{ from: location }} />;
+  }
+
+  return <>{children}</>;
+}
+
+function RootRoute() {
+  const { user, profile, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#001b3d] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#ff751f] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Usuários autenticados na rota raiz são direcionados automaticamente para o /dashboard
+  if (user || profile) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Usuários não autenticados visualizam exclusivamente a LandingPage
+  return <LandingPage />;
+}
+
 function AppLayout() {
   const location = useLocation();
   const isLandingPage = location.pathname === "/";
@@ -50,8 +91,8 @@ function AppLayout() {
 
         <main className="flex-1 overflow-y-auto pb-16 lg:pb-8">
           <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/" element={<RootRoute />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/events" element={<Events />} />
           <Route path="/partners" element={<Partners />} />
           <Route path="/feed" element={<Feed />} />
@@ -60,16 +101,16 @@ function AppLayout() {
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/ranking" element={<GlobalRanking />} />
           <Route path="/leaderboard" element={<GlobalRanking />} />
-          <Route path="/motoclub" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/motoclubes" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/motoclub/:id" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/motoclub/:id/mural" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/motoclub/:id/apply" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/command-center" element={<CommandCenter />} />
-          <Route path="/admin" element={<CommandCenter />} />
-          <Route path="/profile" element={<ProfileDashboard />} />
-          <Route path="/profile/settings" element={<ProfileSettings />} />
-          <Route path="/logbook" element={<Logbook />} />
+          <Route path="/motoclub" element={<Navigate to="/" replace />} />
+          <Route path="/motoclubes" element={<Navigate to="/" replace />} />
+          <Route path="/motoclub/:id" element={<Navigate to="/" replace />} />
+          <Route path="/motoclub/:id/mural" element={<Navigate to="/" replace />} />
+          <Route path="/motoclub/:id/apply" element={<Navigate to="/" replace />} />
+          <Route path="/command-center" element={<ProtectedRoute><CommandCenter /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute><CommandCenter /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><ProfileDashboard /></ProtectedRoute>} />
+          <Route path="/profile/settings" element={<ProtectedRoute><ProfileSettings /></ProtectedRoute>} />
+          <Route path="/logbook" element={<ProtectedRoute><Logbook /></ProtectedRoute>} />
         </Routes>
       </main>
     </div>

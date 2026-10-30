@@ -93,7 +93,6 @@ export function RouteMetricsPanel({
   // Processamento e consolidação de telemetria
   const metricsData = useMemo(() => {
     if (logs.length === 0) {
-      // Estado de demonstração se o usuário ainda não tiver registros
       return {
         totalKm: 0,
         totalMinutes: 0,
@@ -101,14 +100,7 @@ export function RouteMetricsPanel({
         avgMinutesPerTrip: 0,
         avgSpeedKmH: 0,
         tripsCount: 0,
-        chartData: [
-          { name: 'Ponto 0', tripKm: 0, accumKm: 0, tripHours: 0, accumHours: 0, durationFormatted: '0min', rawDurationMin: 0, date: 'Início' },
-          { name: 'Demo 1', tripKm: 120, accumKm: 120, tripHours: 1.8, accumHours: 1.8, durationFormatted: '1h 50min', rawDurationMin: 110, date: 'Rota 1' },
-          { name: 'Demo 2', tripKm: 240, accumKm: 360, tripHours: 3.5, accumHours: 5.3, durationFormatted: '3h 30min', rawDurationMin: 210, date: 'Rota 2' },
-          { name: 'Demo 3', tripKm: 180, accumKm: 540, tripHours: 2.5, accumHours: 7.8, durationFormatted: '2h 30min', rawDurationMin: 150, date: 'Rota 3' },
-          { name: 'Demo 4', tripKm: 310, accumKm: 850, tripHours: 4.2, accumHours: 12.0, durationFormatted: '4h 10min', rawDurationMin: 250, date: 'Rota 4' }
-        ],
-        isDemo: true
+        chartData: []
       };
     }
 
@@ -253,11 +245,6 @@ export function RouteMetricsPanel({
               <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950/50 border border-cyan-500/30 px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1">
                 <Calendar size={11} className="text-cyan-400" />
                 {periodLabel}
-              </span>
-            )}
-            {metricsData.isDemo && (
-              <span className="text-[10px] font-bold text-amber-400 bg-amber-950/40 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                Modo Demonstração
               </span>
             )}
           </div>
@@ -474,9 +461,26 @@ export function RouteMetricsPanel({
           </span>
         </div>
 
-        {/* Gráfico Recharts Responsivo */}
-        <div className="h-64 sm:h-72 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+        {/* Gráfico Recharts Responsivo ou Estado Vazio */}
+        {metricsData.chartData.length === 0 ? (
+          <div className="h-64 sm:h-72 w-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-slate-800/80 rounded-2xl bg-slate-950/40">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-3 shadow-inner">
+              <RouteIcon size={24} />
+            </div>
+            <p className="text-sm font-bold text-slate-200">Nenhuma viagem registrada no Diário de Bordo ainda</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-md">Cadastre sua primeira aventura sobre duas rodas para gerar as estatísticas e evolução de telemetria.</p>
+            <button
+              type="button"
+              onClick={onNewTripClick || (() => navigate('/logbook'))}
+              className="mt-4 px-5 py-2.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-lg shadow-orange-600/20 active:scale-95 transition-all"
+            >
+              <Plus size={15} />
+              <span>Registrar Primeira Viagem</span>
+            </button>
+          </div>
+        ) : (
+          <div className="h-64 sm:h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
             {activeTab === 'combined' ? (
               <ComposedChart data={metricsData.chartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                 <defs>
@@ -552,6 +556,7 @@ export function RouteMetricsPanel({
             )}
           </ResponsiveContainer>
         </div>
+        )}
 
         {/* Rodapé Informativo */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-3 border-t border-slate-900 text-[11px] font-bold text-slate-400">

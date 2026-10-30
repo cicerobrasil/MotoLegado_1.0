@@ -23,11 +23,19 @@ import { getPilotLiveGamification } from '../lib/gamification';
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, loading } = useAuth();
+  const isAuthenticated = Boolean(user || profile);
   const [events, setEvents] = useState<MotoEvent[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [selectedTripModal, setSelectedTripModal] = useState<LogEntry | null>(null);
+
+  // Redireciona imediatamente para a Landing Page (/) caso não haja piloto autenticado
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [loading, isAuthenticated, navigate]);
 
   useEffect(() => {
     const loadDashboardData = () => {

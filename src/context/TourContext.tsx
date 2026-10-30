@@ -89,18 +89,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
 
-  // Check if first-time user on dashboard
-  useEffect(() => {
-    const hasSeenTour = localStorage.getItem('motolegado_tour_completed');
-    if (!hasSeenTour) {
-      const timer = setTimeout(() => {
-        // Auto-start for new visitors
-        setIsActive(true);
-        setCurrentStepIndex(0);
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, []);
+  // O tour não deve iniciar automaticamente ao carregar a página nem redirecionar o visitante
+
 
   const openGuideModal = () => {
     setIsActive(false);

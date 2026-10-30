@@ -34,9 +34,16 @@ export function OnboardingTour() {
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  // Auto-navigate to relevant page for current step if needed
+  // O tour NUNCA deve ser executado na Landing Page (/) nem sequestrar a rota inicial do visitante
   useEffect(() => {
-    if (!isActive) return;
+    if (location.pathname === '/' && isActive) {
+      skipTour();
+    }
+  }, [location.pathname, isActive, skipTour]);
+
+  // Auto-navigate to relevant page for current step if needed (apenas fora da landing page)
+  useEffect(() => {
+    if (!isActive || location.pathname === '/') return;
 
     if (currentStep.path && location.pathname !== currentStep.path) {
       navigate(currentStep.path);
@@ -273,6 +280,10 @@ export function OnboardingTour() {
       navigate(currentStep.path);
     }
   };
+
+  if (!isActive || location.pathname === '/') {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-[9990] pointer-events-auto">

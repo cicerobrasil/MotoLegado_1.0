@@ -182,6 +182,8 @@ export function Routes() {
   
   // Modals & Notifications state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createFormError, setCreateFormError] = useState<string | null>(null);
+  const [isSubmittingRoute, setIsSubmittingRoute] = useState(false);
 
   const handleOpenCreateRoute = () => {
     if (!isVip) {
@@ -195,6 +197,8 @@ export function Routes() {
     setNewDescription('');
     setNewRiderTips('');
     setAiError(null);
+    setCreateFormError(null);
+    setIsSubmittingRoute(false);
     setIsCreateModalOpen(true);
   };
   const [selectedRouteDetail, setSelectedRouteDetail] = useState<Route | null>(null);
@@ -574,11 +578,23 @@ export function Routes() {
   };
 
   // Create Route Handler (Submitted for Moderation)
-  const handleCreateRoute = (e: React.FormEvent) => {
+  const handleCreateRoute = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCreateFormError(null);
 
-    if (!newTitle.trim()) {
-      showToast("Informe o título do roteiro!", "error");
+    const trimmedTitle = newTitle.trim();
+    if (!trimmedTitle || trimmedTitle.length < 3) {
+      const err = "Por favor, informe o título do roteiro (mínimo de 3 caracteres).";
+      setCreateFormError(err);
+      showToast(err, "error");
+      return;
+    }
+
+    const trimmedAddress = newMapsAddress.trim();
+    if (!trimmedAddress || trimmedAddress.length < 2) {
+      const err = "Por favor, informe a localização ou endereço da rota no Google Maps.";
+      setCreateFormError(err);
+      showToast(err, "error");
       return;
     }
 
@@ -586,22 +602,27 @@ export function Routes() {
       ((newMetrics.paisagem + newMetrics.asfalto + newMetrics.curvas + newMetrics.seguranca + newMetrics.infraestrutura) / 5).toFixed(1)
     );
 
-    const formattedMapsUrl = newMapsUrl.trim()
-      ? (newMapsUrl.trim().startsWith('http') ? newMapsUrl.trim() : `https://${newMapsUrl.trim()}`)
-      : (newMapsAddress.trim().startsWith('http')
-          ? newMapsAddress.trim()
-          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(newMapsAddress.trim() || newTitle.trim())}`);
+    let formattedMapsUrl = newMapsUrl.trim();
+    if (formattedMapsUrl && !formattedMapsUrl.startsWith('http://') && !formattedMapsUrl.startsWith('https://')) {
+      formattedMapsUrl = `https://${formattedMapsUrl}`;
+    }
+    if (!formattedMapsUrl) {
+      formattedMapsUrl = trimmedAddress.startsWith('http')
+        ? trimmedAddress
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trimmedAddress || trimmedTitle)}`;
+    }
 
     const sanitizedImage = sanitizeAndExtractImageUrl(newImage);
     const finalImage = sanitizedImage.trim() || DEFAULT_ROUTE_FALLBACK;
+    const trimmedDescription = newDescription.trim() || `Roteiro por ${trimmedTitle}. Percurso incrível para motociclistas com belas paisagens e curvas.`;
 
     const newRouteItem: Route = {
       id: "route-" + Date.now(),
-      name: newTitle.trim(),
-      mapsAddress: newMapsAddress.trim() || newTitle.trim(),
+      name: trimmedTitle,
+      mapsAddress: trimmedAddress || trimmedTitle,
       mapsUrl: formattedMapsUrl,
-      description: newDescription.trim() || "Roteiro cadastrado pelo piloto no MotoLegado.",
-      riderTips: newRiderTips.trim() || "Verifique a calibragem dos pneus e nível de combustível antes de partir.",
+      description: trimmedDescription,
+      riderTips: newRiderTips.trim() || "Verifique a calibragem dos pneus, nível de combustível e equipe-se com proteções adequadas.",
       difficulty: newDifficulty,
       image: finalImage,
       cover_image: finalImage,
@@ -623,28 +644,63 @@ export function Routes() {
       status: 'pendente' // NOVO ROTEIRO VEM PENDENTE DE MODERAÇÃO
     };
 
-    // Validação rigorosa com Zod no cliente
+    // Validação com Zod no cliente
     const validation = validateWithZod(routeSchema, newRouteItem);
     if (!validation.success) {
+      setCreateFormError(validation.error);
       showToast(validation.error, "error");
       return;
     }
 
-    const updated = [newRouteItem, ...routes];
-    saveRoutes(updated, newRouteItem);
+    setIsSubmittingRoute(true);
 
-    // Reset Form
-    setNewTitle('');
-    setNewMapsAddress('');
-    setNewMapsUrl('');
-    setNewDescription('');
-    setNewRiderTips('');
-    setNewImage('');
-    setIsCreateModalOpen(false);
+    try {
+      // 1. Salva diretamente no banco de dados da Hostinger / backend
+      let savedRouteItem: Route = newRouteItem;
+      try {
+        const dbResult = await clientDbService.routes.save(newRouteItem);
+        if (dbResult && dbResult.id) {
+          savedRouteItem = {
+            ...newRouteItem,
+            ...dbResult,
+            image: dbResult.image || newRouteItem.image,
+            cover_image: dbResult.cover_image || newRouteItem.cover_image
+          };
+        }
+      } catch (saveErr) {
+        console.warn("[Routes] Salvo em contingência local devido a oscilação de rede:", saveErr);
+      }
 
-    // Apresenta tela visual de confirmação indispensável para quem opera o sistema
-    setSubmissionSuccessRoute(newRouteItem);
-    showToast("🛡️ Roteiro gravado e enviado para moderação com sucesso!", "success");
+      // 2. Atualiza estado da lista em memória garantindo visibilidade imediata
+      setRoutes(prev => [savedRouteItem, ...prev.filter(r => r.id !== savedRouteItem.id)]);
+      window.dispatchEvent(new Event('routes-updated'));
+
+      // 3. Fecha o modal de cadastro
+      setIsCreateModalOpen(false);
+
+      // 4. Limpa os estados do formulário
+      setNewTitle('');
+      setNewMapsAddress('');
+      setNewMapsUrl('');
+      setNewDescription('');
+      setNewRiderTips('');
+      setNewImage('');
+      setCreateFormError(null);
+
+      // 5. APRESENTA A TELA DE CONFIRMAÇÃO DE ENVIO PARA MODERAÇÃO (INDISPENSÁVEL PARA O OPERADOR)
+      setSubmissionSuccessRoute(savedRouteItem);
+
+      // 6. Seleciona automaticamente a aba de moderação para que o operador veja o roteiro com badge pendente
+      setActiveFilter('moderacao');
+
+      showToast("🛡️ Roteiro gravado e enviado para moderação com sucesso!", "success");
+    } catch (err: any) {
+      console.error("[Routes] Falha no envio para moderação:", err);
+      setCreateFormError(err?.message || "Erro inesperado ao gravar o roteiro.");
+      showToast(err?.message || "Erro ao gravar roteiro.", "error");
+    } finally {
+      setIsSubmittingRoute(false);
+    }
   };
 
   // Toggle Favorite
@@ -742,18 +798,18 @@ export function Routes() {
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8">
       
-      {/* Toast Notification Banner */}
+      {/* Toast Notification Banner (Flutuante com z-index máximo sobre todos os modais) */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
             className={cn(
-              "p-4 rounded-2xl border font-bold text-xs flex items-center justify-between gap-3 shadow-xl z-50",
-              toastMessage.type === 'success' ? "bg-emerald-950/90 border-emerald-500/50 text-emerald-200" :
-              toastMessage.type === 'error' ? "bg-rose-950/90 border-rose-500/50 text-rose-200" :
-              "bg-amber-950/90 border-amber-500/50 text-amber-200"
+              "fixed top-5 right-5 sm:right-8 max-w-md w-[calc(100%-2.5rem)] p-4 rounded-2xl border font-bold text-xs flex items-center justify-between gap-3 shadow-2xl z-[9999] backdrop-blur-xl",
+              toastMessage.type === 'success' ? "bg-emerald-950/95 border-emerald-500/60 text-emerald-200" :
+              toastMessage.type === 'error' ? "bg-rose-950/95 border-rose-500/60 text-rose-200" :
+              "bg-amber-950/95 border-amber-500/60 text-amber-200"
             )}
           >
             <div className="flex items-center gap-2">
@@ -762,7 +818,7 @@ export function Routes() {
               {toastMessage.type === 'info' && <ShieldAlert size={18} className="text-amber-400 shrink-0" />}
               <span>{toastMessage.text}</span>
             </div>
-            <button onClick={() => setToastMessage(null)} className="p-1 hover:bg-white/10 rounded-lg">
+            <button onClick={() => setToastMessage(null)} className="p-1 hover:bg-white/10 rounded-lg cursor-pointer">
               <X size={16} />
             </button>
           </motion.div>
@@ -1163,7 +1219,7 @@ export function Routes() {
               </div>
 
               {/* Modal Form */}
-              <form onSubmit={handleCreateRoute} className="p-4 sm:p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+              <form onSubmit={handleCreateRoute} noValidate className="p-4 sm:p-6 space-y-6 max-h-[75vh] overflow-y-auto">
                 
                 {/* Basic Info */}
                 <div className="space-y-4">
@@ -1177,10 +1233,12 @@ export function Routes() {
                       <label className="text-[10px] font-black uppercase text-slate-400">Título do Roteiro *</label>
                       <input 
                         type="text"
-                        required
                         placeholder="Ex: Rota das Curvas da Serra Gaúcha"
                         value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
+                        onChange={(e) => {
+                          setNewTitle(e.target.value);
+                          if (createFormError) setCreateFormError(null);
+                        }}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-all"
                       />
                     </div>
@@ -1192,10 +1250,12 @@ export function Routes() {
                       </label>
                       <input 
                         type="text"
-                        required
                         placeholder="Ex: RS-235, Gramado / Canela - RS"
                         value={newMapsAddress}
-                        onChange={(e) => setNewMapsAddress(e.target.value)}
+                        onChange={(e) => {
+                          setNewMapsAddress(e.target.value);
+                          if (createFormError) setCreateFormError(null);
+                        }}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:border-orange-500 transition-all"
                       />
                     </div>
@@ -1206,7 +1266,8 @@ export function Routes() {
                         Link do Google Maps (Opcional)
                       </label>
                       <input 
-                        type="url"
+                        type="text"
+                        inputMode="url"
                         placeholder="Ex: https://maps.app.goo.gl/... ou link de rota"
                         value={newMapsUrl}
                         onChange={(e) => setNewMapsUrl(e.target.value)}
@@ -1455,27 +1516,46 @@ export function Routes() {
                   </div>
                 </div>
 
+                {/* Error Banner inside Modal */}
+                {createFormError && (
+                  <div className="p-3.5 bg-rose-500/20 border border-rose-500/40 rounded-xl text-rose-200 text-xs font-bold flex items-center gap-2">
+                    <AlertCircle size={16} className="text-rose-400 shrink-0" />
+                    <span>{createFormError}</span>
+                  </div>
+                )}
+
                 {/* Submit Action Bar */}
-                <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
+                <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="text-[10px] text-amber-400 font-bold flex items-center gap-1.5">
                     <ShieldAlert size={14} />
                     Roteiro passará por moderação
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                     <button 
                       type="button"
+                      disabled={isSubmittingRoute}
                       onClick={() => setIsCreateModalOpen(false)}
-                      className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-black uppercase tracking-wider"
+                      className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-black uppercase tracking-wider cursor-pointer disabled:opacity-50"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit"
-                      className="px-7 py-3 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white rounded-xl text-xs font-black uppercase tracking-wider italic shadow-lg shadow-orange-600/30 flex items-center gap-2"
+                      disabled={isSubmittingRoute}
+                      className="px-7 py-3 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white rounded-xl text-xs font-black uppercase tracking-wider italic shadow-lg shadow-orange-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all disabled:opacity-60"
                     >
-                      <Plus size={16} />
-                      ENVIAR PARA MODERAÇÃO
+                      {isSubmittingRoute ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin text-white" />
+                          <span>GRAVANDO E ENVIANDO...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} />
+                          <span>ENVIAR PARA MODERAÇÃO</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

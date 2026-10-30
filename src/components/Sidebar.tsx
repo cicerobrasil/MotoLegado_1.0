@@ -264,32 +264,19 @@ export function Sidebar({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }
               </div>
             </>
           ) : (
-            <>
-              <div className="rounded-xl bg-[#00273d]/90 border border-slate-700/80 p-3.5 space-y-2.5">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-orange-600/20 border border-orange-500/40 flex items-center justify-center text-orange-400 shrink-0">
-                    <User size={16} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-black uppercase text-white truncate">Modo Visitante</p>
-                    <p className="text-[10px] text-slate-400 truncate">Sem sessão conectada</p>
-                  </div>
-                </div>
-                <Link
-                  to="/"
-                  onClick={() => setIsOpen(false)}
-                  className="btn-primary w-full py-2 px-3 text-xs flex items-center justify-center gap-1.5 font-black uppercase tracking-wider"
-                >
-                  <LogIn size={14} />
-                  <span>Entrar / Cadastrar</span>
-                </Link>
-              </div>
+            <div className="space-y-2.5">
+              <Link
+                to="/"
+                onClick={() => setIsOpen(false)}
+                className="btn-primary w-full py-2.5 px-3 text-xs flex items-center justify-center gap-2 font-black uppercase tracking-wider shadow-md shadow-orange-600/20 active:scale-95 transition-all"
+              >
+                <LogIn size={15} />
+                <span>Entrar / Cadastrar</span>
+              </Link>
 
               {/* Action: PWA Install */}
-              <div className="space-y-2 pt-1">
-                <PWAInstallButton variant="sidebar" />
-              </div>
-            </>
+              <PWAInstallButton variant="sidebar" />
+            </div>
           )}
         </div>
       </aside>
