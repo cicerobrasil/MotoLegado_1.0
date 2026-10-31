@@ -24,10 +24,20 @@ export interface RouteReview {
   metrics?: Partial<RouteRatingMetrics>;
 }
 
+export const BRAZILIAN_UFS = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 
+  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 
+  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+] as const;
+
+export type BrazilianUF = typeof BRAZILIAN_UFS[number];
+
 export interface Route {
   id: string;
   name: string; // Título do Roteiro
   mapsAddress: string; // Endereço ou Query do Google Maps
+  city?: string; // Cidade extraída ou informada
+  uf?: string; // Sigla do Estado / UF (ex: SP, MG, RJ)
   mapsUrl?: string; // Link direto do Google Maps
   description: string; // Descrição do local
   riderTips: string; // Maiores informações e dicas do local
@@ -36,6 +46,7 @@ export interface Route {
   duration?: string; // tempo estimado (opcional, calculado no diário de bordo)
   difficulty: RouteDifficulty;
   image?: string;
+  images?: string[]; // Até 3 fotos em alta resolução para o carrossel padrão
   cover_image?: string;
   startPoint?: string;
   endPoint?: string;

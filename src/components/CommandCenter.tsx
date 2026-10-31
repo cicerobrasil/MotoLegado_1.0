@@ -69,8 +69,10 @@ import {
 } from 'recharts';
 import { cn } from '../lib/utils';
 import { Partner } from './Partners';
-import { CommunityPost, Route, RouteDifficulty } from '../types';
-import { estimateRouteMetrics } from './Routes';
+import { CommunityPost, Route, RouteDifficulty, BRAZILIAN_UFS } from '../types';
+import { estimateRouteMetrics, extractCity, extractUf } from './Routes';
+import { useImageLightbox } from '../context/ImageLightboxContext';
+import { uploadImageToStorage } from '../lib/storage';
 import { getDbStatus, initDbTables, getPilotsFromHostinger, syncPilotToHostinger } from '../lib/api';
 import { clientDbService } from '../lib/dbService';
 import { DateInput } from './DateInput';
@@ -310,16 +312,23 @@ export function CommandCenter() {
   const [postRejectionReason, setPostRejectionReason] = useState('');
 
   // Routes Moderation Modal State
+  const { openCarousel } = useImageLightbox();
   const [viewingRouteModal, setViewingRouteModal] = useState<Route | null>(null);
   const [isEditingRouteInModal, setIsEditingRouteInModal] = useState(false);
   const [editRouteName, setEditRouteName] = useState('');
   const [editRouteMapsAddress, setEditRouteMapsAddress] = useState('');
+  const [editRouteUf, setEditRouteUf] = useState('SP');
   const [editRouteDistance, setEditRouteDistance] = useState('');
   const [editRouteDuration, setEditRouteDuration] = useState('');
   const [editRouteDescription, setEditRouteDescription] = useState('');
   const [editRouteRiderTips, setEditRouteRiderTips] = useState('');
   const [editRouteDifficulty, setEditRouteDifficulty] = useState<RouteDifficulty>(RouteDifficulty.MEDIUM);
   const [editRouteImage, setEditRouteImage] = useState('');
+  const [editRouteImages, setEditRouteImages] = useState<string[]>([]);
+  const editRouteFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingRoutePhoto, setIsUploadingRoutePhoto] = useState(false);
+  const [isApprovingRoute, setIsApprovingRoute] = useState(false);
+  const [routeApprovalSuccess, setRouteApprovalSuccess] = useState<Route | null>(null);
 
   // Partners Requests State
   const [partnerRequests, setPartnerRequests] = useState<PartnerRequest[]>([]);
@@ -939,39 +948,85 @@ export function CommandCenter() {
     const metrics = estimateRouteMetrics(route);
     setViewingRouteModal(route);
     setEditRouteName(route.name || '');
-    setEditRouteMapsAddress(route.mapsAddress || '');
+    setEditRouteMapsAddress(route.city || extractCity(route));
+    setEditRouteUf(route.uf || extractUf(route) || 'SP');
     setEditRouteDistance(route.distance ? String(route.distance) : metrics.distance);
     setEditRouteDuration(route.duration || metrics.duration);
     setEditRouteDescription(route.description || '');
     setEditRouteRiderTips(route.riderTips || '');
     setEditRouteDifficulty(route.difficulty || RouteDifficulty.MEDIUM);
-    setEditRouteImage(route.image || '');
+    const existingImgs = Array.isArray(route.images) && route.images.length > 0
+      ? route.images
+      : (route.image ? [route.image] : []);
+    setEditRouteImages(existingImgs);
+    setEditRouteImage(existingImgs[0] || route.image || '');
     setIsEditingRouteInModal(editMode);
   };
 
-  const handleSaveAndApproveRoute = (routeId: string) => {
-    const updated = routes.map(r => {
-      if (r.id === routeId) {
-        return {
-          ...r,
-          name: editRouteName.trim() || r.name,
-          mapsAddress: editRouteMapsAddress.trim() || r.mapsAddress,
-          distance: parseInt(editRouteDistance.replace(/\D/g, ''), 10) || undefined,
-          duration: editRouteDuration.trim() || undefined,
-          description: editRouteDescription.trim() || r.description,
-          riderTips: editRouteRiderTips.trim() || r.riderTips,
-          difficulty: editRouteDifficulty,
-          image: editRouteImage.trim() || r.image,
-          status: 'aprovado' as const
-        };
-      }
-      return r;
-    });
-    saveRoutesList(updated);
-    addAuditLog(`Roteiro "${editRouteName}" EDITADO & APROVADO pela moderação`);
-    showToast(`Roteiro "${editRouteName}" foi editado e aprovado com sucesso!`, 'success');
-    setViewingRouteModal(null);
-    setIsEditingRouteInModal(false);
+  const handleSaveAndApproveRoute = async (routeId: string) => {
+    const targetRoute = routes.find(r => r.id === routeId) || viewingRouteModal;
+    if (!targetRoute) return;
+
+    setIsApprovingRoute(true);
+    try {
+      const distNum = parseInt(editRouteDistance.replace(/\D/g, ''), 10);
+      const trimmedCity = editRouteMapsAddress.trim() || targetRoute.city || extractCity(targetRoute);
+      const fullAddress = trimmedCity.toLowerCase().includes(editRouteUf.toLowerCase())
+        ? trimmedCity
+        : `${trimmedCity} - ${editRouteUf}`;
+
+      const finalImgs = editRouteImages.length > 0 
+        ? editRouteImages.slice(0, 3) 
+        : (editRouteImage.trim() ? [editRouteImage.trim()] : (targetRoute.images || [targetRoute.image || '']));
+
+      const approvedRoute: Route = {
+        ...targetRoute,
+        id: routeId,
+        name: editRouteName.trim() || targetRoute.name || 'Roteiro Sem Título',
+        city: trimmedCity,
+        uf: editRouteUf,
+        mapsAddress: fullAddress,
+        distance: !isNaN(distNum) && distNum > 0 ? distNum : targetRoute.distance,
+        duration: editRouteDuration.trim() || targetRoute.duration,
+        description: editRouteDescription.trim() || targetRoute.description || '',
+        riderTips: editRouteRiderTips.trim() || targetRoute.riderTips || '',
+        difficulty: editRouteDifficulty || targetRoute.difficulty || RouteDifficulty.MEDIUM,
+        image: finalImgs[0] || targetRoute.image || '',
+        cover_image: finalImgs[0] || targetRoute.cover_image || '',
+        images: finalImgs,
+        status: 'aprovado' as const,
+        rejectionReason: undefined
+      };
+
+      // 1. Grava diretamente no backend MySQL da Hostinger
+      await clientDbService.routes.save(approvedRoute);
+      await clientDbService.routes.updateStatus(routeId, 'aprovado');
+
+      // 2. Atualiza estado da lista e cache local
+      const updated = routes.map(r => r.id === routeId ? approvedRoute : r);
+      setRoutes(updated);
+      try {
+        localStorage.setItem('motolegado_routes', JSON.stringify(updated));
+        localStorage.setItem('motolegado_routes_v3', JSON.stringify(updated));
+      } catch {}
+
+      // 3. Notifica ouvintes
+      window.dispatchEvent(new Event('routes-updated'));
+
+      // 4. Registro de auditoria & Toast
+      addAuditLog(`Roteiro "${approvedRoute.name}" EDITADO & APROVADO pela moderação`);
+      showToast(`Roteiro "${approvedRoute.name}" foi editado e aprovado com sucesso!`, 'success');
+
+      // 5. Fecha modal de edição e exibe TELA DE CONFIRMAÇÃO INDISPENSÁVEL PARA O OPERADOR
+      setViewingRouteModal(null);
+      setIsEditingRouteInModal(false);
+      setRouteApprovalSuccess(approvedRoute);
+    } catch (err: any) {
+      console.error('[CommandCenter] Falha ao aprovar roteiro:', err);
+      showToast(err?.message || 'Erro ao persistir aprovação do roteiro.', 'info');
+    } finally {
+      setIsApprovingRoute(false);
+    }
   };
 
   const handleConfirmDeletePost = () => {
@@ -1383,38 +1438,59 @@ export function CommandCenter() {
     }
   };
 
-  const handleConfirmRouteAction = () => {
+  const handleConfirmRouteAction = async () => {
     if (!pendingActionRoute) return;
     const { route, action } = pendingActionRoute;
     if (action === 'approve') {
+      const approvedRoute: Route = {
+        ...route,
+        status: 'aprovado' as const,
+        rejectionReason: undefined
+      };
       const updatedRoutes = routes.map(r => {
         if (r.id === route.id) {
-          return {
-            ...r,
-            status: 'aprovado' as const
-          };
+          return approvedRoute;
         }
         return r;
       });
       setRoutes(updatedRoutes);
-      localStorage.setItem('motolegado_routes', JSON.stringify(updatedRoutes));
-      localStorage.setItem('motolegado_routes_v3', JSON.stringify(updatedRoutes));
+      try {
+        localStorage.setItem('motolegado_routes', JSON.stringify(updatedRoutes));
+        localStorage.setItem('motolegado_routes_v3', JSON.stringify(updatedRoutes));
+      } catch {}
+
+      try {
+        await clientDbService.routes.save(approvedRoute);
+        await clientDbService.routes.updateStatus(route.id, 'aprovado');
+      } catch (err) {
+        console.warn('[CommandCenter] Falha na sincronização de aprovação com o banco:', err);
+      }
+
       window.dispatchEvent(new Event('routes-updated'));
-      clientDbService.routes.updateStatus(route.id, 'aprovado').catch(() => {});
       addAuditLog(`Roteiro "${route.name}" APROVADO pelo moderador`);
       showToast(`Roteiro "${route.name}" APROVADO com sucesso!`, "success");
+      setPendingActionRoute(null);
+      setRouteApprovalSuccess(approvedRoute);
     } else {
       // Exclui permanentemente o roteiro não aprovado da base de dados
       const updatedRoutes = routes.filter(r => r.id !== route.id);
       setRoutes(updatedRoutes);
-      localStorage.setItem('motolegado_routes', JSON.stringify(updatedRoutes));
-      localStorage.setItem('motolegado_routes_v3', JSON.stringify(updatedRoutes));
+      try {
+        localStorage.setItem('motolegado_routes', JSON.stringify(updatedRoutes));
+        localStorage.setItem('motolegado_routes_v3', JSON.stringify(updatedRoutes));
+      } catch {}
+
+      try {
+        await clientDbService.routes.delete(route.id);
+      } catch (err) {
+        console.warn('[CommandCenter] Falha ao excluir roteiro no banco:', err);
+      }
+
       window.dispatchEvent(new Event('routes-updated'));
-      clientDbService.routes.delete(route.id).catch(() => {});
       addAuditLog(`Roteiro "${route.name}" NÃO APROVADO e EXCLUÍDO da base de dados`);
       showToast(`Roteiro "${route.name}" não foi aprovado e foi excluído permanentemente.`, "info");
+      setPendingActionRoute(null);
     }
-    setPendingActionRoute(null);
   };
 
   // Calculated Counts
@@ -2050,7 +2126,7 @@ export function CommandCenter() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             className={cn(
-              "fixed top-6 right-6 z-50 px-6 py-4 rounded-2xl border shadow-2xl flex items-center gap-3 backdrop-blur-md text-xs font-black uppercase tracking-wider",
+              "fixed top-6 right-6 z-[9999] px-6 py-4 rounded-2xl border shadow-2xl flex items-center gap-3 backdrop-blur-md text-xs font-black uppercase tracking-wider",
               toast.type === 'success' 
                 ? "bg-emerald-950/90 border-emerald-500/50 text-emerald-200" 
                 : "bg-amber-950/90 border-amber-500/50 text-amber-200"
@@ -4758,9 +4834,41 @@ export function CommandCenter() {
                 /* VIEW FULL ROUTE */
                 <div className="space-y-4">
                   {viewingRouteModal.image && (
-                    <div className="rounded-2xl overflow-hidden border border-slate-800 h-52 relative">
-                      <img src={viewingRouteModal.image} alt={viewingRouteModal.name} className="w-full h-full object-cover" />
+                    <div 
+                      className="rounded-2xl overflow-hidden border border-slate-800 h-52 relative cursor-zoom-in group/hero"
+                      onClick={() => {
+                        const photos = Array.isArray(viewingRouteModal.images) && viewingRouteModal.images.length > 0
+                          ? viewingRouteModal.images
+                          : [viewingRouteModal.image!];
+                        openCarousel(photos, 0, viewingRouteModal.name, viewingRouteModal.mapsAddress);
+                      }}
+                      title="Clique para abrir carrossel em tela cheia"
+                    >
+                      <img src={viewingRouteModal.image} alt={viewingRouteModal.name} className="w-full h-full object-cover group-hover/hero:scale-105 transition-transform duration-500" />
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+                      
+                      {/* Photo thumbnails if multiple */}
+                      {Array.isArray(viewingRouteModal.images) && viewingRouteModal.images.length > 1 && (
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10 bg-slate-950/80 p-1.5 rounded-xl border border-slate-700 backdrop-blur-md">
+                          {viewingRouteModal.images.map((img, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openCarousel(viewingRouteModal.images!, idx, viewingRouteModal.name, viewingRouteModal.mapsAddress);
+                              }}
+                              className="w-9 h-9 rounded-lg overflow-hidden border border-slate-600 hover:border-amber-400 cursor-pointer shadow-sm"
+                            >
+                              <img src={img} alt="" className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                          <span className="text-[9px] font-black text-amber-400 px-1">
+                            {viewingRouteModal.images.length} fotos
+                          </span>
+                        </div>
+                      )}
+
                       <div className="absolute bottom-3 left-4 right-4">
                         <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-orange-600 text-white">
                           {viewingRouteModal.difficulty}
@@ -4773,10 +4881,15 @@ export function CommandCenter() {
                   )}
 
                   <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">LOCALIZAÇÃO / ENDEREÇO GOOGLE MAPS</span>
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">LOCALIZAÇÃO / CIDADE E UF</span>
                     <p className="text-xs text-amber-400 flex items-center gap-1 font-bold">
                       <MapPin size={13} className="shrink-0" />
-                      {viewingRouteModal.mapsAddress}
+                      <span>{extractCity(viewingRouteModal)}</span>
+                      <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-black">
+                        {extractUf(viewingRouteModal)}
+                      </span>
+                      <span className="text-slate-500">•</span>
+                      <span className="text-slate-400">{viewingRouteModal.mapsAddress}</span>
                     </p>
                   </div>
 
@@ -4819,7 +4932,7 @@ export function CommandCenter() {
                         Curadoria e Edição de Roteiro
                       </strong>
                       <span className="text-[11px] text-amber-200/90 leading-relaxed">
-                        Faça os ajustes necessários no título, descrição ou dicas do roteiro e clique em <strong>"Salvar Edição & Aprovar"</strong>.
+                        Faça os ajustes necessários no título, cidade/UF, fotos ou dicas do roteiro e clique em <strong>"Salvar Edição & Aprovar Roteiro"</strong>.
                       </span>
                     </div>
                   </div>
@@ -4834,14 +4947,36 @@ export function CommandCenter() {
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Endereço no Google Maps:</label>
-                    <input 
-                      type="text" 
-                      value={editRouteMapsAddress} 
-                      onChange={(e) => setEditRouteMapsAddress(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500" 
-                    />
+                  {/* Endereço / Cidade e UF Separados */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2 space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1.5">
+                        <MapPin size={13} className="text-orange-500" />
+                        Cidade / Endereço:
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editRouteMapsAddress} 
+                        onChange={(e) => setEditRouteMapsAddress(e.target.value)}
+                        placeholder="Ex: São Miguel Arcanjo"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500" 
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Estado / UF:</label>
+                      <select
+                        value={editRouteUf}
+                        onChange={(e) => setEditRouteUf(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-bold text-amber-400 outline-none focus:border-amber-500 uppercase cursor-pointer"
+                      >
+                        {BRAZILIAN_UFS.map(uf => (
+                          <option key={uf} value={uf} className="bg-slate-900 text-white">
+                            {uf} - Estado
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -4887,14 +5022,101 @@ export function CommandCenter() {
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400">URL da Foto de Capa:</label>
+                  {/* Gerenciamento de Fotos (Até 3 fotos no padrão MotoLegado) */}
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1.5">
+                        <Camera size={13} className="text-amber-400" />
+                        Fotos do Roteiro ({editRouteImages.length} de 3 • Máximo de 3 fotos)
+                      </label>
+                      <span className="text-[9px] font-black text-amber-400">
+                        Clique para ampliar no modo Carrossel
+                      </span>
+                    </div>
+
                     <input 
-                      type="text" 
-                      value={editRouteImage} 
-                      onChange={(e) => setEditRouteImage(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500" 
+                      type="file" 
+                      ref={editRouteFileInputRef} 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setIsUploadingRoutePhoto(true);
+                        try {
+                          const result = await uploadImageToStorage(file, { folder: 'routes', userId: profile?.id || 'admin' });
+                          if (result.success && result.url) {
+                            setEditRouteImages(prev => {
+                              const updated = [...prev, result.url].slice(0, 3);
+                              setEditRouteImage(updated[0] || '');
+                              return updated;
+                            });
+                            showToast('Foto do roteiro carregada com sucesso!', 'success');
+                          }
+                        } catch (err: any) {
+                          showToast('Falha no upload de foto: ' + (err?.message || 'Erro'), 'info');
+                        } finally {
+                          setIsUploadingRoutePhoto(false);
+                          e.target.value = '';
+                        }
+                      }} 
                     />
+
+                    {/* Grade de 3 Fotos com Carrossel e Remoção */}
+                    <div className="grid grid-cols-3 gap-2.5">
+                      {[0, 1, 2].map((slotIdx) => {
+                        const pUrl = editRouteImages[slotIdx];
+                        return (
+                          <div 
+                            key={slotIdx}
+                            onClick={() => {
+                              if (pUrl) {
+                                openCarousel(editRouteImages, slotIdx, editRouteName || 'Foto do Roteiro', `${editRouteMapsAddress} - ${editRouteUf}`);
+                              } else if (!isUploadingRoutePhoto) {
+                                editRouteFileInputRef.current?.click();
+                              }
+                            }}
+                            className={cn(
+                              "relative aspect-[4/3] rounded-xl overflow-hidden border transition-all flex flex-col items-center justify-center cursor-pointer group",
+                              pUrl 
+                                ? "border-slate-700 bg-slate-950 shadow-md" 
+                                : "border-dashed border-slate-800 bg-slate-950/40 hover:border-amber-500/50 hover:bg-slate-900/50"
+                            )}
+                          >
+                            {pUrl ? (
+                              <>
+                                <img src={pUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-slate-950/85 text-[8px] font-black uppercase text-white">
+                                  {slotIdx === 0 ? 'Capa' : `Foto ${slotIdx + 1}`}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditRouteImages(prev => {
+                                      const next = prev.filter((_, i) => i !== slotIdx);
+                                      setEditRouteImage(next[0] || '');
+                                      return next;
+                                    });
+                                  }}
+                                  className="absolute top-1 right-1 p-1 rounded-full bg-rose-600 hover:bg-rose-500 text-white shadow-md z-10 cursor-pointer"
+                                  title="Remover foto"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </>
+                            ) : (
+                              <div className="text-center p-2">
+                                <Upload size={14} className="mx-auto text-slate-500 group-hover:text-amber-400 mb-1" />
+                                <span className="text-[9px] font-bold text-slate-400 group-hover:text-white block">
+                                  {isUploadingRoutePhoto ? 'Enviando...' : '+ Carregar Foto'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
@@ -4912,10 +5134,19 @@ export function CommandCenter() {
                     </button>
                     <button
                       type="button"
+                      disabled={isApprovingRoute}
                       onClick={() => handleSaveAndApproveRoute(viewingRouteModal.id)}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 cursor-pointer"
+                      className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:opacity-60 text-white rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 cursor-pointer disabled:cursor-not-allowed transition-all"
                     >
-                      <CheckCircle size={14} /> SALVAR EDIÇÃO & APROVAR ROTEIRO
+                      {isApprovingRoute ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" /> SALVANDO & APROVANDO...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle size={14} /> SALVAR EDIÇÃO & APROVAR ROTEIRO
+                        </>
+                      )}
                     </button>
                   </>
                 ) : (
@@ -4965,6 +5196,89 @@ export function CommandCenter() {
                 )}
               </div>
 
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* MODAL DE CONFIRMAÇÃO VISUAL: ROTEIRO APROVADO COM SUCESSO (CENTRO DE COMANDO) */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {routeApprovalSuccess && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-[60] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div 
+              initial={{ scale: 0.92, y: 20 }} 
+              animate={{ scale: 1, y: 0 }} 
+              exit={{ scale: 0.92, y: 20 }} 
+              className="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-5 shadow-2xl relative overflow-hidden my-6"
+            >
+              {/* Green Glow */}
+              <div className="absolute top-0 right-0 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+
+              <div className="text-center space-y-2 pt-2">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
+                  <CheckCircle size={36} className="text-emerald-400" />
+                </div>
+                <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
+                  <Check size={12} />
+                  STATUS: APROVADO & PUBLICADO NO BANCO MYSQL
+                </span>
+                <h2 className="text-2xl font-black italic uppercase tracking-tight text-white">
+                  ROTEIRO APROVADO COM SUCESSO!
+                </h2>
+                <p className="text-xs text-slate-300">
+                  A moderação foi concluída e gravada com sucesso. O roteiro agora está ativo e visível publicamente no catálogo comunitário.
+                </p>
+              </div>
+
+              {/* Route Summary */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black italic uppercase text-white truncate max-w-[260px]">
+                    {routeApprovalSuccess.name}
+                  </h4>
+                  <span className="px-2.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 text-[10px] font-black uppercase shrink-0">
+                    {routeApprovalSuccess.difficulty}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 flex items-center gap-1 truncate">
+                  <MapPin size={13} className="text-orange-500 shrink-0" />
+                  {routeApprovalSuccess.mapsAddress}
+                </p>
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Autor: <strong className="text-slate-200">{routeApprovalSuccess.author?.name || 'Piloto'}</strong></span>
+                  <span className="text-emerald-400 font-bold flex items-center gap-1">
+                    <ShieldCheck size={12} /> Visível no Catálogo
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-2 pt-2">
+                <button 
+                  onClick={() => {
+                    setRouteApprovalSuccess(null);
+                    navigate('/routes');
+                  }}
+                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                >
+                  <Eye size={14} />
+                  <span>VER NO CATÁLOGO DE ROTEIROS</span>
+                </button>
+
+                <button 
+                  onClick={() => setRouteApprovalSuccess(null)}
+                  className="w-full py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Continuar Moderando
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

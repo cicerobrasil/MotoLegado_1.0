@@ -7,13 +7,16 @@ import {
   RotateCcw, 
   ExternalLink, 
   Maximize2,
-  Image as ImageIcon 
+  Image as ImageIcon,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useImageLightbox } from '../context/ImageLightboxContext';
+import { cn } from '../lib/utils';
 
 export function GlobalImageLightbox() {
-  const { state, closeImage } = useImageLightbox();
+  const { state, closeImage, nextImage, prevImage, goToIndex } = useImageLightbox();
   const [zoomLevel, setZoomLevel] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -130,9 +133,16 @@ export function GlobalImageLightbox() {
               <ImageIcon size={18} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm sm:text-base font-black italic uppercase tracking-tight text-white truncate">
-                {state.title || 'Visualização da Foto'}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm sm:text-base font-black italic uppercase tracking-tight text-white truncate">
+                  {state.title || 'Visualização da Foto'}
+                </h3>
+                {state.images && state.images.length > 1 && (
+                  <span className="px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-400 text-[10px] font-mono font-bold shrink-0">
+                    {state.currentIndex + 1} de {state.images.length}
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] font-medium text-slate-400 truncate">
                 {state.subtitle || 'MotoLegado • Foto em tamanho completo'}
               </p>
@@ -216,10 +226,33 @@ export function GlobalImageLightbox() {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
         >
+          {/* Navegação de Carrossel (Setas Laterais) */}
+          {state.images && state.images.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 p-2.5 sm:p-3 rounded-2xl bg-slate-950/85 hover:bg-orange-600 text-white border border-slate-700/80 hover:border-orange-500 shadow-2xl backdrop-blur-md transition-all cursor-pointer group active:scale-90"
+                title="Foto Anterior (Seta Esquerda)"
+              >
+                <ChevronLeft size={22} className="group-hover:-translate-x-0.5 transition-transform" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 p-2.5 sm:p-3 rounded-2xl bg-slate-950/85 hover:bg-orange-600 text-white border border-slate-700/80 hover:border-orange-500 shadow-2xl backdrop-blur-md transition-all cursor-pointer group active:scale-90"
+                title="Próxima Foto (Seta Direita)"
+              >
+                <ChevronRight size={22} className="group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </>
+          )}
+
           <motion.div
-            initial={{ scale: 0.92, opacity: 0 }}
+            key={state.imageUrl}
+            initial={{ scale: 0.94, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.92, opacity: 0 }}
+            exit={{ scale: 0.94, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
             onDoubleClick={handleToggleZoom}
@@ -233,11 +266,39 @@ export function GlobalImageLightbox() {
             <img
               src={state.imageUrl}
               alt={state.title || 'Foto'}
-              className="max-w-full max-h-[75vh] sm:max-h-[80vh] w-auto h-auto object-contain rounded-2xl shadow-2xl border border-slate-800/80 pointer-events-auto"
+              className="max-w-full max-h-[70vh] sm:max-h-[76vh] w-auto h-auto object-contain rounded-2xl shadow-2xl border border-slate-800/80 pointer-events-auto"
               draggable={false}
             />
           </motion.div>
         </div>
+
+        {/* Carrossel de Miniaturas (quando há mais de uma foto) */}
+        {state.images && state.images.length > 1 && (
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="flex items-center gap-2 p-1.5 bg-slate-950/85 border border-slate-800 rounded-2xl backdrop-blur-md max-w-full overflow-x-auto z-10 mb-2 shadow-2xl scrollbar-none"
+          >
+            {state.images.map((img, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => goToIndex(idx)}
+                className={cn(
+                  "relative w-12 h-12 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer",
+                  idx === state.currentIndex 
+                    ? "border-orange-500 ring-2 ring-orange-500/50 scale-105" 
+                    : "border-slate-800 opacity-60 hover:opacity-100 hover:border-slate-700"
+                )}
+                title={`Ir para foto ${idx + 1}`}
+              >
+                <img src={img} alt={`Miniatura ${idx + 1}`} className="w-full h-full object-cover" />
+                {idx === state.currentIndex && (
+                  <div className="absolute inset-0 bg-orange-500/20" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Footer Hint Bar */}
         <div 
@@ -246,10 +307,10 @@ export function GlobalImageLightbox() {
         >
           <span className="flex items-center gap-1.5">
             <Maximize2 size={12} className="text-orange-500" />
-            Duplo clique ou use a roda do mouse para dar zoom
+            Duplo clique para zoom {state.images && state.images.length > 1 ? '• Use as setas para navegar' : ''}
           </span>
           <span className="text-slate-600">•</span>
-          <span className="text-slate-500">Pressione <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[9px]">ESC</kbd> ou clique fora para fechar</span>
+          <span className="text-slate-500">Pressione <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[9px]">ESC</kbd> para fechar</span>
         </div>
       </motion.div>
     </AnimatePresence>

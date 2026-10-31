@@ -3,25 +3,37 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 export interface ImageLightboxState {
   isOpen: boolean;
   imageUrl: string;
+  images: string[];
+  currentIndex: number;
   title?: string;
   subtitle?: string;
 }
 
 interface ImageLightboxContextType {
   state: ImageLightboxState;
-  openImage: (url: string, title?: string, subtitle?: string) => void;
+  openImage: (url: string, title?: string, subtitle?: string, images?: string[], initialIndex?: number) => void;
+  openCarousel: (images: string[], initialIndex?: number, title?: string, subtitle?: string) => void;
+  nextImage: () => void;
+  prevImage: () => void;
+  goToIndex: (index: number) => void;
   closeImage: () => void;
 }
 
 const ImageLightboxContext = createContext<ImageLightboxContextType | undefined>(undefined);
 
 /**
- * Função utilitária global para abrir o popup de imagem de qualquer lugar da aplicação
+ * Função utilitária global para abrir o popup de imagem / carrossel de qualquer lugar da aplicação
  */
-export function triggerGlobalImageLightbox(imageUrl: string, title?: string, subtitle?: string) {
-  if (!imageUrl) return;
+export function triggerGlobalImageLightbox(
+  imageUrl: string, 
+  title?: string, 
+  subtitle?: string,
+  images?: string[],
+  initialIndex?: number
+) {
+  if (!imageUrl && (!images || images.length === 0)) return;
   window.dispatchEvent(new CustomEvent('motolegado_open_lightbox', {
-    detail: { imageUrl, title, subtitle }
+    detail: { imageUrl, title, subtitle, images, initialIndex }
   }));
 }
 
@@ -29,17 +41,85 @@ export function ImageLightboxProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ImageLightboxState>({
     isOpen: false,
     imageUrl: '',
+    images: [],
+    currentIndex: 0,
     title: '',
     subtitle: '',
   });
 
-  const openImage = useCallback((url: string, title?: string, subtitle?: string) => {
-    if (!url) return;
+  const openImage = useCallback((
+    url: string, 
+    title?: string, 
+    subtitle?: string,
+    imagesList?: string[],
+    initialIndex?: number
+  ) => {
+    const list = Array.isArray(imagesList) && imagesList.length > 0
+      ? imagesList.filter(Boolean)
+      : (url ? [url] : []);
+
+    if (list.length === 0) return;
+
+    let targetIdx = typeof initialIndex === 'number' && initialIndex >= 0 && initialIndex < list.length
+      ? initialIndex
+      : list.indexOf(url);
+    if (targetIdx < 0) targetIdx = 0;
+
     setState({
       isOpen: true,
-      imageUrl: url,
+      imageUrl: list[targetIdx] || url,
+      images: list,
+      currentIndex: targetIdx,
       title: title || 'Visualização da Foto',
       subtitle: subtitle || 'MotoLegado • Registro em alta resolução',
+    });
+  }, []);
+
+  const openCarousel = useCallback((
+    images: string[],
+    initialIndex: number = 0,
+    title?: string,
+    subtitle?: string
+  ) => {
+    const valid = Array.isArray(images) ? images.filter(Boolean) : [];
+    if (valid.length === 0) return;
+    const safeIdx = Math.max(0, Math.min(initialIndex, valid.length - 1));
+    openImage(valid[safeIdx], title, subtitle, valid, safeIdx);
+  }, [openImage]);
+
+  const goToIndex = useCallback((index: number) => {
+    setState(prev => {
+      if (!prev.images || prev.images.length === 0) return prev;
+      const safeIndex = (index + prev.images.length) % prev.images.length;
+      return {
+        ...prev,
+        currentIndex: safeIndex,
+        imageUrl: prev.images[safeIndex]
+      };
+    });
+  }, []);
+
+  const nextImage = useCallback(() => {
+    setState(prev => {
+      if (!prev.images || prev.images.length <= 1) return prev;
+      const nextIdx = (prev.currentIndex + 1) % prev.images.length;
+      return {
+        ...prev,
+        currentIndex: nextIdx,
+        imageUrl: prev.images[nextIdx]
+      };
+    });
+  }, []);
+
+  const prevImage = useCallback(() => {
+    setState(prev => {
+      if (!prev.images || prev.images.length <= 1) return prev;
+      const prevIdx = (prev.currentIndex - 1 + prev.images.length) % prev.images.length;
+      return {
+        ...prev,
+        currentIndex: prevIdx,
+        imageUrl: prev.images[prevIdx]
+      };
     });
   }, []);
 
@@ -50,9 +130,21 @@ export function ImageLightboxProvider({ children }: { children: ReactNode }) {
   // 1. Escuta evento global disparado por qualquer componente
   useEffect(() => {
     const handleCustomOpen = (e: Event) => {
-      const customEvent = e as CustomEvent<{ imageUrl: string; title?: string; subtitle?: string }>;
-      if (customEvent.detail?.imageUrl) {
-        openImage(customEvent.detail.imageUrl, customEvent.detail.title, customEvent.detail.subtitle);
+      const customEvent = e as CustomEvent<{ 
+        imageUrl: string; 
+        title?: string; 
+        subtitle?: string;
+        images?: string[];
+        initialIndex?: number;
+      }>;
+      if (customEvent.detail) {
+        openImage(
+          customEvent.detail.imageUrl, 
+          customEvent.detail.title, 
+          customEvent.detail.subtitle,
+          customEvent.detail.images,
+          customEvent.detail.initialIndex
+        );
       }
     };
 
@@ -116,20 +208,33 @@ export function ImageLightboxProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('click', handleDocumentClick, { capture: true });
   }, [openImage]);
 
-  // 3. Atalho de tecla Esc para fechar o popup
+  // 3. Atalhos de teclado: Esc para fechar, setas para navegar no carrossel
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && state.isOpen) {
+      if (!state.isOpen) return;
+      if (e.key === 'Escape') {
         closeImage();
+      } else if (e.key === 'ArrowRight') {
+        nextImage();
+      } else if (e.key === 'ArrowLeft') {
+        prevImage();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.isOpen, closeImage]);
+  }, [state.isOpen, closeImage, nextImage, prevImage]);
 
   return (
-    <ImageLightboxContext.Provider value={{ state, openImage, closeImage }}>
+    <ImageLightboxContext.Provider value={{ 
+      state, 
+      openImage, 
+      openCarousel, 
+      nextImage, 
+      prevImage, 
+      goToIndex, 
+      closeImage 
+    }}>
       {children}
     </ImageLightboxContext.Provider>
   );

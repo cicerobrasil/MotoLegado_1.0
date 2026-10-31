@@ -588,7 +588,13 @@ export class HostingerDbService {
     const title = route.title || route.name || 'Roteiro de Moto';
     const desc = route.description || '';
     const status = route.status || 'pendente';
-    const coverImage = (route as any).cover_image || (route as any).image || (route as any).banner_url || null;
+    const rawImages = Array.isArray((route as any).images) 
+      ? (route as any).images.filter((img: any) => typeof img === 'string' && img.trim()) 
+      : [];
+    const coverImage = (route as any).cover_image || (route as any).image || rawImages[0] || (route as any).banner_url || null;
+    const finalImages = rawImages.length > 0 ? rawImages.slice(0, 3) : (coverImage ? [coverImage] : []);
+    const ufState = (route as any).uf || route.state || null;
+    const cityName = route.city || null;
 
     // 1. Persistência imediata garantida no arquivo local store.json
     const localSaved = storeSaveRoute({
@@ -599,7 +605,11 @@ export class HostingerDbService {
       description: desc,
       status,
       cover_image: coverImage,
-      image: coverImage
+      image: coverImage,
+      images: finalImages,
+      state: ufState,
+      uf: ufState,
+      city: cityName
     });
 
     // 2. Persistência no MySQL da Hostinger
@@ -646,8 +656,8 @@ export class HostingerDbService {
         route.maps_url || null,
         route.rider_tips || null,
         route.ai_tourist_info || null,
-        route.state || null,
-        route.city || null,
+        ufState,
+        cityName,
         route.distance_km || 0,
         route.duration || null,
         route.difficulty || 'Médio',
@@ -716,12 +726,25 @@ export class HostingerDbService {
     }
 
     const effectiveImage = row.cover_image || row.image || row.banner_url || null;
+    let images = row.images;
+    if (typeof images === 'string') {
+      try { images = JSON.parse(images); } catch { images = []; }
+    }
+    if (!Array.isArray(images) || images.length === 0) {
+      images = effectiveImage ? [effectiveImage] : [];
+    }
+
+    const stateUf = row.state || row.uf || null;
 
     return {
       ...row,
       name: row.title || row.name,
       image: effectiveImage,
       cover_image: effectiveImage,
+      images: Array.isArray(images) ? images.slice(0, 3) : [],
+      state: stateUf,
+      uf: stateUf,
+      city: row.city || null,
       mapsAddress: row.maps_address || row.mapsAddress,
       mapsUrl: row.maps_url || row.mapsUrl,
       riderTips: row.rider_tips || row.riderTips,
